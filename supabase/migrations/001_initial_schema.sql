@@ -144,16 +144,6 @@ CREATE TABLE po_line_items (
   created_at timestamptz DEFAULT now()
 );
 
-CREATE TABLE po_attachments (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  po_id uuid NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
-  uploaded_by uuid NOT NULL REFERENCES users(id),
-  file_name text NOT NULL,
-  file_url text NOT NULL,
-  file_size_kb integer,
-  created_at timestamptz DEFAULT now()
-);
-
 -- ============================================================
 -- Row Level Security
 -- ============================================================
@@ -168,7 +158,6 @@ ALTER TABLE departments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE po_line_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE po_attachments ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================
 -- RLS Policies — all scoped to the authenticated user's company
@@ -212,13 +201,6 @@ CREATE POLICY "Users see own POs"
 
 CREATE POLICY "Users see own PO lines"
   ON po_line_items FOR ALL
-  USING (po_id IN (
-    SELECT id FROM purchase_orders
-    WHERE company_id = (SELECT company_id FROM users WHERE id = auth.uid())
-  ));
-
-CREATE POLICY "Users see own PO attachments"
-  ON po_attachments FOR ALL
   USING (po_id IN (
     SELECT id FROM purchase_orders
     WHERE company_id = (SELECT company_id FROM users WHERE id = auth.uid())
