@@ -1,0 +1,72 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { AuthProvider } from './hooks/useAuth'
+import { LanguageProvider } from './hooks/useLanguage'
+import { Toaster } from './components/ui/Toast'
+import AppLayout from './components/layout/AppLayout'
+import LandingPage from './pages/LandingPage'
+import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
+import OnboardingPage from './pages/OnboardingPage'
+import DashboardPage from './pages/DashboardPage'
+import SuppliersPage from './pages/SuppliersPage'
+import CategoriesPage from './pages/CategoriesPage'
+import ProjectsPage from './pages/ProjectsPage'
+import LocationsPage from './pages/LocationsPage'
+import DepartmentsPage from './pages/DepartmentsPage'
+import ItemsPage from './pages/ItemsPage'
+import PurchaseOrdersPage from './pages/PurchaseOrdersPage'
+import POFormPage from './pages/POFormPage'
+import PODetailPage from './pages/PODetailPage'
+import SettingsPage from './pages/SettingsPage'
+import PrivacyPage from './pages/PrivacyPage'
+import TermsPage from './pages/TermsPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
+
+const queryClient = new QueryClient()
+
+function App({ children }: { children: React.ReactNode }) {
+  return <AppLayout>{children}</AppLayout>
+}
+
+export default function Root() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <LanguageProvider>
+          <Toaster />
+          <Routes>
+            {/* Public */}
+            <Route path="/"            element={<LandingPage />} />
+            <Route path="/login"       element={<LoginPage />} />
+            <Route path="/register"    element={<RegisterPage />} />
+            <Route path="/onboarding"  element={<OnboardingPage />} />
+            <Route path="/privacy"          element={<PrivacyPage />} />
+            <Route path="/terms"            element={<TermsPage />} />
+            <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
+            <Route path="/reset-password"   element={<ResetPasswordPage />} />
+
+            {/* Protected app */}
+            <Route path="/dashboard"              element={<App><DashboardPage /></App>} />
+            <Route path="/purchase-orders"        element={<App><PurchaseOrdersPage /></App>} />
+            <Route path="/purchase-orders/new"    element={<App><POFormPage /></App>} />
+            <Route path="/purchase-orders/:id"    element={<App><PODetailPage /></App>} />
+            <Route path="/purchase-orders/:id/edit" element={<App><POFormPage /></App>} />
+            <Route path="/suppliers"              element={<App><SuppliersPage /></App>} />
+            <Route path="/items"                  element={<App><ItemsPage /></App>} />
+            <Route path="/categories"             element={<App><CategoriesPage /></App>} />
+            <Route path="/projects"               element={<App><ProjectsPage /></App>} />
+            <Route path="/locations"              element={<App><LocationsPage /></App>} />
+            <Route path="/departments"            element={<App><DepartmentsPage /></App>} />
+            <Route path="/settings"               element={<App><SettingsPage /></App>} />
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+          </LanguageProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  )
+}
