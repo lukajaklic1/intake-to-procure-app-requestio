@@ -152,7 +152,7 @@ export default function ItemsPage() {
       <div className="flex gap-2 mb-5 flex-wrap">
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={"Išči artikle..."}
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
             className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
         </div>
         <select
@@ -223,12 +223,12 @@ export default function ItemsPage() {
       {/* Modal */}
       <Pagination total={filtered.length} page={page} pageSize={PAGE_SIZE} onChange={setPage} />
 
-      <Modal open={modalOpen} onClose={closeModal} title={editing.id ? 'Uredi artikel' : s.new} size="md">
+      <Modal open={modalOpen} onClose={closeModal} title={editing.id ? t.common.editEntity : s.new} size="md">
         <div className="flex flex-col gap-4">
           {/* Item number — read-only when editing */}
           {editing.id && (
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">Šifra artikla</label>
+              <label className="text-sm font-medium text-gray-700">{s.itemNumber}</label>
               <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono text-gray-500">
                 {editing.item_number}
               </div>
@@ -248,7 +248,6 @@ export default function ItemsPage() {
               value={editing.long_description ?? ''}
               onChange={e => setEditing(f => ({ ...f, long_description: e.target.value }))}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              placeholder="Tehnični opis, specifikacije..."
             />
           </div>
 
@@ -290,9 +289,7 @@ export default function ItemsPage() {
                   {editing.status === 'active' ? t.common.statusActive : t.common.statusInactive}
                 </p>
                 <p className="text-xs text-gray-400">
-                  {editing.status === 'active'
-                    ? 'Artikel je na voljo v katalogu pri ustvarjanju naročil.'
-                    : 'Artikel je skrit iz kataloga. Obstoječa naročila niso prizadeta.'}
+                  {s.statusHelp}
                 </p>
               </div>
               <button
@@ -315,9 +312,9 @@ export default function ItemsPage() {
       <ConfirmDialog
         open={!!confirmDelete} onClose={() => setConfirmDelete(null)}
         onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
-        title="Izbriši" danger loading={actionLoading}
-        message={`Izbriši "${confirmDelete?.name}" (${confirmDelete?.item_number})? Brisanje ne bo mogoče, če je artikel v uporabi na naročilih.`}
-        confirmLabel="Izbriši"
+        title={t.common.deleteEntity} danger loading={actionLoading}
+        message={`${t.common.deleteEntity} "${confirmDelete?.name}" (${confirmDelete?.item_number})? ${t.common.cannotUndo} ${t.common.deleteInUse}`}
+        confirmLabel={t.common.deleteEntity}
       />
     </div>
   )

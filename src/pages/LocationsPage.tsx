@@ -101,7 +101,7 @@ export default function LocationsPage() {
       <div className="flex gap-2 mb-5 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={"Išči lokacije..."}
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
             className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
         </div>
         {(['all', 'active', 'inactive'] as const).map(v => (
@@ -152,7 +152,7 @@ export default function LocationsPage() {
 
       <Pagination total={filtered.length} page={page} pageSize={PAGE_SIZE} onChange={setPage} />
 
-      <Modal open={modalOpen} onClose={closeModal} title={editing.id ? 'Uredi lokacijo' : s.new} size="md">
+      <Modal open={modalOpen} onClose={closeModal} title={editing.id ? t.common.editEntity : s.new} size="md">
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2"><Input id="l-name" label={s.locationName + " *"} {...field('name')} /></div>
           <div className="col-span-2"><Input id="l-street" label={t.common.streetAddress + ' *'} {...field('address_street')} /></div>
@@ -188,8 +188,8 @@ export default function LocationsPage() {
 
       <ConfirmDialog open={!!confirmDelete} onClose={() => setConfirmDelete(null)}
         onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
-        title="Izbriši" danger loading={actionLoading}
-        message={`Izbriši "${confirmDelete?.name}"? Brisanje ne bo mogoče, če je lokacija v uporabi na naročilih.`} confirmLabel="Izbriši" />
+        title={t.common.deleteEntity} danger loading={actionLoading}
+        message={`${t.common.deleteEntity} "${confirmDelete?.name}"? ${t.common.cannotUndo} ${t.common.deleteInUse}`} confirmLabel={t.common.deleteEntity} />
     </div>
   )
 }

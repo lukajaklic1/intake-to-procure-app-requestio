@@ -264,15 +264,15 @@ export default function PurchaseOrdersPage() {
                     <div className="flex items-center gap-1 justify-end">
                       {po.status === 'draft' ? (
                         <>
-                          <Link to={`/purchase-orders/${po.id}/edit`} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Uredi">
+                          <Link to={`/purchase-orders/${po.id}/edit`} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title={t.common.editEntity}>
                             <Pencil className="w-3.5 h-3.5" />
                           </Link>
-                          <button onClick={() => setConfirmDelete(po)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Izbriši">
+                          <button onClick={() => setConfirmDelete(po)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title={t.common.deleteEntity}>
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </>
                       ) : (
-                        <Link to={`/purchase-orders/${po.id}`} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Poglej">
+                        <Link to={`/purchase-orders/${po.id}`} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title={t.common.view}>
                           <Eye className="w-3.5 h-3.5" />
                         </Link>
                       )}
@@ -289,9 +289,9 @@ export default function PurchaseOrdersPage() {
       <ConfirmDialog
         open={!!confirmDelete} onClose={() => setConfirmDelete(null)}
         onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
-        title="Izbriši naročilo" danger loading={actionLoading}
-        message={`Izbriši naročilo ${confirmDelete?.po_number}? Vse postavke bodo tudi izbrisane. Tega ni mogoče razveljaviti.`}
-        confirmLabel="Izbriši"
+        title={t.common.deleteEntity} danger loading={actionLoading}
+        message={`${t.common.deleteEntity} ${confirmDelete?.po_number}? ${t.common.cannotUndo}`}
+        confirmLabel={t.common.deleteEntity}
       />
     </div>
   )

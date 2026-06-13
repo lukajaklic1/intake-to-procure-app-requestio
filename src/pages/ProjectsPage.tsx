@@ -30,15 +30,25 @@ export default function ProjectsPage() {
   const [confirmDelete, setConfirmDelete] = useState<Project | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [page, setPage] = useState(1)
+  const [members, setMembers] = useState<{ id: string; first_name: string; last_name: string }[]>([])
 
   useEffect(() => { if (company) load() }, [company])
 
   async function load() {
     if (!company) return
     setLoading(true)
-    const { data } = await supabase.from('projects').select('*').eq('company_id', company.id).order('created_at', { ascending: false })
+    const [{ data }, { data: usersData }] = await Promise.all([
+      supabase.from('projects').select('*').eq('company_id', company.id).order('created_at', { ascending: false }),
+      supabase.from('users').select('id, first_name, last_name').eq('company_id', company.id).order('first_name'),
+    ])
     setProjects(data ?? [])
+    setMembers(usersData ?? [])
     setLoading(false)
+  }
+
+  const managerName = (id: string | null) => {
+    const m = members.find(u => u.id === id)
+    return m ? `${m.first_name} ${m.last_name}` : '—'
   }
 
   function openNew() { setEditing({ ...EMPTY }); setModalOpen(true) }
@@ -51,6 +61,7 @@ export default function ProjectsPage() {
 
   async function save() {
     if (!company || !editing.name?.trim()) { toast.error(t.common.nameRequired); return }
+    if (!editing.manager_id) { toast.error(s.manager + ' *'); return }
     setSaving(true)
     const payload = { ...editing, start_date: editing.start_date || null, end_date: editing.end_date || null }
     if (editing.id) {
@@ -100,7 +111,7 @@ export default function ProjectsPage() {
       <div className="flex gap-2 mb-5 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={"Išči projekte..."}
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
             className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
         </div>
         {(['all', 'active', 'inactive'] as const).map(v => (
@@ -123,7 +134,7 @@ export default function ProjectsPage() {
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]">
             <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>{[t.common.name, s.projectCode, s.customer, s.startDate, s.endDate, t.common.status, ''].map(h => (
+              <tr>{[t.common.name, s.projectCode, s.customer, s.manager, s.startDate, s.endDate, t.common.status, ''].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
               ))}</tr>
             </thead>
@@ -133,6 +144,7 @@ export default function ProjectsPage() {
                   <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">{p.project_code ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{p.customer ?? '—'}</td>
+                  <td className="px-4 py-3 text-gray-600">{managerName(p.manager_id)}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{p.start_date ? new Date(p.start_date).toLocaleDateString('de-DE') : '—'}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{p.end_date ? new Date(p.end_date).toLocaleDateString('de-DE') : '—'}</td>
                   <td className="px-4 py-3">
@@ -153,11 +165,20 @@ export default function ProjectsPage() {
 
       <Pagination total={filtered.length} page={page} pageSize={PAGE_SIZE} onChange={setPage} />
 
-      <Modal open={modalOpen} onClose={closeModal} title={editing.id ? 'Uredi projekt' : s.new} size="md">
+      <Modal open={modalOpen} onClose={closeModal} title={editing.id ? t.common.editEntity : s.new} size="md">
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2"><Input id="p-name" label={s.projectName + " *"} {...field('name')} /></div>
           <Input id="p-code" label={s.projectCode} {...field('project_code')} />
           <Input id="p-customer" label={s.customer} {...field('customer')} />
+          <div className="col-span-2 flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">{s.manager} *</label>
+            <select value={editing.manager_id ?? ''} onChange={e => setEditing(f => ({ ...f, manager_id: e.target.value || null }))}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              <option value="">{s.selectManager}</option>
+              {members.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
+            </select>
+            <p className="text-xs text-gray-400">{s.managerHint}</p>
+          </div>
           <Input id="p-start" label={s.startDate} type="date" {...field('start_date')} />
           <Input id="p-end" label={s.endDate} type="date" {...field('end_date')} />
 
@@ -189,8 +210,8 @@ export default function ProjectsPage() {
 
       <ConfirmDialog open={!!confirmDelete} onClose={() => setConfirmDelete(null)}
         onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
-        title="Izbriši" danger loading={actionLoading}
-        message={`Izbriši "${confirmDelete?.name}"? Brisanje ne bo mogoče, če je projekt v uporabi na naročilih.`} confirmLabel="Izbriši" />
+        title={t.common.deleteEntity} danger loading={actionLoading}
+        message={`${t.common.deleteEntity} "${confirmDelete?.name}"? ${t.common.cannotUndo} ${t.common.deleteInUse}`} confirmLabel={t.common.deleteEntity} />
     </div>
   )
 }

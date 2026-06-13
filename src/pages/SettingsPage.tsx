@@ -32,8 +32,15 @@ export default function SettingsPage() {
   // Personal profile
   const [profile, setProfile] = useState({ first_name: '', last_name: '', phone: '' })
   const [profileUserId, setProfileUserId] = useState<string | null>(null)
+  const [members, setMembers] = useState<{ id: string; first_name: string; last_name: string }[]>([])
 
   useEffect(() => { if (company) setForm(company) }, [company])
+
+  useEffect(() => {
+    if (!company || !isAdmin) return
+    supabase.from('users').select('id, first_name, last_name').eq('company_id', company.id).order('first_name')
+      .then(({ data }) => setMembers(data ?? []))
+  }, [company, isAdmin])
 
   useEffect(() => {
     async function loadProfile() {
@@ -162,12 +169,18 @@ export default function SettingsPage() {
           <Section icon={ShieldCheck} title={s.approvalsSettings}>
             <p className="text-xs text-gray-400 mb-4">{s.approvalsSettingsHint}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input id="approval_auto_under" label={s.autoApproveUnder} type="number"
-                value={form.approval_auto_under?.toString() ?? ''}
-                onChange={e => setForm(f => ({ ...f, approval_auto_under: e.target.value === '' ? null : parseFloat(e.target.value) }))} />
               <Input id="approval_second_over" label={s.secondApprovalOver} type="number"
                 value={form.approval_second_over?.toString() ?? ''}
                 onChange={e => setForm(f => ({ ...f, approval_second_over: e.target.value === '' ? null : parseFloat(e.target.value) }))} />
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-700">{s.secondApprover}</label>
+                <select value={form.second_approver_id ?? ''}
+                  onChange={e => setForm(f => ({ ...f, second_approver_id: e.target.value || null }))}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  <option value="">{s.selectApprover}</option>
+                  {members.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
+                </select>
+              </div>
             </div>
             <label className="flex items-center gap-2 mt-4 text-sm text-gray-700">
               <input type="checkbox" checked={form.team_edit_requests ?? false}
@@ -176,7 +189,7 @@ export default function SettingsPage() {
               {s.teamEditRequests}
             </label>
             <div className="mt-4 flex justify-end">
-              <Button loading={saving === 'approvals'} onClick={() => save('approvals', ['approval_auto_under', 'approval_second_over', 'team_edit_requests'])}>
+              <Button loading={saving === 'approvals'} onClick={() => save('approvals', ['approval_second_over', 'second_approver_id', 'team_edit_requests'])}>
                 {t.common.save}
               </Button>
             </div>

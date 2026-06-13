@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Building2, Package,
   Tag, FolderOpen, MapPin, Users, UserCog, Settings, LogOut, X,
+  ClipboardList, CheckCircle2,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useCompany } from '../../hooks/useCompany'
@@ -11,6 +12,8 @@ import AppLogo from '../ui/AppLogo'
 
 const NAV_KEYS = [
   { to: '/dashboard',       icon: LayoutDashboard, key: 'dashboard' as const },
+  { to: '/requests',        icon: ClipboardList,    key: 'myRequests' as const },
+  { to: '/approvals',       icon: CheckCircle2,     key: 'approvals' as const },
   { to: '/purchase-orders', icon: FileText,         key: 'purchaseOrders' as const },
   { to: '/suppliers',       icon: Building2,        key: 'suppliers' as const },
   { to: '/items',           icon: Package,          key: 'items' as const },

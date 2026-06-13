@@ -53,10 +53,10 @@ export default function SuppliersPage() {
   }
 
   async function save() {
-    if (!company || !editing.name?.trim()) { toast.error('Ime podjetja je obvezno'); return }
-    if (!editing.vat_number?.trim()) { toast.error('Davčna številka je obvezna'); return }
-    if (!editing.address_street?.trim()) { toast.error('Ulica je obvezna'); return }
-    if (!editing.address_city?.trim()) { toast.error('Kraj je obvezen'); return }
+    if (!company || !editing.name?.trim()) { toast.error(t.common.nameRequired); return }
+    if (!editing.vat_number?.trim()) { toast.error(t.common.nameRequired); return }
+    if (!editing.address_street?.trim()) { toast.error(t.common.nameRequired); return }
+    if (!editing.address_city?.trim()) { toast.error(t.common.nameRequired); return }
     setSaving(true)
     if (editing.id) {
       const { error } = await supabase.from('suppliers').update({ ...editing, updated_at: new Date().toISOString() }).eq('id', editing.id)
@@ -106,7 +106,7 @@ export default function SuppliersPage() {
       <div className="flex gap-2 mb-5 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={"Išči dobavitelje..."}
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
             className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
         </div>
         {(['all', 'active', 'inactive'] as const).map(v => (
@@ -166,7 +166,7 @@ export default function SuppliersPage() {
       <Pagination total={filtered.length} page={page} pageSize={PAGE_SIZE} onChange={setPage} />
 
       {/* Create / Edit Modal */}
-      <Modal open={modalOpen} onClose={closeModal} title={editing.id ? 'Uredi dobavitelja' : s.new} size="lg">
+      <Modal open={modalOpen} onClose={closeModal} title={editing.id ? t.common.editEntity : s.new} size="lg">
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2"><Input id="s-name" label={s.companyName + ' *'} {...field('name')} /></div>
           <Input id="s-vat" label={s.vatNumber + ' *'} {...field('vat_number')} />
@@ -212,9 +212,9 @@ export default function SuppliersPage() {
       <ConfirmDialog
         open={!!confirmDelete} onClose={() => setConfirmDelete(null)}
         onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
-        title="Izbriši" danger loading={actionLoading}
-        message={`Izbriši "${confirmDelete?.name}"? Tega ni mogoče razveljaviti. Brisanje ne bo mogoče, če ima dobavitelj naročila.`}
-        confirmLabel="Izbriši"
+        title={t.common.deleteEntity} danger loading={actionLoading}
+        message={`${t.common.deleteEntity} "${confirmDelete?.name}"? ${t.common.cannotUndo} ${t.common.deleteInUse}`}
+        confirmLabel={t.common.deleteEntity}
       />
     </div>
   )

@@ -88,7 +88,7 @@ export default function DepartmentsPage() {
       <div className="flex gap-2 mb-5 flex-wrap">
         <div className="relative max-w-sm w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={"Išči oddelke..."}
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
             className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
         </div>
       </div>
@@ -131,7 +131,7 @@ export default function DepartmentsPage() {
 
       <Pagination total={filtered.length} page={page} pageSize={PAGE_SIZE} onChange={setPage} />
 
-      <Modal open={modalOpen} onClose={closeModal} title={editing.id ? 'Uredi oddelek' : 'Nov oddelek'} size="sm">
+      <Modal open={modalOpen} onClose={closeModal} title={editing.id ? t.common.editEntity : s.new} size="sm">
         <Input id="dept-name" label={s.departmentName + " *"} value={editing.name} onChange={e => setEditing(f => ({ ...f, name: e.target.value }))} />
         <div className="flex gap-3 justify-end mt-5">
           <Button variant="secondary" onClick={closeModal}>{t.common.cancel}</Button>
@@ -141,9 +141,9 @@ export default function DepartmentsPage() {
 
       <ConfirmDialog open={!!confirmDelete} onClose={() => setConfirmDelete(null)}
         onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
-        title="Izbriši" danger loading={actionLoading}
-        message={`Izbriši "${confirmDelete?.name}"? Brisanje ne bo mogoče, če je oddelek v uporabi na naročilih.`}
-        confirmLabel="Izbriši" />
+        title={t.common.deleteEntity} danger loading={actionLoading}
+        message={`${t.common.deleteEntity} "${confirmDelete?.name}"? ${t.common.cannotUndo} ${t.common.deleteInUse}`}
+        confirmLabel={t.common.deleteEntity} />
     </div>
   )
 }

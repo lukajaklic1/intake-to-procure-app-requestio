@@ -365,8 +365,8 @@ export default function DashboardPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-5">
         <StatCard icon={TrendingUp} label={t.dashboard.totalSpend} value={fmt(stats.total, currency)} color="bg-blue-50 text-blue-600" />
-        <StatCard icon={FileText} label="Število naročil" value={String(stats.poCount)} color="bg-amber-50 text-amber-600" />
-        <StatCard icon={Clock} label="Odprta naročila" value={String(stats.openPos)} color="bg-purple-50 text-purple-600" />
+        <StatCard icon={FileText} label={t.dashboard.poCount} value={String(stats.poCount)} color="bg-amber-50 text-amber-600" />
+        <StatCard icon={Clock} label={t.dashboard.openPos} value={String(stats.openPos)} color="bg-purple-50 text-purple-600" />
         <StatCard icon={BarChart2} label={t.dashboard.avgPoValue} value={fmt(stats.avgPo, currency)} color="bg-green-50 text-green-600" />
       </div>
 

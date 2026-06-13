@@ -16,7 +16,10 @@ export interface Company {
   bank_iban: string | null
   approval_auto_under: number | null
   approval_second_over: number | null
+  second_approver_id: string | null
   team_edit_requests: boolean
+  req_prefix: string
+  req_next_number: number
   created_at: string
   updated_at: string
 }
@@ -201,6 +204,70 @@ export interface UserInvitation {
   accepted_at: string | null
 }
 
+export type RequestStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'cancelled'
+
+export interface Request {
+  id: string
+  company_id: string
+  request_number: string
+  created_by: string
+  project_id: string
+  supplier_id: string | null
+  supplier_name: string | null
+  category_id: string | null
+  location_id: string | null
+  department_id: string | null
+  needed_by_date: string | null
+  note: string | null
+  discount_amount: number
+  total_estimate: number
+  status: RequestStatus
+  approver_id: string | null
+  decided_by: string | null
+  decided_at: string | null
+  decision_note: string | null
+  po_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RequestLineItem {
+  id: string
+  request_id: string
+  item_id: string | null
+  position: number
+  name: string
+  long_description: string | null
+  quantity: number
+  unit: string
+  est_unit_price: number
+  line_total: number
+  created_at: string
+}
+
+export interface RequestAttachment {
+  id: string
+  request_id: string
+  company_id: string
+  file_path: string
+  file_name: string
+  file_size: number | null
+  created_at: string
+}
+
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
+
+export interface Approval {
+  id: string
+  request_id: string
+  step: number
+  approver_id: string
+  status: ApprovalStatus
+  decided_at: string | null
+  decision_note: string | null
+  created_at: string
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -217,6 +284,10 @@ export interface Database {
       po_attachments: { Row: PoAttachment; Insert: Omit<PoAttachment, 'id' | 'created_at'>; Update: Partial<Omit<PoAttachment, 'id'>> }
       user_permissions: { Row: UserPermission; Insert: Omit<UserPermission, 'id'>; Update: Partial<Omit<UserPermission, 'id'>> }
       user_invitations: { Row: UserInvitation; Insert: Omit<UserInvitation, 'id' | 'created_at'>; Update: Partial<Omit<UserInvitation, 'id'>> }
+      requests: { Row: Request; Insert: Omit<Request, 'id' | 'created_at' | 'updated_at'>; Update: Partial<Omit<Request, 'id'>> }
+      request_line_items: { Row: RequestLineItem; Insert: Omit<RequestLineItem, 'id' | 'created_at' | 'line_total'>; Update: Partial<Omit<RequestLineItem, 'id' | 'line_total'>> }
+      approvals: { Row: Approval; Insert: Omit<Approval, 'id' | 'created_at'>; Update: Partial<Omit<Approval, 'id'>> }
+      request_attachments: { Row: RequestAttachment; Insert: Omit<RequestAttachment, 'id' | 'created_at'>; Update: Partial<Omit<RequestAttachment, 'id'>> }
     }
   }
 }

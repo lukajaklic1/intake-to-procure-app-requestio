@@ -48,7 +48,7 @@ function newLine(position: number): LineItem {
 
 // ─── Item search component ────────────────────────────────────────────────────
 
-function ItemSearch({ items, onSelect }: { items: Item[]; onSelect: (item: Item) => void }) {
+function ItemSearch({ items, onSelect, placeholder }: { items: Item[]; onSelect: (item: Item) => void; placeholder: string }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
 
@@ -65,7 +65,7 @@ function ItemSearch({ items, onSelect }: { items: Item[]; onSelect: (item: Item)
           onChange={e => { setQuery(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder="Iskanje kataloga..."
+          placeholder={placeholder}
           className="text-xs bg-transparent outline-none flex-1 text-gray-600 placeholder-gray-400 min-w-0"
         />
         {query && <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setQuery('')}><X className="w-3 h-3 text-gray-300" /></button>}
@@ -89,12 +89,13 @@ function ItemSearch({ items, onSelect }: { items: Item[]; onSelect: (item: Item)
 
 // ─── Supplier search combobox ─────────────────────────────────────────────────
 
-function SupplierSearch({ suppliers, value, onChange, label, disabled }: {
+function SupplierSearch({ suppliers, value, onChange, label, disabled, placeholder }: {
   suppliers: Supplier[]
   value: string
   onChange: (id: string) => void
   label: string
   disabled?: boolean
+  placeholder: string
 }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -114,7 +115,7 @@ function SupplierSearch({ suppliers, value, onChange, label, disabled }: {
           onFocus={() => { setQuery(''); setOpen(true) }}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           readOnly={disabled}
-          placeholder="Išči dobavitelja..."
+          placeholder={placeholder}
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-50"
         />
         {open && !disabled && filtered.length > 0 && (
@@ -154,7 +155,7 @@ function Select({ id, label, value, onChange, required, children }: {
 
 // ─── Generic search combobox ─────────────────────────────────────────────────
 
-function SearchCombobox({ items, value, onChange, label, required, disabled, placeholder }: {
+function SearchCombobox({ items, value, onChange, label, required, disabled, placeholder, emptyText }: {
   items: { id: string; name: string; sub?: string }[]
   value: string
   onChange: (id: string) => void
@@ -162,6 +163,7 @@ function SearchCombobox({ items, value, onChange, label, required, disabled, pla
   required?: boolean
   disabled?: boolean
   placeholder?: string
+  emptyText: string
 }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -195,7 +197,7 @@ function SearchCombobox({ items, value, onChange, label, required, disabled, pla
                 {item.sub && <span className="ml-2 text-xs text-gray-400">{item.sub}</span>}
               </button>
             )) : (
-              <p className="px-3 py-2 text-sm text-gray-400">Ni rezultatov</p>
+              <p className="px-3 py-2 text-sm text-gray-400">{emptyText}</p>
             )}
           </div>
         )}
@@ -485,8 +487,8 @@ export default function POFormPage() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-            {isReadOnly && <p className="text-xs text-red-500 mt-0.5">To naročilo je zaprto/preklicano in ga ni mogoče urejati.</p>}
-            {isSent && <p className="text-xs text-amber-600 mt-0.5">⚠️ To naročilo je že bilo poslano dobavitelju.</p>}
+            {isReadOnly && <p className="text-xs text-red-500 mt-0.5">{s.readOnlyNote}</p>}
+            {isSent && <p className="text-xs text-amber-600 mt-0.5">{s.sentNote}</p>}
           </div>
         </div>
 
@@ -531,6 +533,7 @@ export default function POFormPage() {
             onChange={v => setHeader(h => ({ ...h, supplier_id: v }))}
             label={s.supplier}
             disabled={isReadOnly}
+            placeholder={t.common.search + '…'}
           />
           <SearchCombobox
             items={categories.map(c => ({ id: c.id, name: c.name }))}
@@ -539,7 +542,8 @@ export default function POFormPage() {
             label={s.category}
             required
             disabled={isReadOnly}
-            placeholder="Išči kategorijo..."
+            placeholder={t.common.search + '…'}
+            emptyText={s.noResults}
           />
           <SearchCombobox
             items={projects.map(p => ({ id: p.id, name: p.name, sub: p.project_code ?? undefined }))}
@@ -548,32 +552,32 @@ export default function POFormPage() {
             label={s.project}
             required
             disabled={isReadOnly}
-            placeholder="Išči projekt..."
+            placeholder={t.common.search + '…'}
+            emptyText={s.noResults}
           />
-          <Select id="location" label='Lokacija *' required value={header.location_id} onChange={v => setHeader(h => ({ ...h, location_id: v }))}>
+          <Select id="location" label={s.location + ' *'} required value={header.location_id} onChange={v => setHeader(h => ({ ...h, location_id: v }))}>
             {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
           </Select>
-          <Select id="department" label='Oddelek' value={header.department_id} onChange={v => setHeader(h => ({ ...h, department_id: v }))}>
+          <Select id="department" label={s.department} value={header.department_id} onChange={v => setHeader(h => ({ ...h, department_id: v }))}>
             {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </Select>
-          <Input id="payment_terms" label="Plačilni pogoji *"
+          <Input id="payment_terms" label={s.paymentTermsLabel + ' *'}
             value={header.payment_terms}
             onChange={e => setHeader(h => ({ ...h, payment_terms: e.target.value }))}
-            placeholder="npr. 30 dni"
             readOnly={isReadOnly}
           />
-          <Input id="delivery_date" label="Željen datum dobave *" type="date"
+          <Input id="delivery_date" label={s.desiredDelivery + ' *'} type="date"
             value={header.expected_delivery_date}
             onChange={e => setHeader(h => ({ ...h, expected_delivery_date: e.target.value }))}
             readOnly={isReadOnly}
           />
-          <Input id="incoterm" label="Pariteta"
+          <Input id="incoterm" label={s.incoterm}
             value={header.incoterm}
             onChange={e => setHeader(h => ({ ...h, incoterm: e.target.value }))}
-            placeholder="npr. CPT, FOB, EXW"
+            placeholder="CPT, FOB, EXW"
             readOnly={isReadOnly}
           />
-          <Input id="quote_ref" label="Številka ponudbe dobavitelja"
+          <Input id="quote_ref" label={s.quoteRef}
             value={header.supplier_quote_ref}
             onChange={e => setHeader(h => ({ ...h, supplier_quote_ref: e.target.value }))}
             readOnly={isReadOnly}
@@ -582,11 +586,11 @@ export default function POFormPage() {
 
         <div className="mt-4">
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">Opombe</label>
+            <label className="text-sm font-medium text-gray-700">{s.notes}</label>
             <textarea rows={3} value={header.notes}
               onChange={e => setHeader(h => ({ ...h, notes: e.target.value }))}
               readOnly={isReadOnly}
-              placeholder="Opombe za dobavitelja..."
+              placeholder={s.notesPlaceholder}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
           </div>
@@ -638,7 +642,7 @@ export default function POFormPage() {
                 onChange={e => addFiles(e.target.files)} />
             </label>
           )}
-          {uploadingFiles && <p className="text-xs text-blue-500 mt-1">Nalaganje...</p>}
+          {uploadingFiles && <p className="text-xs text-blue-500 mt-1">{s.uploading}</p>}
         </div>
       </div>
 
@@ -653,8 +657,8 @@ export default function POFormPage() {
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-12">{t.po.position}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">Katalog</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">Šifra</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">{s.catalog}</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">{s.code}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">Ime / Opis</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">Kol.</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-20">EM</th>
@@ -668,7 +672,7 @@ export default function POFormPage() {
                 <tr key={idx} className="align-top">
                   <td className="px-4 py-2.5 text-gray-400 font-mono text-xs pt-4">{line.position}</td>
                   <td className="px-4 py-2.5 pt-3">
-                    {!isReadOnly && <ItemSearch items={items} onSelect={item => applyItem(idx, item)} />}
+                    {!isReadOnly && <ItemSearch items={items} onSelect={item => applyItem(idx, item)} placeholder={t.common.searchCatalog} />}
                   </td>
                   <td className="px-4 py-2.5 pt-3 text-xs font-mono text-gray-400">
                     {line.item_id ? items.find(i => i.id === line.item_id)?.item_number ?? '—' : '—'}
@@ -678,14 +682,14 @@ export default function POFormPage() {
                       value={line.name}
                       onChange={e => setLine(idx, { name: e.target.value })}
                       readOnly={isReadOnly}
-                      placeholder="Ime artikla..."
+                      placeholder={s.itemNamePlaceholder}
                       className="w-full text-sm border-0 bg-transparent outline-none text-gray-900 placeholder-gray-300 font-medium focus:ring-0 pb-0.5"
                     />
                     <input
                       value={line.long_description}
                       onChange={e => setLine(idx, { long_description: e.target.value })}
                       readOnly={isReadOnly}
-                      placeholder="Opis (neobvezno)"
+                      placeholder={s.descPlaceholder}
                       className="w-full text-xs border-0 bg-transparent outline-none text-gray-400 placeholder-gray-300 focus:ring-0 mt-0.5"
                     />
                   </td>
@@ -730,7 +734,7 @@ export default function POFormPage() {
                 <tr>
                   <td colSpan={8} className="px-4 py-2 border-t border-gray-100 text-right">
                     <button type="button" onClick={addLine} className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium">
-                      <Plus className="w-4 h-4" />Dodaj postavko
+                      <Plus className="w-4 h-4" />{s.addLine}
                     </button>
                   </td>
                 </tr>
@@ -741,7 +745,7 @@ export default function POFormPage() {
               {discountAmount > 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 pt-3 pb-1 text-right text-sm text-gray-500">
-                    Vmesni znesek
+                    {s.subtotal}
                   </td>
                   <td className="px-4 pt-3 pb-1 text-right text-sm text-gray-700">
                     {fmt(subtotal)}
@@ -752,7 +756,7 @@ export default function POFormPage() {
               {/* Discount row */}
               <tr>
                 <td colSpan={6} className="px-4 py-2 text-right text-sm text-gray-500">
-                  Popust (€)
+                  {s.discount} (€)
                 </td>
                 <td className="px-4 py-2 text-right">
                   {isReadOnly ? (
@@ -772,7 +776,7 @@ export default function POFormPage() {
               {/* Grand total */}
               <tr className="border-t-2 border-gray-300">
                 <td colSpan={6} className="px-4 py-3 text-right text-sm font-bold text-gray-900">
-                  Skupaj (brez DDV)
+                  {s.totalExVat}
                 </td>
                 <td className="px-4 py-3 text-right text-base font-bold text-blue-700">
                   {fmt(grandTotal)}

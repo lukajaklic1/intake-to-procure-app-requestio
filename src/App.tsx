@@ -20,6 +20,10 @@ import POFormPage from './pages/POFormPage'
 import PODetailPage from './pages/PODetailPage'
 import SettingsPage from './pages/SettingsPage'
 import UsersPage from './pages/UsersPage'
+import RequestsPage from './pages/RequestsPage'
+import RequestFormPage from './pages/RequestFormPage'
+import RequestDetailPage from './pages/RequestDetailPage'
+import ApprovalsPage from './pages/ApprovalsPage'
 import PrivacyPage from './pages/PrivacyPage'
 import TermsPage from './pages/TermsPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
@@ -63,6 +67,11 @@ export default function Root() {
             <Route path="/projects"               element={<App><ProjectsPage /></App>} />
             <Route path="/locations"              element={<App><LocationsPage /></App>} />
             <Route path="/departments"            element={<App><DepartmentsPage /></App>} />
+            <Route path="/requests"               element={<App><RequestsPage /></App>} />
+            <Route path="/requests/new"           element={<App><RequestFormPage /></App>} />
+            <Route path="/requests/:id"           element={<App><RequestDetailPage /></App>} />
+            <Route path="/requests/:id/edit"      element={<App><RequestFormPage /></App>} />
+            <Route path="/approvals"              element={<App><ApprovalsPage /></App>} />
             <Route path="/users"                  element={<App><UsersPage /></App>} />
             <Route path="/settings"               element={<App><SettingsPage /></App>} />
 
