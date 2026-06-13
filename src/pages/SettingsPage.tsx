@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Building2, CreditCard, Receipt, User } from 'lucide-react'
+import { Building2, CreditCard, Receipt, User, ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -23,7 +23,7 @@ function Section({ icon: Icon, title, children }: { icon: React.ElementType; tit
 }
 
 export default function SettingsPage() {
-  const { company, loading, refetch } = useCompany()
+  const { company, isAdmin, loading, refetch } = useCompany()
   const { t } = useLanguage()
   const s = t.settings
   const [form, setForm] = useState<Partial<Company>>({})
@@ -157,6 +157,31 @@ export default function SettingsPage() {
             </Button>
           </div>
         </Section>
+
+        {isAdmin && (
+          <Section icon={ShieldCheck} title={s.approvalsSettings}>
+            <p className="text-xs text-gray-400 mb-4">{s.approvalsSettingsHint}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input id="approval_auto_under" label={s.autoApproveUnder} type="number"
+                value={form.approval_auto_under?.toString() ?? ''}
+                onChange={e => setForm(f => ({ ...f, approval_auto_under: e.target.value === '' ? null : parseFloat(e.target.value) }))} />
+              <Input id="approval_second_over" label={s.secondApprovalOver} type="number"
+                value={form.approval_second_over?.toString() ?? ''}
+                onChange={e => setForm(f => ({ ...f, approval_second_over: e.target.value === '' ? null : parseFloat(e.target.value) }))} />
+            </div>
+            <label className="flex items-center gap-2 mt-4 text-sm text-gray-700">
+              <input type="checkbox" checked={form.team_edit_requests ?? false}
+                onChange={e => setForm(f => ({ ...f, team_edit_requests: e.target.checked }))}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+              {s.teamEditRequests}
+            </label>
+            <div className="mt-4 flex justify-end">
+              <Button loading={saving === 'approvals'} onClick={() => save('approvals', ['approval_auto_under', 'approval_second_over', 'team_edit_requests'])}>
+                {t.common.save}
+              </Button>
+            </div>
+          </Section>
+        )}
       </div>
     </div>
   )

@@ -57,7 +57,7 @@ export default function PrivacyPage() {
               ? 'Vaše podatke obdelujemo izključno za naslednje namene:'
               : 'We process your data exclusively for the following purposes:'}</p>
             <ul className="list-disc pl-6 space-y-1">
-              <li>{isSl ? 'Zagotavljanje storitve Intracely (upravljanje nabavnih naročil, analitika, dobavitelji)' : 'Providing the Intracely service (purchase order management, analytics, suppliers)'}</li>
+              <li>{isSl ? 'Zagotavljanje storitve Requestio (upravljanje nabavnih naročil, analitika, dobavitelji)' : 'Providing the Requestio service (purchase order management, analytics, suppliers)'}</li>
               <li>{isSl ? 'Upravljanje vašega računa in avtentikacija' : 'Account management and authentication'}</li>
               <li>{isSl ? 'Varnost aplikacije in preprečevanje zlorab' : 'Application security and abuse prevention'}</li>
               <li>{isSl ? 'Izpolnjevanje zakonskih obveznosti' : 'Compliance with legal obligations'}</li>

@@ -14,6 +14,9 @@ export interface Company {
   logo_url: string | null
   bank_name: string | null
   bank_iban: string | null
+  approval_auto_under: number | null
+  approval_second_over: number | null
+  team_edit_requests: boolean
   created_at: string
   updated_at: string
 }
@@ -26,6 +29,8 @@ export interface User {
   email: string
   phone: string | null
   is_admin: boolean
+  department_id: string | null
+  job_title: string | null
   created_at: string
   updated_at: string
 }
@@ -65,6 +70,8 @@ export interface Project {
   start_date: string | null
   end_date: string | null
   status: 'active' | 'inactive'
+  budget_amount: number | null
+  manager_id: string | null
   created_at: string
   updated_at: string
 }
@@ -106,11 +113,9 @@ export interface Item {
 
 export type PurchaseOrderStatus =
   | 'draft'
-  | 'pending_approval'
-  | 'approved'
+  | 'issued'
   | 'sent'
-  | 'partially_received'
-  | 'received'
+  | 'closed'
   | 'cancelled'
 
 export interface PurchaseOrder {
@@ -131,6 +136,8 @@ export interface PurchaseOrder {
   notes: string | null
   delivery_notes: string | null
   total_amount: number
+  discount_amount: number
+  request_id: string | null
   created_at: string
   updated_at: string
 }
@@ -152,11 +159,46 @@ export interface PoLineItem {
 export interface PoAttachment {
   id: string
   po_id: string
-  uploaded_by: string
+  company_id: string
+  file_path: string
   file_name: string
-  file_url: string
-  file_size_kb: number
+  file_size: number | null
   created_at: string
+}
+
+export interface UserPermission {
+  id: string
+  user_id: string
+  module: 'requests' | 'purchase_orders' | 'receipts' | 'invoices' | 'budgets' | 'reports'
+  can_view: boolean
+  can_create: boolean
+  can_approve: boolean
+  can_pay: boolean
+}
+
+export interface InvitationPermission {
+  module: UserPermission['module']
+  can_view: boolean
+  can_create: boolean
+  can_approve: boolean
+  can_pay: boolean
+}
+
+export interface UserInvitation {
+  id: string
+  company_id: string
+  email: string
+  token: string
+  invited_by: string
+  is_admin: boolean
+  first_name: string | null
+  last_name: string | null
+  department_id: string | null
+  job_title: string | null
+  permissions: InvitationPermission[] | null
+  status: 'pending' | 'accepted' | 'revoked'
+  created_at: string
+  accepted_at: string | null
 }
 
 export interface Database {
@@ -173,6 +215,8 @@ export interface Database {
       purchase_orders: { Row: PurchaseOrder; Insert: Omit<PurchaseOrder, 'id' | 'created_at' | 'updated_at'>; Update: Partial<Omit<PurchaseOrder, 'id'>> }
       po_line_items: { Row: PoLineItem; Insert: Omit<PoLineItem, 'id' | 'created_at' | 'line_total'>; Update: Partial<Omit<PoLineItem, 'id' | 'line_total'>> }
       po_attachments: { Row: PoAttachment; Insert: Omit<PoAttachment, 'id' | 'created_at'>; Update: Partial<Omit<PoAttachment, 'id'>> }
+      user_permissions: { Row: UserPermission; Insert: Omit<UserPermission, 'id'>; Update: Partial<Omit<UserPermission, 'id'>> }
+      user_invitations: { Row: UserInvitation; Insert: Omit<UserInvitation, 'id' | 'created_at'>; Update: Partial<Omit<UserInvitation, 'id'>> }
     }
   }
 }

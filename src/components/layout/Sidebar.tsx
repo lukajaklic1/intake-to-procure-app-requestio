@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Building2, Package,
-  Tag, FolderOpen, MapPin, Users, Settings, LogOut, X,
+  Tag, FolderOpen, MapPin, Users, UserCog, Settings, LogOut, X,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useCompany } from '../../hooks/useCompany'
@@ -18,6 +18,7 @@ const NAV_KEYS = [
   { to: '/projects',        icon: FolderOpen,       key: 'projects' as const },
   { to: '/locations',       icon: MapPin,           key: 'locations' as const },
   { to: '/departments',     icon: Users,            key: 'departments' as const },
+  { to: '/users',           icon: UserCog,          key: 'users' as const, adminOnly: true },
 ]
 
 interface SidebarProps {
@@ -61,7 +62,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-3 px-2">
-        {NAV_KEYS.map(({ to, icon: Icon, key }) => (
+        {NAV_KEYS.filter(item => !item.adminOnly || profile?.is_admin).map(({ to, icon: Icon, key }) => (
           <NavLink
             key={to}
             to={to}

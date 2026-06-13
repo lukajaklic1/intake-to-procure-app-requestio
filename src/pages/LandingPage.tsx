@@ -194,7 +194,7 @@ export default function LandingPage() {
               <div className="w-44 bg-white rounded-xl border border-gray-200 p-3 flex flex-col gap-1 shrink-0">
                 <div className="flex items-center gap-2 p-2 mb-2">
                   <div className="w-6 h-6 bg-blue-600 rounded-md" />
-                  <span className="text-xs font-semibold text-gray-800">Intracely</span>
+                  <span className="text-xs font-semibold text-gray-800">Requestio</span>
                 </div>
                 {[t.nav.dashboard,t.nav.purchaseOrders,t.nav.suppliers,t.nav.items,t.nav.categories,t.nav.projects].map((item, i) => (
                   <div key={item} className={`text-xs px-2 py-1.5 rounded-lg ${i === 0 ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-500'}`}>

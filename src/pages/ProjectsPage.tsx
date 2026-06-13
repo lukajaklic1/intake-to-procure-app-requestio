@@ -36,7 +36,7 @@ export default function ProjectsPage() {
   async function load() {
     if (!company) return
     setLoading(true)
-    const { data } = await supabase.from('projects').select('*').eq('company_id', company.id).order('name')
+    const { data } = await supabase.from('projects').select('*').eq('company_id', company.id).order('created_at', { ascending: false })
     setProjects(data ?? [])
     setLoading(false)
   }

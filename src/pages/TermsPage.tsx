@@ -33,15 +33,15 @@ export default function TermsPage() {
           <section>
             <h2 className="text-xl font-semibold text-gray-900 mb-3">{isSl ? '1. Sprejemanje pogojev' : '1. Acceptance of Terms'}</h2>
             <p>{isSl
-              ? 'Z registracijo in uporabo aplikacije Intracely sprejemate te pogoje uporabe v celoti. Če se s katerimkoli določilom ne strinjate, aplikacije ne smete uporabljati.'
-              : 'By registering and using the Intracely application, you accept these terms of service in full. If you do not agree with any provision, you must not use the application.'}</p>
+              ? 'Z registracijo in uporabo aplikacije Requestio sprejemate te pogoje uporabe v celoti. Če se s katerimkoli določilom ne strinjate, aplikacije ne smete uporabljati.'
+              : 'By registering and using the Requestio application, you accept these terms of service in full. If you do not agree with any provision, you must not use the application.'}</p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-gray-900 mb-3">{isSl ? '2. Opis storitve' : '2. Service Description'}</h2>
             <p>{isSl
-              ? 'Intracely je spletna aplikacija za upravljanje nabavnih naročil, dobaviteljev in analitike stroškov. Storitev zagotavlja TCE, d.o.o. Storitev se zagotavlja v obliki SaaS (Software as a Service) in je dostopna prek spletnega brskalnika.'
-              : 'Intracely is a web application for managing purchase orders, suppliers and spend analytics. The service is provided by TCE, d.o.o. as Software as a Service (SaaS) accessible via a web browser.'}</p>
+              ? 'Requestio je spletna aplikacija za upravljanje nabavnih naročil, dobaviteljev in analitike stroškov. Storitev zagotavlja TCE, d.o.o. Storitev se zagotavlja v obliki SaaS (Software as a Service) in je dostopna prek spletnega brskalnika.'
+              : 'Requestio is a web application for managing purchase orders, suppliers and spend analytics. The service is provided by TCE, d.o.o. as Software as a Service (SaaS) accessible via a web browser.'}</p>
           </section>
 
           <section>
@@ -61,8 +61,8 @@ export default function TermsPage() {
           <section>
             <h2 className="text-xl font-semibold text-gray-900 mb-3">{isSl ? '5. Lastninska pravica nad podatki' : '5. Data Ownership'}</h2>
             <p>{isSl
-              ? 'Vsi podatki, ki jih vnesete v Intracely (naročilnice, dobavitelji, artikli, priložene datoteke), so vaša izključna last. TCE, d.o.o. nima pravice do uporabe vaših podatkov v komercialne namene. Ob prenehanju uporabe storitve vam omogočimo izvoz podatkov.'
-              : 'All data you enter into Intracely (purchase orders, suppliers, items, attached files) is your exclusive property. TCE, d.o.o. has no right to use your data for commercial purposes. Upon termination of service, we will enable you to export your data.'}</p>
+              ? 'Vsi podatki, ki jih vnesete v Requestio (naročilnice, dobavitelji, artikli, priložene datoteke), so vaša izključna last. TCE, d.o.o. nima pravice do uporabe vaših podatkov v komercialne namene. Ob prenehanju uporabe storitve vam omogočimo izvoz podatkov.'
+              : 'All data you enter into Requestio (purchase orders, suppliers, items, attached files) is your exclusive property. TCE, d.o.o. has no right to use your data for commercial purposes. Upon termination of service, we will enable you to export your data.'}</p>
           </section>
 
           <section>

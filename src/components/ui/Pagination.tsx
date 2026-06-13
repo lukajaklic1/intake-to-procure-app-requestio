@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '../../lib/cn'
+import { useLanguage } from '../../hooks/useLanguage'
 
 interface PaginationProps {
   total: number
@@ -9,6 +10,7 @@ interface PaginationProps {
 }
 
 export default function Pagination({ total, page, pageSize, onChange }: PaginationProps) {
+  const { t } = useLanguage()
   const totalPages = Math.ceil(total / pageSize)
   if (totalPages <= 1) return null
 
@@ -31,7 +33,7 @@ export default function Pagination({ total, page, pageSize, onChange }: Paginati
   return (
     <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
       <p className="text-xs text-gray-400">
-        Showing <span className="font-medium text-gray-600">{from}–{to}</span> of <span className="font-medium text-gray-600">{total}</span>
+        {t.common.showing} <span className="font-medium text-gray-600">{from}–{to}</span> {t.common.of} <span className="font-medium text-gray-600">{total}</span>
       </p>
       <div className="flex items-center gap-1">
         <button

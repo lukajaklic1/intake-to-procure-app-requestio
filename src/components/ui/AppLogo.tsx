@@ -43,7 +43,7 @@ export default function AppLogo({ size = 'md', showName = true, dark = false }: 
 
       {showName && (
         <span className={`font-semibold tracking-tight ${fontSize} ${textColor}`}>
-          Intracely
+          Requestio
         </span>
       )}
     </div>

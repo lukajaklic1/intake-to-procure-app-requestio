@@ -75,7 +75,6 @@ export default function PurchaseOrdersPage() {
 
   const [page, setPage] = useState(1)
   const [confirmDelete, setConfirmDelete] = useState<PO | null>(null)
-  const [confirmCancel, setConfirmCancel] = useState<PO | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
 
   useEffect(() => { if (company) { load(); loadRefs() } }, [company])
@@ -113,16 +112,6 @@ export default function PurchaseOrdersPage() {
     setActionLoading(false); setConfirmDelete(null)
     if (error) { toast.error(error.message); return }
     toast.success(t.common.deleted); load()
-  }
-
-  async function handleCancel(po: PO) {
-    setActionLoading(true)
-    const { error } = await supabase.from('purchase_orders')
-      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-      .eq('id', po.id)
-    setActionLoading(false); setConfirmCancel(null)
-    if (error) { toast.error(error.message); return }
-    toast.success(t.common.updated); load()
   }
 
   function clearFilters() {
@@ -303,13 +292,6 @@ export default function PurchaseOrdersPage() {
         title="Izbriši naročilo" danger loading={actionLoading}
         message={`Izbriši naročilo ${confirmDelete?.po_number}? Vse postavke bodo tudi izbrisane. Tega ni mogoče razveljaviti.`}
         confirmLabel="Izbriši"
-      />
-      <ConfirmDialog
-        open={!!confirmCancel} onClose={() => setConfirmCancel(null)}
-        onConfirm={() => confirmCancel && handleCancel(confirmCancel)}
-        title="Prekliči naročilo" loading={actionLoading}
-        message={`Prekliči naročilo ${confirmCancel?.po_number}? Tega ni mogoče razveljaviti. Naročilo bo ostalo vidno kot preklicano.`}
-        confirmLabel="Prekliči naročilo"
       />
     </div>
   )

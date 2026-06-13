@@ -22,7 +22,6 @@ interface POFull {
   incoterm: string | null; supplier_quote_ref: string | null
   notes: string | null
   discount_amount: number
-  quotation_url: string | null
   supplier_id: string; category_id: string; project_id: string; location_id: string; department_id: string | null
   suppliers: { name: string; email: string | null; address_street: string | null; address_city: string | null; address_postal_code: string | null; address_country: string | null; vat_number: string | null }
   categories: { name: string }

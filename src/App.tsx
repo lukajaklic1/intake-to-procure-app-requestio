@@ -19,10 +19,12 @@ import PurchaseOrdersPage from './pages/PurchaseOrdersPage'
 import POFormPage from './pages/POFormPage'
 import PODetailPage from './pages/PODetailPage'
 import SettingsPage from './pages/SettingsPage'
+import UsersPage from './pages/UsersPage'
 import PrivacyPage from './pages/PrivacyPage'
 import TermsPage from './pages/TermsPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import AcceptInvitePage from './pages/AcceptInvitePage'
 
 const queryClient = new QueryClient()
 
@@ -47,6 +49,7 @@ export default function Root() {
             <Route path="/terms"            element={<TermsPage />} />
             <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
             <Route path="/reset-password"   element={<ResetPasswordPage />} />
+            <Route path="/accept-invite"    element={<AcceptInvitePage />} />
 
             {/* Protected app */}
             <Route path="/dashboard"              element={<App><DashboardPage /></App>} />
@@ -60,6 +63,7 @@ export default function Root() {
             <Route path="/projects"               element={<App><ProjectsPage /></App>} />
             <Route path="/locations"              element={<App><LocationsPage /></App>} />
             <Route path="/departments"            element={<App><DepartmentsPage /></App>} />
+            <Route path="/users"                  element={<App><UsersPage /></App>} />
             <Route path="/settings"               element={<App><SettingsPage /></App>} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
