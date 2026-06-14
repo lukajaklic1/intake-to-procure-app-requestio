@@ -7,6 +7,7 @@ import { useLanguage } from '../hooks/useLanguage'
 import { toast } from '../components/ui/Toast'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import Modal from '../components/ui/Modal'
 import type { Item } from '../types/database'
 
 // ─── Catalog search ────────────────────────────────────────────
@@ -129,6 +130,9 @@ export default function RequestFormPage() {
   const [lines, setLines] = useState<Line[]>([newLine(10)])
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
+  const [reqStatus, setReqStatus] = useState<'draft' | 'pending' | 'rejected' | 'approved'>('draft')
+  const [submitOpen, setSubmitOpen] = useState(false)
+  const [submitNote, setSubmitNote] = useState('')
   const [attachments, setAttachments] = useState<{ id: string; file_name: string; file_path: string }[]>([])
   const [newFiles, setNewFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
@@ -161,7 +165,8 @@ export default function RequestFormPage() {
   async function loadRequest() {
     const { data: req } = await supabase.from('requests').select('*').eq('id', id!).single()
     if (!req) { toast.error('Not found'); navigate('/requests'); return }
-    if (req.status !== 'draft') { navigate(`/requests/${id}`); return }
+    if (req.status === 'cancelled') { navigate(`/requests/${id}`); return }
+    setReqStatus(req.status)
     setHeader({
       project_id: req.project_id ?? '', supplier_id: req.supplier_id ?? '', supplier_name: req.supplier_name ?? '',
       category_id: req.category_id ?? '', location_id: req.location_id ?? '', department_id: req.department_id ?? '',
@@ -250,6 +255,7 @@ export default function RequestFormPage() {
       if (error || !req) { toast.error(error?.message ?? 'Error'); return null }
       await supabase.from('request_line_items').insert(linePayload.map(l => ({ ...l, request_id: req.id })))
       await uploadAttachments(req.id)
+      await supabase.from('activity_log').insert({ company_id: company.id, request_id: req.id, actor_id: profile.id, action: 'created' })
       return req.id
     } else {
       const { error } = await supabase.from('requests').update({ ...reqFields, updated_at: new Date().toISOString() }).eq('id', id!)
@@ -257,6 +263,7 @@ export default function RequestFormPage() {
       await supabase.from('request_line_items').delete().eq('request_id', id!)
       await supabase.from('request_line_items').insert(linePayload.map(l => ({ ...l, request_id: id! })))
       await uploadAttachments(id!)
+      await supabase.from('activity_log').insert({ company_id: company.id, request_id: id!, actor_id: profile.id, action: 'edited' })
       return id!
     }
   }
@@ -268,11 +275,11 @@ export default function RequestFormPage() {
     if (reqId) { toast.success(t.common.saved); navigate(`/requests/${reqId}`) }
   }
 
-  async function submit() {
+  async function doSubmit() {
     setSaving(true)
     const reqId = await persist()
     if (!reqId) { setSaving(false); return }
-    const { error } = await (supabase as any).rpc('submit_request', { p_request_id: reqId })
+    const { error } = await (supabase as any).rpc('submit_request', { p_request_id: reqId, p_note: submitNote.trim() || null })
     setSaving(false)
     if (error) { toast.error(error.message); return }
     toast.success(s.submittedToManager)
@@ -291,8 +298,8 @@ export default function RequestFormPage() {
         </div>
         <div className="hidden lg:flex items-center gap-2">
           <Button variant="secondary" onClick={() => navigate(-1)} disabled={saving}>{t.common.cancel}</Button>
-          <Button variant="secondary" onClick={saveDraft} loading={saving}>{s.saveDraft}</Button>
-          <Button onClick={submit} loading={saving}>{s.submit}</Button>
+          {reqStatus === 'draft' && <Button variant="secondary" onClick={saveDraft} loading={saving}>{s.saveDraft}</Button>}
+          <Button onClick={() => { setSubmitNote(""); setSubmitOpen(true) }} loading={saving}>{s.submit}</Button>
         </div>
       </div>
 
@@ -341,7 +348,7 @@ export default function RequestFormPage() {
             <UploadCloud className="w-4 h-4 text-gray-400 shrink-0" />
             <span className="text-sm text-gray-500">{s.uploadHint}</span>
             <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple className="hidden"
-              onChange={e => { if (e.target.files) setNewFiles(fs => [...fs, ...Array.from(e.target.files!)]) }} />
+              onChange={e => { const fl = Array.from(e.target.files ?? []); setNewFiles(fs => [...fs, ...fl]); e.target.value = '' }} />
           </label>
           {uploading && <p className="text-xs text-blue-500 mt-1">{s.uploading}</p>}
         </div>
@@ -415,9 +422,21 @@ export default function RequestFormPage() {
 
       <div className="hidden lg:flex justify-end gap-2">
         <Button variant="secondary" onClick={() => navigate(-1)} disabled={saving}>{t.common.cancel}</Button>
-        <Button variant="secondary" onClick={saveDraft} loading={saving}>{s.saveDraft}</Button>
-        <Button onClick={submit} loading={saving}>{s.submit}</Button>
+        {reqStatus === 'draft' && <Button variant="secondary" onClick={saveDraft} loading={saving}>{s.saveDraft}</Button>}
+        <Button onClick={() => { setSubmitNote(""); setSubmitOpen(true) }} loading={saving}>{s.submit}</Button>
       </div>
+
+      <Modal open={submitOpen} onClose={() => setSubmitOpen(false)} title={s.submitTitle} size="sm">
+        <div className="flex flex-col gap-1 mb-4">
+          <label className="text-sm font-medium text-gray-700">{s.submitComment}</label>
+          <textarea value={submitNote} onChange={e => setSubmitNote(e.target.value)} rows={3}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+        </div>
+        <div className="flex gap-3 justify-end">
+          <Button variant="secondary" onClick={() => setSubmitOpen(false)}>{t.common.cancel}</Button>
+          <Button loading={saving} onClick={() => { setSubmitOpen(false); doSubmit() }}>{s.submit}</Button>
+        </div>
+      </Modal>
     </div>
   )
 }

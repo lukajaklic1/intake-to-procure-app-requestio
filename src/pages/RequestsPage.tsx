@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, FileText } from 'lucide-react'
+import { Plus, FileText, Eye } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -93,8 +93,8 @@ export default function RequestsPage() {
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]">
             <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>{[s.requestNumber, s.project, s.requestedBy, s.estTotal, t.common.status].map(h => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
+              <tr>{[s.requestNumber, s.project, s.requestedBy, s.estTotal, t.common.status, ''].map((h, i) => (
+                <th key={i} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
               ))}</tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -109,6 +109,12 @@ export default function RequestsPage() {
                   <td className="px-4 py-3 font-medium text-gray-800">{fmt(r.total_estimate ?? 0, company?.currency)}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[r.status]}`}>{s.st[r.status]}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1 justify-end">
+                      <Link to={`/requests/${r.id}`} onClick={e => e.stopPropagation()} title={t.common.view}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Eye className="w-3.5 h-3.5" /></Link>
+                    </div>
                   </td>
                 </tr>
               ))}

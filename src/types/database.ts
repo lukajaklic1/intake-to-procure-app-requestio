@@ -255,6 +255,17 @@ export interface RequestAttachment {
   created_at: string
 }
 
+export interface ActivityLog {
+  id: string
+  company_id: string
+  request_id: string
+  actor_id: string | null
+  action: 'created' | 'edited' | 'submitted' | 'approved' | 'rejected' | 'cancelled'
+  note: string | null
+  meta: { step?: number } | null
+  created_at: string
+}
+
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
 export interface Approval {
@@ -288,6 +299,7 @@ export interface Database {
       request_line_items: { Row: RequestLineItem; Insert: Omit<RequestLineItem, 'id' | 'created_at' | 'line_total'>; Update: Partial<Omit<RequestLineItem, 'id' | 'line_total'>> }
       approvals: { Row: Approval; Insert: Omit<Approval, 'id' | 'created_at'>; Update: Partial<Omit<Approval, 'id'>> }
       request_attachments: { Row: RequestAttachment; Insert: Omit<RequestAttachment, 'id' | 'created_at'>; Update: Partial<Omit<RequestAttachment, 'id'>> }
+      activity_log: { Row: ActivityLog; Insert: Omit<ActivityLog, 'id' | 'created_at'>; Update: Partial<Omit<ActivityLog, 'id'>> }
     }
   }
 }

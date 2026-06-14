@@ -639,7 +639,7 @@ export default function POFormPage() {
               <UploadCloud className="w-4 h-4 text-gray-400 shrink-0" />
               <span className="text-sm text-gray-500">{t.po.uploadQuotation}</span>
               <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple className="hidden"
-                onChange={e => addFiles(e.target.files)} />
+                onChange={e => { addFiles(e.target.files); e.target.value = '' }} />
             </label>
           )}
           {uploadingFiles && <p className="text-xs text-blue-500 mt-1">{s.uploading}</p>}

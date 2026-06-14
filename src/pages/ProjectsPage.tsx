@@ -31,6 +31,7 @@ export default function ProjectsPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [members, setMembers] = useState<{ id: string; first_name: string; last_name: string }[]>([])
+  const [budgetStr, setBudgetStr] = useState('')
 
   useEffect(() => { if (company) load() }, [company])
 
@@ -51,9 +52,19 @@ export default function ProjectsPage() {
     return m ? `${m.first_name} ${m.last_name}` : '—'
   }
 
-  function openNew() { setEditing({ ...EMPTY }); setModalOpen(true) }
-  function openEdit(p: Project) { setEditing({ ...p }); setModalOpen(true) }
-  function closeModal() { setModalOpen(false); setEditing(EMPTY) }
+  const currency = company?.currency ?? 'EUR'
+  const fmt = (n: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(n)
+  const fmtNum = (n: number) => new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 }).format(n)
+  const parseBudget = (str: string): number | null => {
+    const clean = str.replace(/\./g, '').replace(',', '.').trim()
+    if (clean === '') return null
+    const n = parseFloat(clean)
+    return isNaN(n) ? null : n
+  }
+
+  function openNew() { setEditing({ ...EMPTY }); setBudgetStr(''); setModalOpen(true) }
+  function openEdit(p: Project) { setEditing({ ...p }); setBudgetStr(p.budget_amount != null ? fmtNum(p.budget_amount) : ''); setModalOpen(true) }
+  function closeModal() { setModalOpen(false); setEditing(EMPTY); setBudgetStr('') }
 
   function field(key: keyof Project) {
     return { value: (editing[key] as string) ?? '', onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEditing(f => ({ ...f, [key]: e.target.value })) }
@@ -63,7 +74,7 @@ export default function ProjectsPage() {
     if (!company || !editing.name?.trim()) { toast.error(t.common.nameRequired); return }
     if (!editing.manager_id) { toast.error(s.manager + ' *'); return }
     setSaving(true)
-    const payload = { ...editing, start_date: editing.start_date || null, end_date: editing.end_date || null }
+    const payload = { ...editing, start_date: editing.start_date || null, end_date: editing.end_date || null, budget_amount: parseBudget(budgetStr) }
     if (editing.id) {
       const { error } = await supabase.from('projects').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', editing.id)
       if (error) { toast.error(error.message); setSaving(false); return }
@@ -134,8 +145,8 @@ export default function ProjectsPage() {
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]">
             <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>{[t.common.name, s.projectCode, s.customer, s.manager, s.startDate, s.endDate, t.common.status, ''].map(h => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
+              <tr>{[t.common.name, s.projectCode, s.customer, s.manager, s.budget, s.startDate, s.endDate, t.common.status, ''].map((h, i) => (
+                <th key={i} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
               ))}</tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -145,6 +156,7 @@ export default function ProjectsPage() {
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">{p.project_code ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{p.customer ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{managerName(p.manager_id)}</td>
+                  <td className="px-4 py-3 text-gray-700 font-medium">{p.budget_amount != null ? fmt(p.budget_amount) : '—'}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{p.start_date ? new Date(p.start_date).toLocaleDateString('de-DE') : '—'}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{p.end_date ? new Date(p.end_date).toLocaleDateString('de-DE') : '—'}</td>
                   <td className="px-4 py-3">
@@ -181,6 +193,12 @@ export default function ProjectsPage() {
           </div>
           <Input id="p-start" label={s.startDate} type="date" {...field('start_date')} />
           <Input id="p-end" label={s.endDate} type="date" {...field('end_date')} />
+          <div className="col-span-2">
+            <Input id="p-budget" label={`${s.budget} (${currency})`} inputMode="decimal"
+              value={budgetStr}
+              onChange={e => { if (/^[\d.,\s]*$/.test(e.target.value)) setBudgetStr(e.target.value) }}
+              onBlur={() => { const n = parseBudget(budgetStr); setBudgetStr(n != null ? fmtNum(n) : '') }} />
+          </div>
 
           {editing.id && (
             <div className="col-span-2 flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">

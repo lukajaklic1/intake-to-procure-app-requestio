@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, Pencil, Send, XCircle, Check, X, FileText } from 'lucide-react'
+import { ChevronLeft, Pencil, XCircle, Check, X, FileText } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -9,7 +9,7 @@ import Button from '../components/ui/Button'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { format } from 'date-fns'
-import type { Request, RequestLineItem, RequestStatus, Approval } from '../types/database'
+import type { Request, RequestLineItem, RequestStatus, Approval, ActivityLog } from '../types/database'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -41,6 +41,8 @@ export default function RequestDetailPage() {
   const [req, setReq] = useState<ReqFull | null>(null)
   const [lines, setLines] = useState<RequestLineItem[]>([])
   const [approvals, setApprovals] = useState<Approval[]>([])
+  const [activity, setActivity] = useState<ActivityLog[]>([])
+  const [budget, setBudget] = useState<{ budget: number | null; ordered: number; approved: number; pending: number } | null>(null)
   const [attachments, setAttachments] = useState<{ id: string; file_name: string; file_path: string }[]>([])
   const [names, setNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -59,6 +61,10 @@ export default function RequestDetailPage() {
       .eq('id', id!).single()
     if (!data) { toast.error('Not found'); navigate('/requests'); return }
     setReq(data as unknown as ReqFull)
+    if (data.project_id) {
+      const { data: b } = await (supabase as any).rpc('get_project_budget_status', { p_project_id: data.project_id })
+      setBudget(b ?? null)
+    }
     const { data: ls } = await supabase.from('request_line_items').select('*').eq('request_id', id!).order('position')
     setLines((ls as RequestLineItem[]) ?? [])
     const { data: aps } = await supabase.from('approvals').select('*').eq('request_id', id!).order('step')
@@ -66,7 +72,10 @@ export default function RequestDetailPage() {
     setApprovals(apList)
     const { data: atts } = await supabase.from('request_attachments').select('id, file_name, file_path').eq('request_id', id!)
     setAttachments(atts ?? [])
-    const ids = [data.created_by, data.approver_id, data.decided_by, ...apList.map(a => a.approver_id)].filter(Boolean)
+    const { data: acts } = await supabase.from('activity_log').select('*').eq('request_id', id!).order('created_at', { ascending: true })
+    const actList = (acts as ActivityLog[]) ?? []
+    setActivity(actList)
+    const ids = [data.created_by, data.approver_id, data.decided_by, ...apList.map(a => a.approver_id), ...actList.map(a => a.actor_id)].filter(Boolean)
     if (ids.length) {
       const { data: us } = await supabase.from('users').select('id, first_name, last_name').in('id', ids)
       const m: Record<string, string> = {}
@@ -89,14 +98,6 @@ export default function RequestDetailPage() {
     setActionLoading(false); setConfirmCancel(false)
     if (error) { toast.error(error.message); return }
     toast.success(s.st.cancelled); load()
-  }
-
-  async function doSubmit() {
-    setActionLoading(true)
-    const { data, error } = await (supabase as any).rpc('submit_request', { p_request_id: id })
-    setActionLoading(false)
-    if (error) { toast.error(error.message); return }
-    toast.success(data?.status === 'approved' ? s.autoApproved : s.submittedToManager); load()
   }
 
   async function doDecide() {
@@ -125,11 +126,8 @@ export default function RequestDetailPage() {
           <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[st]}`}>{s.st[st]}</span>
         </div>
         <div className="flex items-center gap-2">
-          {st === 'draft' && isCreator && (
-            <>
-              <Button variant="secondary" onClick={() => navigate(`/requests/${id}/edit`)} className="gap-1.5"><Pencil className="w-3.5 h-3.5" />{s.edit}</Button>
-              <Button loading={actionLoading} onClick={doSubmit} className="gap-1.5"><Send className="w-3.5 h-3.5" />{s.submit}</Button>
-            </>
+          {st !== 'cancelled' && (isCreator || isAdmin) && (
+            <Button variant="secondary" onClick={() => navigate(`/requests/${id}/edit`)} className="gap-1.5"><Pencil className="w-3.5 h-3.5" />{s.edit}</Button>
           )}
           {st === 'pending' && myPending && (
             <>
@@ -137,11 +135,48 @@ export default function RequestDetailPage() {
               <Button onClick={() => { setDecision('approve'); setNote('') }} className="gap-1.5"><Check className="w-3.5 h-3.5" />{t.approvals.approve}</Button>
             </>
           )}
-          {(st === 'draft' || st === 'pending') && (isCreator || isAdmin) && (
+          {st !== 'cancelled' && (isCreator || isAdmin) && (
             <Button variant="secondary" onClick={() => setConfirmCancel(true)} className="gap-1.5 text-red-600"><XCircle className="w-3.5 h-3.5" />{s.cancelRequest}</Button>
           )}
         </div>
       </div>
+
+      {budget && budget.budget != null && (() => {
+        const committed = budget.ordered + budget.approved + budget.pending
+        const remaining = budget.budget - committed
+        const over = remaining < 0
+        const denom = Math.max(budget.budget, committed) || 1
+        const oPct = (budget.ordered / denom) * 100
+        const aPct = (budget.approved / denom) * 100
+        const pPct = (budget.pending / denom) * 100
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold text-gray-900">{s.budgetTitle}</p>
+              <p className={`text-sm font-bold ${over ? 'text-red-600' : 'text-gray-900'}`}>
+                {over ? `${s.budgetOver}: ` : `${s.budgetRemaining}: `}{fmt(Math.abs(remaining))}
+              </p>
+            </div>
+            <div className={`relative h-2.5 w-full rounded-full bg-gray-100 overflow-hidden mb-3 flex ${over ? 'ring-1 ring-red-300' : ''}`}>
+              <div className="h-full bg-blue-500" style={{ width: `${oPct}%` }} title={s.budgetOrdered} />
+              <div className="h-full bg-green-500" style={{ width: `${aPct}%` }} title={s.budgetApproved} />
+              <div className="h-full bg-amber-400" style={{ width: `${pPct}%` }} title={s.budgetPending} />
+              {over && (
+                <>
+                  <div className="absolute inset-y-0 bg-red-500/25" style={{ left: `${(budget.budget / committed) * 100}%`, right: 0 }} />
+                  <div className="absolute inset-y-0 w-0.5 bg-gray-800" style={{ left: `${(budget.budget / committed) * 100}%` }} title={s.budgetAmount} />
+                </>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+              <div><p className="text-xs text-gray-400">{s.budgetAmount}</p><p className="font-medium text-gray-800">{fmt(budget.budget)}</p></div>
+              <div><p className="text-xs text-gray-400 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" />{s.budgetOrdered}</p><p className="font-medium text-gray-800">{fmt(budget.ordered)}</p></div>
+              <div><p className="text-xs text-gray-400 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" />{s.budgetApproved}</p><p className="font-medium text-gray-800">{fmt(budget.approved)}</p></div>
+              <div><p className="text-xs text-gray-400 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400" />{s.budgetPending}</p><p className="font-medium text-gray-800">{fmt(budget.pending)}</p></div>
+            </div>
+          </div>
+        )
+      })()}
 
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5 grid grid-cols-2 sm:grid-cols-3 gap-5">
         <Field label={s.project} value={req.projects?.name} />
@@ -170,31 +205,7 @@ export default function RequestDetailPage() {
         </div>
       )}
 
-      {approvals.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5">
-          <p className="text-sm font-semibold text-gray-900 mb-3">{s.approvalChain}</p>
-          <div className="flex flex-col gap-2">
-            {approvals.map(a => (
-              <div key={a.id} className="flex items-center justify-between text-sm">
-                <span className="text-gray-700">{s.step} {a.step} · {names[a.approver_id] ?? '—'}{a.decision_note ? ` · ${a.decision_note}` : ''}</span>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${a.status === 'approved' ? 'bg-green-100 text-green-700' : a.status === 'rejected' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}`}>
-                  {a.status === 'approved' ? s.st.approved : a.status === 'rejected' ? s.st.rejected : s.st.pending}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {(st === 'approved' || st === 'rejected') && (
-        <div className={`rounded-xl border p-4 mb-5 ${st === 'approved' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-          <p className="text-sm font-medium text-gray-800">{s.decision}: {s.st[st]}</p>
-          {req.decided_by && <p className="text-xs text-gray-500 mt-1">{s.decidedBy}: {names[req.decided_by]} · {req.decided_at ? format(new Date(req.decided_at), 'dd.MM.yyyy HH:mm') : ''}</p>}
-          {req.decision_note && <p className="text-sm text-gray-600 mt-1">{s.decisionNote}: {req.decision_note}</p>}
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-5">
         <div className="overflow-x-auto"><table className="w-full text-sm min-w-[500px]">
           <thead className="bg-gray-50 border-b border-gray-100"><tr>
             <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">{s.itemName}</th>
@@ -222,6 +233,33 @@ export default function RequestDetailPage() {
           </div>
         </div>
       </div>
+
+      {activity.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5">
+          <p className="text-sm font-semibold text-gray-900 mb-4">{s.auditTrail}</p>
+          <ol className="flex flex-col gap-4">
+            {activity.map(a => {
+              const dot = a.action === 'approved' ? 'bg-green-500' : a.action === 'rejected' ? 'bg-red-500' : a.action === 'cancelled' ? 'bg-gray-400' : a.action === 'submitted' ? 'bg-amber-500' : 'bg-blue-500'
+              return (
+                <li key={a.id} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <span className={`w-2.5 h-2.5 rounded-full ${dot} mt-1.5`} />
+                    <span className="flex-1 w-px bg-gray-100 mt-1" />
+                  </div>
+                  <div className="flex-1 -mt-0.5">
+                    <p className="text-sm text-gray-800">
+                      <span className="font-medium">{a.actor_id ? names[a.actor_id] ?? '—' : '—'}</span>{' '}
+                      {s.act[a.action]}{a.meta?.step ? ` (${s.step} ${a.meta.step})` : ''}
+                    </p>
+                    <p className="text-xs text-gray-400">{format(new Date(a.created_at), 'dd.MM.yyyy HH:mm')}</p>
+                    {a.note && <p className="text-sm text-gray-600 mt-1 bg-gray-50 border border-gray-100 rounded-lg px-3 py-1.5">{a.note}</p>}
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+        </div>
+      )}
 
       <ConfirmDialog open={confirmCancel} onClose={() => setConfirmCancel(false)} onConfirm={doCancel}
         title={s.cancelRequest} danger loading={actionLoading} message={s.cancelConfirm} confirmLabel={s.cancelRequest} />
