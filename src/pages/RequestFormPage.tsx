@@ -137,7 +137,8 @@ export default function RequestFormPage() {
   const [newFiles, setNewFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
 
-  const [projects, setProjects] = useState<{ id: string; name: string; project_code?: string | null }[]>([])
+  const [projects, setProjects] = useState<{ id: string; name: string; project_code?: string | null; manager_id?: string | null }[]>([])
+  const [members, setMembers] = useState<{ id: string; first_name: string; last_name: string }[]>([])
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([])
@@ -151,7 +152,7 @@ export default function RequestFormPage() {
     if (!company) return
     const cid = company.id
     const [p, sup, c, l, d, itm] = await Promise.all([
-      supabase.from('projects').select('id, name, project_code').eq('company_id', cid).eq('status', 'active').order('name'),
+      supabase.from('projects').select('id, name, project_code, manager_id').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('suppliers').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('categories').select('id, name').eq('company_id', cid).order('name'),
       supabase.from('locations').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
@@ -160,12 +161,14 @@ export default function RequestFormPage() {
     ])
     setProjects(p.data ?? []); setSuppliers(sup.data ?? []); setCategories(c.data ?? [])
     setLocations(l.data ?? []); setDepartments(d.data ?? []); setItems((itm.data as Item[]) ?? [])
+    const { data: us } = await supabase.from('users').select('id, first_name, last_name').eq('company_id', cid)
+    setMembers(us ?? [])
   }
 
   async function loadRequest() {
     const { data: req } = await supabase.from('requests').select('*').eq('id', id!).single()
     if (!req) { toast.error('Not found'); navigate('/requests'); return }
-    if (req.status === 'cancelled') { navigate(`/requests/${id}`); return }
+    if (req.status === 'cancelled' || req.po_id) { navigate(`/requests/${id}`); return }
     setReqStatus(req.status)
     setHeader({
       project_id: req.project_id ?? '', supplier_id: req.supplier_id ?? '', supplier_name: req.supplier_name ?? '',
@@ -224,6 +227,13 @@ export default function RequestFormPage() {
   const discountAmount = parseNum(discount)
   const grandTotal = Math.max(0, subtotal - discountAmount)
   const fmt = (n: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: company?.currency ?? 'EUR' }).format(n)
+
+  const approverName = (() => {
+    const mid = projects.find(p => p.id === header.project_id)?.manager_id
+    if (!mid) return null
+    const m = members.find(u => u.id === mid)
+    return m ? `${m.first_name} ${m.last_name}` : null
+  })()
 
   async function persist(): Promise<string | null> {
     if (!company || !profile) return null
@@ -319,6 +329,10 @@ export default function RequestFormPage() {
           </Select>
           <Input id="r-needed" label={s.neededBy} type="date" value={header.needed_by_date} onChange={e => setHeader(h => ({ ...h, needed_by_date: e.target.value }))} />
         </div>
+
+        {approverName && (
+          <p className="mt-3 text-xs text-gray-500">{s.goesTo} <span className="font-medium text-gray-700">{approverName}</span></p>
+        )}
 
         <div className="mt-4 flex flex-col gap-1">
           <label className="text-sm font-medium text-gray-700">{s.note}</label>

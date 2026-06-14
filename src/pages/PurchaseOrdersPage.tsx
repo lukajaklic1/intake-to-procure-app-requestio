@@ -24,6 +24,7 @@ interface PO {
   category_id: string
   project_id: string
   department_id: string | null
+  request_id: string | null
   suppliers: { name: string } | null
   categories: { name: string } | null
   projects: { name: string } | null
@@ -56,6 +57,7 @@ export default function PurchaseOrdersPage() {
   const s = t.po
   const navigate = useNavigate()
   const [pos, setPos] = useState<PO[]>([])
+  const [reqNums, setReqNums] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
   // Filters
@@ -99,10 +101,18 @@ export default function PurchaseOrdersPage() {
     setLoading(true)
     const { data } = await supabase
       .from('purchase_orders')
-      .select('id, po_number, status, total_amount, created_at, expected_delivery_date, supplier_id, category_id, project_id, department_id, suppliers(name), categories(name), projects(name), locations(name)')
+      .select('id, po_number, status, total_amount, created_at, expected_delivery_date, supplier_id, category_id, project_id, department_id, request_id, suppliers(name), categories(name), projects(name), locations(name)')
       .eq('company_id', company.id)
       .order('created_at', { ascending: false })
-    setPos((data as unknown as PO[]) ?? [])
+    const list = (data as unknown as PO[]) ?? []
+    setPos(list)
+    const reqIds = list.map(p => p.request_id).filter(Boolean) as string[]
+    if (reqIds.length) {
+      const { data: reqs } = await supabase.from('requests').select('id, request_number').in('id', reqIds)
+      const rm: Record<string, string> = {}
+      for (const r of reqs ?? []) rm[r.id] = r.request_number
+      setReqNums(rm)
+    }
     setLoading(false)
   }
 
@@ -234,8 +244,8 @@ export default function PurchaseOrdersPage() {
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                {[s.poNumber, s.supplier, s.project, s.category, s.deliveryDate, s.total, t.common.status, ''].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
+                {[s.poNumber, s.supplier, s.project, s.category, s.deliveryDate, s.total, t.common.status, s.requestCol, ''].map((h, i) => (
+                  <th key={i} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -259,6 +269,11 @@ export default function PurchaseOrdersPage() {
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_BADGE[po.status] ?? 'bg-gray-100 text-gray-600'}`}>
                       {t.status[po.status as keyof typeof t.status] ?? po.status}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {po.request_id
+                      ? <Link to={`/requests/${po.request_id}`} className="font-mono text-xs font-semibold text-blue-600 hover:underline">{reqNums[po.request_id] ?? '—'}</Link>
+                      : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">

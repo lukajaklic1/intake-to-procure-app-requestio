@@ -260,9 +260,9 @@ export interface ActivityLog {
   company_id: string
   request_id: string
   actor_id: string | null
-  action: 'created' | 'edited' | 'submitted' | 'approved' | 'rejected' | 'cancelled'
+  action: 'created' | 'edited' | 'submitted' | 'approved' | 'rejected' | 'cancelled' | 'po_created'
   note: string | null
-  meta: { step?: number } | null
+  meta: { step?: number; po_id?: string; po_number?: string } | null
   created_at: string
 }
 

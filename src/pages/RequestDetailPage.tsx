@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Fragment } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, Pencil, XCircle, Check, X, FileText } from 'lucide-react'
+import { ChevronLeft, Pencil, XCircle, Check, X, FileText, ShoppingCart } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -33,7 +33,7 @@ function Field({ label, value }: { label: string; value?: string | null }) {
 
 export default function RequestDetailPage() {
   const { id } = useParams()
-  const { company, profile, isAdmin } = useCompany()
+  const { company, profile, isAdmin, hasPerm } = useCompany()
   const { t } = useLanguage()
   const s = t.requests
   const navigate = useNavigate()
@@ -43,6 +43,7 @@ export default function RequestDetailPage() {
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [activity, setActivity] = useState<ActivityLog[]>([])
   const [budget, setBudget] = useState<{ budget: number | null; ordered: number; approved: number; pending: number } | null>(null)
+  const [linkedPo, setLinkedPo] = useState<{ id: string; po_number: string; status: string; total_amount: number } | null>(null)
   const [attachments, setAttachments] = useState<{ id: string; file_name: string; file_path: string }[]>([])
   const [names, setNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -61,6 +62,10 @@ export default function RequestDetailPage() {
       .eq('id', id!).single()
     if (!data) { toast.error('Not found'); navigate('/requests'); return }
     setReq(data as unknown as ReqFull)
+    if (data.po_id) {
+      const { data: po } = await supabase.from('purchase_orders').select('id, po_number, status, total_amount').eq('id', data.po_id).single()
+      setLinkedPo(po ?? null)
+    } else setLinkedPo(null)
     if (data.project_id) {
       const { data: b } = await (supabase as any).rpc('get_project_budget_status', { p_project_id: data.project_id })
       setBudget(b ?? null)
@@ -75,7 +80,7 @@ export default function RequestDetailPage() {
     const { data: acts } = await supabase.from('activity_log').select('*').eq('request_id', id!).order('created_at', { ascending: true })
     const actList = (acts as ActivityLog[]) ?? []
     setActivity(actList)
-    const ids = [data.created_by, data.approver_id, data.decided_by, ...apList.map(a => a.approver_id), ...actList.map(a => a.actor_id)].filter(Boolean)
+    const ids = [data.created_by, data.approver_id, data.decided_by, company?.second_approver_id, ...apList.map(a => a.approver_id), ...actList.map(a => a.actor_id)].filter(Boolean)
     if (ids.length) {
       const { data: us } = await supabase.from('users').select('id, first_name, last_name').in('id', ids)
       const m: Record<string, string> = {}
@@ -100,6 +105,15 @@ export default function RequestDetailPage() {
     toast.success(s.st.cancelled); load()
   }
 
+  async function doCreatePo() {
+    setActionLoading(true)
+    const { data, error } = await (supabase as any).rpc('create_po_from_request', { p_request_id: id })
+    setActionLoading(false)
+    if (error) { toast.error(error.message); return }
+    toast.success(s.poCreatedToast)
+    navigate(`/purchase-orders/${data}/edit`)
+  }
+
   async function doDecide() {
     if (!decision || !myPending) return
     setActionLoading(true)
@@ -116,6 +130,47 @@ export default function RequestDetailPage() {
   const myPending = approvals.find(a => a.status === 'pending' && (a.approver_id === profile?.id || isAdmin))
   const st = req.status as RequestStatus
 
+  type FlowState = 'done' | 'current' | 'upcoming' | 'rejected' | 'cancelled'
+  const flowSteps: { label: string; name?: string; state: FlowState }[] = (() => {
+    if (st === 'draft') return []
+    const pendingState: FlowState = st === 'pending' ? 'current' : 'upcoming'
+    const steps: { label: string; name?: string; state: FlowState }[] = []
+
+    // 1. Created
+    steps.push({ label: s.flowCreated, name: req.created_by ? names[req.created_by] : undefined, state: 'done' })
+
+    // 2. Approvers (manager + director)
+    const a1 = approvals.find(a => a.step === 1)
+    const a1Approver = a1?.approver_id ?? req.approver_id
+    steps.push({
+      label: s.roleManager,
+      name: a1Approver ? names[a1Approver] : undefined,
+      state: a1?.status === 'approved' ? 'done' : a1?.status === 'rejected' ? 'rejected' : pendingState,
+    })
+    const a2 = approvals.find(a => a.step === 2)
+    if (a2) {
+      steps.push({ label: s.roleDirector, name: a2.approver_id ? names[a2.approver_id] : undefined, state: a2.status === 'approved' ? 'done' : a2.status === 'rejected' ? 'rejected' : pendingState })
+    } else {
+      const threshold = company?.approval_second_over
+      const director = company?.second_approver_id
+      if (threshold && threshold > 0 && director && director !== a1Approver && req.total_estimate > threshold) {
+        steps.push({ label: s.roleDirector, name: director ? names[director] : undefined, state: a1?.status === 'approved' ? (st === 'pending' ? 'current' : 'upcoming') : 'upcoming' })
+      }
+    }
+
+    // 3. Outcome
+    if (st === 'approved') steps.push({ label: s.st.approved, state: 'done' })
+    else if (st === 'rejected') steps.push({ label: s.st.rejected, state: 'rejected' })
+    else if (st === 'cancelled') steps.push({ label: s.st.cancelled, state: 'cancelled' })
+    else steps.push({ label: s.st.approved, state: 'upcoming' })
+
+    // 4. Purchase (only when relevant)
+    if (req.po_id) steps.push({ label: s.flowPurchased, name: linkedPo?.po_number, state: 'done' })
+    else if (st === 'approved') steps.push({ label: s.flowPurchase, state: 'upcoming' })
+
+    return steps
+  })()
+
   return (
     <div className="p-4 lg:p-6 max-w-4xl mx-auto">
       <button onClick={() => navigate('/requests')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-4"><ChevronLeft className="w-4 h-4" />{s.title}</button>
@@ -126,7 +181,10 @@ export default function RequestDetailPage() {
           <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[st]}`}>{s.st[st]}</span>
         </div>
         <div className="flex items-center gap-2">
-          {st !== 'cancelled' && (isCreator || isAdmin) && (
+          {st === 'approved' && !req.po_id && (hasPerm('purchase_orders', 'create') || isAdmin) && (
+            <Button loading={actionLoading} onClick={doCreatePo} className="gap-1.5"><ShoppingCart className="w-3.5 h-3.5" />{s.createPO}</Button>
+          )}
+          {st !== 'cancelled' && !req.po_id && (isCreator || isAdmin) && (
             <Button variant="secondary" onClick={() => navigate(`/requests/${id}/edit`)} className="gap-1.5"><Pencil className="w-3.5 h-3.5" />{s.edit}</Button>
           )}
           {st === 'pending' && myPending && (
@@ -140,6 +198,18 @@ export default function RequestDetailPage() {
           )}
         </div>
       </div>
+
+      {linkedPo && (
+        <button onClick={() => navigate(`/purchase-orders/${linkedPo.id}`)}
+          className="w-full flex items-center gap-3 p-4 mb-5 bg-blue-50 border border-blue-200 rounded-xl text-left hover:bg-blue-100 transition-colors">
+          <ShoppingCart className="w-5 h-5 text-blue-600 shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs text-blue-500">{s.linkedPO}</p>
+            <p className="text-sm font-semibold text-blue-700 font-mono">{linkedPo.po_number}</p>
+          </div>
+          <span className="text-sm font-medium text-blue-700">{fmt(linkedPo.total_amount ?? 0)}</span>
+        </button>
+      )}
 
       {budget && budget.budget != null && (() => {
         const committed = budget.ordered + budget.approved + budget.pending
@@ -189,6 +259,36 @@ export default function RequestDetailPage() {
         <Field label={s.approver} value={req.approver_id ? names[req.approver_id] : null} />
         {req.note && <div className="col-span-2 sm:col-span-3"><Field label={s.note} value={req.note} /></div>}
       </div>
+
+      {flowSteps.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5">
+          <p className="text-sm font-semibold text-gray-900 mb-4">{s.flowTitle}</p>
+          <div className="flex items-start overflow-x-auto py-2">
+            {flowSteps.map((step, i) => {
+              const circle =
+                step.state === 'done' ? 'bg-green-500 text-white border-2 border-green-500'
+                : step.state === 'rejected' ? 'bg-red-500 text-white border-2 border-red-500'
+                : step.state === 'cancelled' ? 'bg-gray-400 text-white border-2 border-gray-400'
+                : step.state === 'current' ? 'bg-amber-100 text-amber-600 border-2 border-amber-400'
+                : 'bg-gray-100 text-gray-300 border-2 border-gray-200'
+              return (
+                <Fragment key={i}>
+                  <div className="flex flex-col items-center text-center px-1.5 w-28 shrink-0">
+                    <div style={{ width: 44, height: 44, minWidth: 44, minHeight: 44, aspectRatio: '1 / 1' }} className={`shrink-0 rounded-full flex items-center justify-center ${circle}`}>
+                      {step.state === 'done' ? <Check className="w-5 h-5" />
+                        : step.state === 'rejected' || step.state === 'cancelled' ? <X className="w-5 h-5" />
+                        : <span style={{ width: 10, height: 10 }} className="rounded-full bg-current" />}
+                    </div>
+                    <p className="text-[11px] font-semibold text-gray-700 mt-1.5">{step.label}</p>
+                    {step.name && <p className="text-xs text-gray-500 truncate w-full">{step.name}</p>}
+                  </div>
+                  {i < flowSteps.length - 1 && <div className={`flex-1 h-0.5 mt-[22px] min-w-[20px] ${step.state === 'done' ? 'bg-green-300' : 'bg-gray-200'}`} />}
+                </Fragment>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {attachments.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5">
@@ -249,7 +349,7 @@ export default function RequestDetailPage() {
                   <div className="flex-1 -mt-0.5">
                     <p className="text-sm text-gray-800">
                       <span className="font-medium">{a.actor_id ? names[a.actor_id] ?? '—' : '—'}</span>{' '}
-                      {s.act[a.action]}{a.meta?.step ? ` (${s.step} ${a.meta.step})` : ''}
+                      {s.act[a.action]}{a.meta?.step ? ` (${s.step} ${a.meta.step})` : ''}{a.meta?.po_number ? ` ${a.meta.po_number}` : ''}
                     </p>
                     <p className="text-xs text-gray-400">{format(new Date(a.created_at), 'dd.MM.yyyy HH:mm')}</p>
                     {a.note && <p className="text-sm text-gray-600 mt-1 bg-gray-50 border border-gray-100 rounded-lg px-3 py-1.5">{a.note}</p>}

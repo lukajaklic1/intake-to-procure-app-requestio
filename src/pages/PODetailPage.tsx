@@ -22,6 +22,7 @@ interface POFull {
   incoterm: string | null; supplier_quote_ref: string | null
   notes: string | null
   discount_amount: number
+  request_id: string | null
   supplier_id: string; category_id: string; project_id: string; location_id: string; department_id: string | null
   suppliers: { name: string; email: string | null; address_street: string | null; address_city: string | null; address_postal_code: string | null; address_country: string | null; vat_number: string | null }
   categories: { name: string }
@@ -61,6 +62,7 @@ export default function PODetailPage() {
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [confirmTransition, setConfirmTransition] = useState<{ label: string; status: string } | null>(null)
   const [attachments, setAttachments] = useState<{ id: string; file_name: string; file_path: string }[]>([])
+  const [linkedReq, setLinkedReq] = useState<{ id: string; request_number: string } | null>(null)
 
   async function openAttachment(path: string) {
     const { data } = await supabase.storage.from('quotations').createSignedUrl(path, 3600)
@@ -77,6 +79,11 @@ export default function PODetailPage() {
       .eq('id', id!)
       .single()
     setPo(data as unknown as POFull)
+
+    if (data?.request_id) {
+      const { data: r } = await supabase.from('requests').select('id, request_number').eq('id', data.request_id).single()
+      setLinkedReq(r ?? null)
+    } else setLinkedReq(null)
 
     const { data: lineData } = await supabase.from('po_line_items').select('*, items(item_number)').eq('po_id', id!).order('position')
     setLines(lineData ?? [])
@@ -165,6 +172,17 @@ export default function PODetailPage() {
           {actionButtons}
         </div>
       </div>
+
+      {linkedReq && (
+        <button onClick={() => navigate(`/requests/${linkedReq.id}`)}
+          className="w-full flex items-center gap-3 p-4 mb-5 bg-blue-50 border border-blue-200 rounded-xl text-left hover:bg-blue-100 transition-colors">
+          <FileText className="w-5 h-5 text-blue-600 shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs text-blue-500">{t.requests.fromRequest}</p>
+            <p className="text-sm font-semibold text-blue-700 font-mono">{linkedReq.request_number}</p>
+          </div>
+        </button>
+      )}
 
       {/* Details grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
