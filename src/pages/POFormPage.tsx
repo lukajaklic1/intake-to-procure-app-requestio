@@ -439,6 +439,12 @@ export default function POFormPage() {
 
       await uploadAttachments(po.id)
 
+      const log: { company_id: string; po_id: string; actor_id: string; action: string }[] = [
+        { company_id: company.id, po_id: po.id, actor_id: session.user.id, action: 'created' },
+      ]
+      if (targetStatus === 'issued') log.push({ company_id: company.id, po_id: po.id, actor_id: session.user.id, action: 'issued' })
+      await supabase.from('po_activity_log').insert(log)
+
       toast.success(targetStatus === 'draft' ? t.common.saved : t.po.newPO + ' ' + poNum)
       navigate(targetStatus === 'draft' ? '/purchase-orders' : `/purchase-orders/${po.id}`)
     } else {
@@ -463,6 +469,10 @@ export default function POFormPage() {
       if (linePayload.length > 0) {
         await supabase.from('po_line_items').insert(linePayload.map(l => ({ ...l, po_id: id })))
       }
+
+      // Audit: status transition (e.g. draft -> issued) or a plain edit
+      const action = targetStatus !== poStatus ? targetStatus : 'edited'
+      await supabase.from('po_activity_log').insert({ company_id: company.id, po_id: id!, actor_id: session.user.id, action })
 
       toast.success(t.common.saved)
       // Osnutek → seznam, ostalo → view

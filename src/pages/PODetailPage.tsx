@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { ChevronLeft, Pencil, XCircle, CheckCircle, Download, FileText } from 'lucide-react'
+import { ChevronLeft, Pencil, XCircle, CheckCircle, Download, FileText, RotateCcw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -9,6 +9,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Button from '../components/ui/Button'
 import { usePODownload } from '../hooks/usePODownload'
 import { format } from 'date-fns'
+import type { PoActivityLog } from '../types/database'
 
 interface LineItem {
   id: string; position: number; name: string; long_description: string | null
@@ -23,6 +24,9 @@ interface POFull {
   notes: string | null
   discount_amount: number
   request_id: string | null
+  version: number
+  change_note: string | null
+  prev_status: string | null
   supplier_id: string; category_id: string; project_id: string; location_id: string; department_id: string | null
   suppliers: { name: string; email: string | null; address_street: string | null; address_city: string | null; address_postal_code: string | null; address_country: string | null; vat_number: string | null }
   categories: { name: string }
@@ -51,7 +55,7 @@ function Field({ label, value }: { label: string; value?: string | null }) {
 export default function PODetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { company } = useCompany()
+  const { company, profile, isAdmin } = useCompany()
   const { t } = useLanguage()
   const s = t.po
   const [po, setPo] = useState<POFull | null>(null)
@@ -63,6 +67,8 @@ export default function PODetailPage() {
   const [confirmTransition, setConfirmTransition] = useState<{ label: string; status: string } | null>(null)
   const [attachments, setAttachments] = useState<{ id: string; file_name: string; file_path: string }[]>([])
   const [linkedReq, setLinkedReq] = useState<{ id: string; request_number: string } | null>(null)
+  const [activity, setActivity] = useState<PoActivityLog[]>([])
+  const [actNames, setActNames] = useState<Record<string, string>>({})
 
   async function openAttachment(path: string) {
     const { data } = await supabase.storage.from('quotations').createSignedUrl(path, 3600)
@@ -91,17 +97,46 @@ export default function PODetailPage() {
     const { data: atts } = await supabase.from('po_attachments').select('id, file_name, file_path').eq('po_id', id!)
     setAttachments(atts ?? [])
 
+    const { data: acts } = await supabase.from('po_activity_log').select('*').eq('po_id', id!).order('created_at', { ascending: true })
+    const aList = (acts as PoActivityLog[]) ?? []
+    setActivity(aList)
+    const aIds = [...new Set(aList.map(a => a.actor_id).filter(Boolean) as string[])]
+    if (aIds.length) {
+      const { data: us } = await supabase.from('users').select('id, first_name, last_name').in('id', aIds)
+      const m: Record<string, string> = {}
+      for (const u of us ?? []) m[u.id] = `${u.first_name} ${u.last_name}`
+      setActNames(m)
+    }
+
     setLoading(false)
   }
 
   async function transition(newStatus: string) {
     if (!po) return
     setActionLoading(true)
-    const { error } = await supabase.from('purchase_orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', po.id)
+    // Remember where to return to when reopening
+    const patch: Record<string, unknown> = { status: newStatus, updated_at: new Date().toISOString() }
+    if (newStatus === 'cancelled' || newStatus === 'closed') patch.prev_status = po.status
+    const { error } = await supabase.from('purchase_orders').update(patch).eq('id', po.id)
+    if (!error && profile) {
+      await supabase.from('po_activity_log').insert({ company_id: po.company_id, po_id: po.id, actor_id: profile.id, action: newStatus })
+    }
     setActionLoading(false); setConfirmTransition(null); setConfirmCancel(false)
     if (error) { toast.error(error.message); return }
     toast.success(t.common.updated)
     load()
+  }
+
+  async function reopen() {
+    if (!po || !profile) return
+    // Return to the exact status it had before being cancelled/closed
+    const target = po.prev_status ?? 'draft'
+    setActionLoading(true)
+    const { error } = await supabase.from('purchase_orders').update({ status: target, prev_status: null, updated_at: new Date().toISOString() }).eq('id', po.id)
+    if (!error) await supabase.from('po_activity_log').insert({ company_id: po.company_id, po_id: po.id, actor_id: profile.id, action: 'reopened' })
+    setActionLoading(false)
+    if (error) { toast.error(error.message); return }
+    toast.success(t.common.updated); load()
   }
 
   function fmt(n: number) {
@@ -138,6 +173,11 @@ export default function PODetailPage() {
       {canCancel && (
         <Button variant="danger" onClick={() => setConfirmCancel(true)}>
           <XCircle className="w-4 h-4 mr-1.5" />{t.po.cancelPO}
+        </Button>
+      )}
+      {(po.status === 'closed' || po.status === 'cancelled') && isAdmin && (
+        <Button variant="secondary" loading={actionLoading} onClick={reopen}>
+          <RotateCcw className="w-4 h-4 mr-1.5" />{s.reopen}
         </Button>
       )}
     </>
@@ -301,6 +341,30 @@ export default function PODetailPage() {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Audit trail */}
+      {activity.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5 mb-5">
+          <p className="text-sm font-semibold text-gray-900 mb-4">{s.auditTrail}</p>
+          <ol className="flex flex-col gap-4">
+            {activity.map(a => {
+              const dot = a.action === 'cancelled' ? 'bg-red-500' : a.action === 'closed' ? 'bg-green-500' : a.action === 'sent' ? 'bg-blue-500' : a.action === 'issued' ? 'bg-amber-500' : 'bg-gray-400'
+              return (
+                <li key={a.id} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <span className={`w-2.5 h-2.5 rounded-full ${dot} mt-1.5`} />
+                    <span className="flex-1 w-px bg-gray-100 mt-1" />
+                  </div>
+                  <div className="flex-1 -mt-0.5">
+                    <p className="text-sm text-gray-800"><span className="font-medium">{a.actor_id ? actNames[a.actor_id] ?? '—' : '—'}</span> {s.act[a.action]}</p>
+                    <p className="text-xs text-gray-400">{format(new Date(a.created_at), 'dd.MM.yyyy HH:mm')}</p>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
         </div>
       )}
 

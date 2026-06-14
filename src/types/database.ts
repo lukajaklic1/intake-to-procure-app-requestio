@@ -141,8 +141,20 @@ export interface PurchaseOrder {
   total_amount: number
   discount_amount: number
   request_id: string | null
+  version: number
+  change_note: string | null
   created_at: string
   updated_at: string
+}
+
+export interface PoActivityLog {
+  id: string
+  company_id: string
+  po_id: string
+  actor_id: string | null
+  action: 'created' | 'edited' | 'issued' | 'sent' | 'closed' | 'cancelled' | 'reopened'
+  note: string | null
+  created_at: string
 }
 
 export interface PoLineItem {
@@ -300,6 +312,7 @@ export interface Database {
       approvals: { Row: Approval; Insert: Omit<Approval, 'id' | 'created_at'>; Update: Partial<Omit<Approval, 'id'>> }
       request_attachments: { Row: RequestAttachment; Insert: Omit<RequestAttachment, 'id' | 'created_at'>; Update: Partial<Omit<RequestAttachment, 'id'>> }
       activity_log: { Row: ActivityLog; Insert: Omit<ActivityLog, 'id' | 'created_at'>; Update: Partial<Omit<ActivityLog, 'id'>> }
+      po_activity_log: { Row: PoActivityLog; Insert: Omit<PoActivityLog, 'id' | 'created_at'>; Update: Partial<Omit<PoActivityLog, 'id'>> }
     }
   }
 }

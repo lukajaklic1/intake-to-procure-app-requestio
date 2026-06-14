@@ -209,6 +209,17 @@ export const translations = {
       noResults: 'No results',
       requestCol: 'Request',
       creatorAll: 'Order creator: all',
+      auditTrail: 'History',
+      reopen: 'Reopen',
+      act: {
+        created: 'created the order',
+        edited: 'edited the order',
+        issued: 'issued the order',
+        sent: 'marked as sent',
+        closed: 'marked as closed',
+        cancelled: 'cancelled the order',
+        reopened: 'reopened the order',
+      },
     },
 
     // Suppliers
@@ -802,6 +813,17 @@ export const translations = {
       noResults: 'Ni rezultatov',
       requestCol: 'Zahtevek',
       creatorAll: 'Kreator naročila: vsi',
+      auditTrail: 'Zgodovina',
+      reopen: 'Ponovno odpri',
+      act: {
+        created: 'je ustvaril naročilo',
+        edited: 'je uredil naročilo',
+        issued: 'je izdal naročilo',
+        sent: 'je označil kot poslano',
+        closed: 'je označil kot zaprto',
+        cancelled: 'je preklical naročilo',
+        reopened: 'je ponovno odprl naročilo',
+      },
     },
 
     // Suppliers
