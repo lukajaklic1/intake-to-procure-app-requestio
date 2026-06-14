@@ -13,6 +13,7 @@ interface Row {
   created_at: string
   needed_by_date: string | null
   created_by: string
+  approver_id: string | null
   projects: { name: string } | null
 }
 
@@ -21,7 +22,7 @@ function fmt(n: number, currency = 'EUR') {
 }
 
 export default function ApprovalsPage() {
-  const { company, profile } = useCompany()
+  const { company, profile, isAdmin } = useCompany()
   const { t } = useLanguage()
   const a = t.approvals
   const s = t.requests
@@ -30,21 +31,23 @@ export default function ApprovalsPage() {
   const [names, setNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { if (company && profile) load() }, [company, profile])
+  useEffect(() => { if (company && profile) load() }, [company, profile, isAdmin])
 
   async function load() {
     if (!company || !profile) return
     setLoading(true)
-    const { data } = await supabase
+    let query = supabase
       .from('requests')
-      .select('id, request_number, total_estimate, created_at, needed_by_date, created_by, projects(name)')
+      .select('id, request_number, total_estimate, created_at, needed_by_date, created_by, approver_id, projects(name)')
       .eq('company_id', company.id)
-      .eq('approver_id', profile.id)
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
+    // Admins see every pending request; others only those assigned to them.
+    if (!isAdmin) query = query.eq('approver_id', profile.id)
+    const { data } = await query
     const list = (data as unknown as Row[]) ?? []
     setRows(list)
-    const ids = [...new Set(list.map(r => r.created_by))]
+    const ids = [...new Set(list.flatMap(r => [r.created_by, r.approver_id]).filter(Boolean) as string[])]
     if (ids.length) {
       const { data: us } = await supabase.from('users').select('id, first_name, last_name').in('id', ids)
       const m: Record<string, string> = {}
@@ -72,8 +75,8 @@ export default function ApprovalsPage() {
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
             <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>{[s.requestNumber, s.project, a.requestedBy, s.neededBy, s.estTotal].map(h => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
+              <tr>{[s.requestNumber, s.project, a.requestedBy, ...(isAdmin ? [s.approver] : []), s.neededBy, s.estTotal].map((h, i) => (
+                <th key={i} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
               ))}</tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -84,6 +87,7 @@ export default function ApprovalsPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-700">{r.projects?.name ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{names[r.created_by] ?? '—'}</td>
+                  {isAdmin && <td className="px-4 py-3 text-gray-600">{r.approver_id ? names[r.approver_id] ?? '—' : '—'}</td>}
                   <td className="px-4 py-3 text-gray-500 text-xs">{r.needed_by_date ? format(new Date(r.needed_by_date), 'dd.MM.yyyy') : '—'}</td>
                   <td className="px-4 py-3 font-medium text-gray-800">{fmt(r.total_estimate ?? 0, company?.currency)}</td>
                 </tr>

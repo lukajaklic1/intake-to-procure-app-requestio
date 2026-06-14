@@ -130,7 +130,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({ total: 0, poCount: 0, openPos: 0, avgPo: 0 })
 
   // Checklist
-  const [checklist, setChecklist] = useState({ companyInfo: false, supplier: false, category: false, project: false, location: false, department: false, firstPo: false })
+  const [checklist, setChecklist] = useState({ companyInfo: false, supplier: false, category: false, project: false, location: false, department: false, teamMember: false, firstRequest: false, firstPo: false })
   const [checklistLoaded, setChecklistLoaded] = useState(false)
 
   const currency = company?.currency ?? 'EUR'
@@ -163,13 +163,16 @@ export default function DashboardPage() {
   async function loadChecklist() {
     const cid = company!.id
     const comp = company!
-    const [{ count: sc }, { count: cc }, { count: projc }, { count: locc }, { count: deptc }, { count: poc }] = await Promise.all([
+    const [{ count: sc }, { count: cc }, { count: projc }, { count: locc }, { count: deptc }, { count: poc }, { count: uc }, { count: invc }, { count: reqc }] = await Promise.all([
       supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('company_id', cid),
       supabase.from('categories').select('*', { count: 'exact', head: true }).eq('company_id', cid),
       supabase.from('projects').select('*', { count: 'exact', head: true }).eq('company_id', cid),
       supabase.from('locations').select('*', { count: 'exact', head: true }).eq('company_id', cid),
       supabase.from('departments').select('*', { count: 'exact', head: true }).eq('company_id', cid),
       supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('company_id', cid),
+      supabase.from('users').select('*', { count: 'exact', head: true }).eq('company_id', cid),
+      supabase.from('user_invitations').select('*', { count: 'exact', head: true }).eq('company_id', cid).eq('status', 'pending'),
+      supabase.from('requests').select('*', { count: 'exact', head: true }).eq('company_id', cid),
     ])
     setChecklist({
       companyInfo: !!(comp.address_street && comp.tax_id),
@@ -178,6 +181,8 @@ export default function DashboardPage() {
       project: (projc ?? 0) > 0,
       location: (locc ?? 0) > 0,
       department: (deptc ?? 0) > 0,
+      teamMember: (uc ?? 0) > 1 || (invc ?? 0) > 0,
+      firstRequest: (reqc ?? 0) > 0,
       firstPo: (poc ?? 0) > 0,
     })
     setChecklistLoaded(true)
@@ -277,6 +282,8 @@ export default function DashboardPage() {
     { done: checklist.project,       label: t.checklist.createProject,                 to: '/projects' },
     { done: checklist.location,      label: t.checklist.createLocation,       to: '/locations' },
     { done: checklist.department,    label: t.checklist.createDepartment,              to: '/departments' },
+    { done: checklist.teamMember,    label: t.checklist.inviteTeam,                    to: '/users' },
+    { done: checklist.firstRequest,  label: t.checklist.createFirstRequest,            to: '/requests' },
     { done: checklist.firstPo,       label: t.checklist.createFirstPO, to: '/purchase-orders' },
   ]
   const doneCount = checklistItems.filter(i => i.done).length

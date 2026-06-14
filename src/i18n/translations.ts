@@ -129,6 +129,8 @@ export const translations = {
       createProject: 'Create a project',
       createLocation: 'Create a delivery location',
       createDepartment: 'Create a department',
+      inviteTeam: 'Invite a team member',
+      createFirstRequest: 'Create your first request',
       createFirstPO: 'Create your first purchase order',
     },
 
@@ -698,6 +700,8 @@ export const translations = {
       createProject: 'Dodajte prvi projekt',
       createLocation: 'Dodajte prvo lokacijo dostave',
       createDepartment: 'Dodajte prvi oddelek',
+      inviteTeam: 'Povabite člana ekipe',
+      createFirstRequest: 'Ustvarite prvi zahtevek',
       createFirstPO: 'Dodajte prvo naročilo',
     },
 
