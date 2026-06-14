@@ -58,7 +58,7 @@ export default function RequestsPage() {
   const navigate = useNavigate()
   const [rows, setRows] = useState<Row[]>([])
   const [names, setNames] = useState<Record<string, string>>({})
-  const [poNums, setPoNums] = useState<Record<string, string>>({})
+  const [poNums, setPoNums] = useState<Record<string, { po_number: string; created_at: string }>>({})
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
 
@@ -70,11 +70,14 @@ export default function RequestsPage() {
   const [categoryId, setCategoryId] = useState('')
   const [projectId, setProjectId] = useState('')
   const [departmentId, setDepartmentId] = useState('')
+  const [poFilter, setPoFilter] = useState('all')
+  const [creatorId, setCreatorId] = useState('')
 
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([])
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
+  const [members, setMembers] = useState<{ id: string; first_name: string; last_name: string }[]>([])
 
   const canViewAll = hasPerm('requests', 'view')
 
@@ -83,13 +86,14 @@ export default function RequestsPage() {
   async function loadRefs() {
     if (!company) return
     const cid = company.id
-    const [sp, c, p, d] = await Promise.all([
+    const [sp, c, p, d, u] = await Promise.all([
       supabase.from('suppliers').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('categories').select('id, name').eq('company_id', cid).order('name'),
       supabase.from('projects').select('id, name').eq('company_id', cid).order('name'),
       supabase.from('departments').select('id, name').eq('company_id', cid).order('name'),
+      supabase.from('users').select('id, first_name, last_name').eq('company_id', cid).order('first_name'),
     ])
-    setSuppliers(sp.data ?? []); setCategories(c.data ?? []); setProjects(p.data ?? []); setDepartments(d.data ?? [])
+    setSuppliers(sp.data ?? []); setCategories(c.data ?? []); setProjects(p.data ?? []); setDepartments(d.data ?? []); setMembers(u.data ?? [])
   }
 
   async function load() {
@@ -113,9 +117,9 @@ export default function RequestsPage() {
     }
     const poIds = list.map(r => r.po_id).filter(Boolean) as string[]
     if (poIds.length) {
-      const { data: pos } = await supabase.from('purchase_orders').select('id, po_number').in('id', poIds)
-      const pm: Record<string, string> = {}
-      for (const p of pos ?? []) pm[p.id] = p.po_number
+      const { data: pos } = await supabase.from('purchase_orders').select('id, po_number, created_at').in('id', poIds)
+      const pm: Record<string, { po_number: string; created_at: string }> = {}
+      for (const p of pos ?? []) pm[p.id] = { po_number: p.po_number, created_at: p.created_at }
       setPoNums(pm)
     }
     setLoading(false)
@@ -123,12 +127,12 @@ export default function RequestsPage() {
 
   function clearFilters() {
     setSearch(''); setStatus('all'); setDateRange('all')
-    setSupplierId(''); setCategoryId(''); setProjectId(''); setDepartmentId(''); setPage(1)
+    setSupplierId(''); setCategoryId(''); setProjectId(''); setDepartmentId(''); setPoFilter('all'); setCreatorId(''); setPage(1)
   }
-  const hasActiveFilters = search || status !== 'all' || dateRange !== 'all' || supplierId || categoryId || projectId || departmentId
+  const hasActiveFilters = search || status !== 'all' || dateRange !== 'all' || supplierId || categoryId || projectId || departmentId || poFilter !== 'all' || creatorId
 
   const dateFrom = getDateFrom(dateRange)
-  useEffect(() => { setPage(1) }, [search, status, dateRange, supplierId, categoryId, projectId, departmentId])
+  useEffect(() => { setPage(1) }, [search, status, dateRange, supplierId, categoryId, projectId, departmentId, poFilter, creatorId])
 
   const filtered = rows.filter(r => {
     const q = search.toLowerCase()
@@ -139,6 +143,9 @@ export default function RequestsPage() {
     if (categoryId && r.category_id !== categoryId) return false
     if (projectId && r.project_id !== projectId) return false
     if (departmentId && r.department_id !== departmentId) return false
+    if (poFilter === 'ordered' && !r.po_id) return false
+    if (poFilter === 'not' && r.po_id) return false
+    if (creatorId && r.created_by !== creatorId) return false
     return true
   })
 
@@ -190,6 +197,15 @@ export default function RequestsPage() {
             <option value="">{t.filters.allDepartments}</option>
             {departments.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
           </select>
+          <select value={creatorId} onChange={e => setCreatorId(e.target.value)} className={selectCls}>
+            <option value="">{s.allRequesters}</option>
+            {members.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
+          </select>
+          <select value={poFilter} onChange={e => setPoFilter(e.target.value)} className={selectCls}>
+            <option value="all">{s.poFilterAll}</option>
+            <option value="ordered">{s.ordered}</option>
+            <option value="not">{s.notOrdered}</option>
+          </select>
           {hasActiveFilters && (
             <button onClick={clearFilters} className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 font-medium ml-auto whitespace-nowrap">
               <X className="w-3.5 h-3.5" />{t.common.clearFilters}
@@ -236,8 +252,11 @@ export default function RequestsPage() {
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[r.status]}`}>{s.st[r.status]}</span>
                   </td>
                   <td className="px-4 py-3">
-                    {r.po_id
-                      ? <Link to={`/purchase-orders/${r.po_id}`} onClick={e => e.stopPropagation()} className="font-mono text-xs font-semibold text-blue-600 hover:underline">{poNums[r.po_id] ?? '—'}</Link>
+                    {r.po_id && poNums[r.po_id]
+                      ? <>
+                          <Link to={`/purchase-orders/${r.po_id}`} onClick={e => e.stopPropagation()} className="font-mono text-xs font-semibold text-blue-600 hover:underline">{poNums[r.po_id].po_number}</Link>
+                          <p className="text-xs text-gray-400 mt-0.5">{format(new Date(poNums[r.po_id].created_at), 'dd.MM.yyyy')}</p>
+                        </>
                       : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3">

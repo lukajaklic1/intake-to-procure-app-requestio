@@ -19,6 +19,7 @@ interface PO {
   status: string
   total_amount: number
   created_at: string
+  created_by: string
   expected_delivery_date: string | null
   supplier_id: string
   category_id: string
@@ -68,12 +69,14 @@ export default function PurchaseOrdersPage() {
   const [categoryId, setCategoryId]   = useState('')
   const [projectId, setProjectId]     = useState('')
   const [departmentId, setDepartmentId] = useState('')
+  const [creatorId, setCreatorId]     = useState('')
 
   // Reference data for dropdowns
   const [suppliers, setSuppliers]     = useState<{ id: string; name: string }[]>([])
   const [categories, setCategories]   = useState<{ id: string; name: string }[]>([])
   const [projects, setProjects]       = useState<{ id: string; name: string }[]>([])
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
+  const [members, setMembers]         = useState<{ id: string; first_name: string; last_name: string }[]>([])
 
   const [page, setPage] = useState(1)
   const [confirmDelete, setConfirmDelete] = useState<PO | null>(null)
@@ -84,16 +87,18 @@ export default function PurchaseOrdersPage() {
   async function loadRefs() {
     if (!company) return
     const cid = company.id
-    const [s, c, p, d] = await Promise.all([
+    const [s, c, p, d, u] = await Promise.all([
       supabase.from('suppliers').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('categories').select('id, name').eq('company_id', cid).order('name'),
       supabase.from('projects').select('id, name').eq('company_id', cid).order('name'),
       supabase.from('departments').select('id, name').eq('company_id', cid).order('name'),
+      supabase.from('users').select('id, first_name, last_name').eq('company_id', cid).order('first_name'),
     ])
     setSuppliers(s.data ?? [])
     setCategories(c.data ?? [])
     setProjects(p.data ?? [])
     setDepartments(d.data ?? [])
+    setMembers(u.data ?? [])
   }
 
   async function load() {
@@ -101,7 +106,7 @@ export default function PurchaseOrdersPage() {
     setLoading(true)
     const { data } = await supabase
       .from('purchase_orders')
-      .select('id, po_number, status, total_amount, created_at, expected_delivery_date, supplier_id, category_id, project_id, department_id, request_id, suppliers(name), categories(name), projects(name), locations(name)')
+      .select('id, po_number, status, total_amount, created_at, created_by, expected_delivery_date, supplier_id, category_id, project_id, department_id, request_id, suppliers(name), categories(name), projects(name), locations(name)')
       .eq('company_id', company.id)
       .order('created_at', { ascending: false })
     const list = (data as unknown as PO[]) ?? []
@@ -126,16 +131,16 @@ export default function PurchaseOrdersPage() {
 
   function clearFilters() {
     setSearch(''); setStatus('all'); setDateRange('all')
-    setSupplierId(''); setCategoryId(''); setProjectId(''); setDepartmentId('')
+    setSupplierId(''); setCategoryId(''); setProjectId(''); setDepartmentId(''); setCreatorId('')
     setPage(1)
   }
 
-  const hasActiveFilters = search || status !== 'all' || dateRange !== 'all' || supplierId || categoryId || projectId || departmentId
+  const hasActiveFilters = search || status !== 'all' || dateRange !== 'all' || supplierId || categoryId || projectId || departmentId || creatorId
 
   const dateFrom = getDateFrom(dateRange)
 
   // Reset page on any filter change
-  useEffect(() => { setPage(1) }, [search, status, dateRange, supplierId, categoryId, projectId, departmentId])
+  useEffect(() => { setPage(1) }, [search, status, dateRange, supplierId, categoryId, projectId, departmentId, creatorId])
 
   const filtered = pos.filter(po => {
     const q = search.toLowerCase()
@@ -146,6 +151,7 @@ export default function PurchaseOrdersPage() {
     if (categoryId && po.category_id !== categoryId) return false
     if (projectId && po.project_id !== projectId) return false
     if (departmentId && po.department_id !== departmentId) return false
+    if (creatorId && po.created_by !== creatorId) return false
     return true
   })
 
@@ -218,6 +224,12 @@ export default function PurchaseOrdersPage() {
           <select value={departmentId} onChange={e => setDepartmentId(e.target.value)} className={selectCls}>
             <option value="">{t.filters.allDepartments}</option>
             {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+
+          {/* Creator */}
+          <select value={creatorId} onChange={e => setCreatorId(e.target.value)} className={selectCls}>
+            <option value="">{s.creatorAll}</option>
+            {members.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
           </select>
 
           {hasActiveFilters && (

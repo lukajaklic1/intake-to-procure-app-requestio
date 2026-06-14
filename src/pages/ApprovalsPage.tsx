@@ -41,14 +41,19 @@ export default function ApprovalsPage() {
   const [search, setSearch] = useState('')
   const [projectId, setProjectId] = useState('')
   const [dateRange, setDateRange] = useState('all')
+  const [approverId, setApproverId] = useState('')
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([])
+  const [members, setMembers] = useState<{ id: string; first_name: string; last_name: string }[]>([])
 
-  useEffect(() => { if (company && profile) { load(); loadProjects() } }, [company, profile, isAdmin])
+  useEffect(() => { if (company && profile) { load(); loadRefs() } }, [company, profile, isAdmin])
 
-  async function loadProjects() {
+  async function loadRefs() {
     if (!company) return
-    const { data } = await supabase.from('projects').select('id, name').eq('company_id', company.id).order('name')
-    setProjects(data ?? [])
+    const [{ data: p }, { data: u }] = await Promise.all([
+      supabase.from('projects').select('id, name').eq('company_id', company.id).order('name'),
+      supabase.from('users').select('id, first_name, last_name').eq('company_id', company.id).order('first_name'),
+    ])
+    setProjects(p ?? []); setMembers(u ?? [])
   }
 
   async function load() {
@@ -74,8 +79,8 @@ export default function ApprovalsPage() {
     setLoading(false)
   }
 
-  function clearFilters() { setSearch(''); setProjectId(''); setDateRange('all') }
-  const hasActiveFilters = search || projectId || dateRange !== 'all'
+  function clearFilters() { setSearch(''); setProjectId(''); setDateRange('all'); setApproverId('') }
+  const hasActiveFilters = search || projectId || dateRange !== 'all' || approverId
   const dateFrom = getDateFrom(dateRange)
 
   const filtered = rows.filter(r => {
@@ -83,6 +88,7 @@ export default function ApprovalsPage() {
     if (search && !r.request_number.toLowerCase().includes(q) && !(r.projects?.name ?? '').toLowerCase().includes(q)) return false
     if (projectId && r.project_id !== projectId) return false
     if (dateFrom && r.created_at < dateFrom) return false
+    if (approverId && r.approver_id !== approverId) return false
     return true
   })
 
@@ -114,6 +120,12 @@ export default function ApprovalsPage() {
               <option value="6m">{t.filters.last6Months}</option>
               <option value="1y">{t.filters.last12Months}</option>
             </select>
+            {isAdmin && (
+              <select value={approverId} onChange={e => setApproverId(e.target.value)} className={selectCls}>
+                <option value="">{a.approverAll}</option>
+                {members.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
+              </select>
+            )}
             {hasActiveFilters && (
               <button onClick={clearFilters} className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 font-medium ml-auto whitespace-nowrap">
                 <X className="w-3.5 h-3.5" />{t.common.clearFilters}

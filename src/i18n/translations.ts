@@ -208,6 +208,7 @@ export const translations = {
       code: 'Code',
       noResults: 'No results',
       requestCol: 'Request',
+      creatorAll: 'Order creator: all',
     },
 
     // Suppliers
@@ -455,7 +456,11 @@ export const translations = {
       fromRequest: 'From request',
       poCreatedToast: 'Purchase order created',
       lockedByPO: 'A purchase order exists for this request, so it can no longer be edited.',
-      poCol: 'PO',
+      poCol: 'Purchase order',
+      poFilterAll: 'Purchase order: all',
+      allRequesters: 'Requester: all',
+      ordered: 'Ordered',
+      notOrdered: 'Not ordered',
       goesTo: 'Goes to approval:',
       flowTitle: 'Approval flow',
       roleManager: 'Project manager',
@@ -483,6 +488,7 @@ export const translations = {
       rejectTitle: 'Reject request',
       noteOptional: 'Note (optional)',
       requestedBy: 'Requested by',
+      approverAll: 'Approver: all',
     },
 
     // Auth
@@ -795,6 +801,7 @@ export const translations = {
       code: 'Šifra',
       noResults: 'Ni rezultatov',
       requestCol: 'Zahtevek',
+      creatorAll: 'Kreator naročila: vsi',
     },
 
     // Suppliers
@@ -935,7 +942,7 @@ export const translations = {
       approvalsSettingsHint: 'Nastavite mejne vrednosti za samodejno odobritev in kdo lahko ureja zahtevke.',
       autoApproveUnder: 'Samodejno odobri zahtevke pod',
       secondApprovalOver: 'Zahtevaj odobritev direktorja nad',
-      secondApprover: 'Direktor / drugi odobritelj',
+      secondApprover: 'Direktor / drugi potrjevalec',
       selectApprover: 'Izberi osebo',
       teamEditRequests: 'Dovoli članom ekipe urejanje zahtevkov drugih',
       addUser: 'Dodaj uporabnika',
@@ -1006,7 +1013,7 @@ export const translations = {
       estTotal: 'Ocenjena vrednost',
       saveDraft: 'Shrani osnutek',
       submit: 'Oddaj v potrjevanje',
-      approver: 'Odobritelj',
+      approver: 'Potrjevalec',
       requestedBy: 'Zahteval',
       decision: 'Odločitev',
       decidedBy: 'Odločil',
@@ -1042,7 +1049,11 @@ export const translations = {
       fromRequest: 'Iz zahtevka',
       poCreatedToast: 'Naročilo ustvarjeno',
       lockedByPO: 'Za ta zahtevek obstaja naročilo, zato ga ni več mogoče urejati.',
-      poCol: 'Naročilo',
+      poCol: 'Nabavno naročilo',
+      poFilterAll: 'Nabavno naročilo: vse',
+      allRequesters: 'Kreator zahtevka: vsi',
+      ordered: 'Naročeno',
+      notOrdered: 'Še ni naročeno',
       goesTo: 'Gre v potrjevanje:',
       flowTitle: 'Potek odobritve',
       roleManager: 'Vodja projekta',
@@ -1070,6 +1081,7 @@ export const translations = {
       rejectTitle: 'Zavrni zahtevek',
       noteOptional: 'Opomba (neobvezno)',
       requestedBy: 'Zahteval',
+      approverAll: 'Potrjevalec: vsi',
     },
 
     // Auth

@@ -43,7 +43,7 @@ export default function RequestDetailPage() {
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [activity, setActivity] = useState<ActivityLog[]>([])
   const [budget, setBudget] = useState<{ budget: number | null; ordered: number; approved: number; pending: number } | null>(null)
-  const [linkedPo, setLinkedPo] = useState<{ id: string; po_number: string; status: string; total_amount: number } | null>(null)
+  const [linkedPo, setLinkedPo] = useState<{ id: string; po_number: string; status: string; total_amount: number; created_at: string } | null>(null)
   const [attachments, setAttachments] = useState<{ id: string; file_name: string; file_path: string }[]>([])
   const [names, setNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -63,7 +63,7 @@ export default function RequestDetailPage() {
     if (!data) { toast.error('Not found'); navigate('/requests'); return }
     setReq(data as unknown as ReqFull)
     if (data.po_id) {
-      const { data: po } = await supabase.from('purchase_orders').select('id, po_number, status, total_amount').eq('id', data.po_id).single()
+      const { data: po } = await supabase.from('purchase_orders').select('id, po_number, status, total_amount, created_at').eq('id', data.po_id).single()
       setLinkedPo(po ?? null)
     } else setLinkedPo(null)
     if (data.project_id) {
@@ -107,11 +107,21 @@ export default function RequestDetailPage() {
 
   async function doCreatePo() {
     setActionLoading(true)
-    const { data, error } = await (supabase as any).rpc('create_po_from_request', { p_request_id: id })
+    const { data: poId, error } = await (supabase as any).rpc('create_po_from_request', { p_request_id: id })
+    if (error) { setActionLoading(false); toast.error(error.message); return }
+    // Carry the request's attachments (offers) over to the new PO — independent copies
+    if (company && poId) {
+      const { data: atts } = await supabase.from('request_attachments').select('file_path, file_name, file_size').eq('request_id', id!)
+      for (let i = 0; i < (atts?.length ?? 0); i++) {
+        const att = atts![i]
+        const newPath = `${company.id}/${poId}/${Date.now()}-${i}-${att.file_name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+        const { error: cpErr } = await supabase.storage.from('quotations').copy(att.file_path, newPath)
+        if (!cpErr) await supabase.from('po_attachments').insert({ po_id: poId, company_id: company.id, file_path: newPath, file_name: att.file_name, file_size: att.file_size })
+      }
+    }
     setActionLoading(false)
-    if (error) { toast.error(error.message); return }
     toast.success(s.poCreatedToast)
-    navigate(`/purchase-orders/${data}/edit`)
+    navigate(`/purchase-orders/${poId}/edit`)
   }
 
   async function doDecide() {
@@ -193,7 +203,7 @@ export default function RequestDetailPage() {
               <Button onClick={() => { setDecision('approve'); setNote('') }} className="gap-1.5"><Check className="w-3.5 h-3.5" />{t.approvals.approve}</Button>
             </>
           )}
-          {st !== 'cancelled' && (isCreator || isAdmin) && (
+          {st !== 'cancelled' && !req.po_id && (isCreator || isAdmin) && (
             <Button variant="secondary" onClick={() => setConfirmCancel(true)} className="gap-1.5 text-red-600"><XCircle className="w-3.5 h-3.5" />{s.cancelRequest}</Button>
           )}
         </div>
@@ -206,6 +216,7 @@ export default function RequestDetailPage() {
           <div className="flex-1">
             <p className="text-xs text-blue-500">{s.linkedPO}</p>
             <p className="text-sm font-semibold text-blue-700 font-mono">{linkedPo.po_number}</p>
+            <p className="text-xs text-blue-400 mt-0.5">{format(new Date(linkedPo.created_at), 'dd.MM.yyyy')}</p>
           </div>
           <span className="text-sm font-medium text-blue-700">{fmt(linkedPo.total_amount ?? 0)}</span>
         </button>
