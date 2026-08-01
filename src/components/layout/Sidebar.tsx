@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Building2, Package,
   Tag, FolderOpen, MapPin, Users, UserCog, Settings, LogOut, X,
-  ClipboardList, CheckCircle2,
+  ClipboardList, CheckCircle2, PackageCheck,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useCompany } from '../../hooks/useCompany'
@@ -15,6 +15,7 @@ const NAV_KEYS = [
   { to: '/requests',        icon: ClipboardList,    key: 'myRequests' as const },
   { to: '/approvals',       icon: CheckCircle2,     key: 'approvals' as const },
   { to: '/purchase-orders', icon: FileText,         key: 'purchaseOrders' as const },
+  { to: '/receipts',        icon: PackageCheck,     key: 'receipts' as const },
   { to: '/suppliers',       icon: Building2,        key: 'suppliers' as const },
   { to: '/items',           icon: Package,          key: 'items' as const },
   { to: '/categories',      icon: Tag,              key: 'categories' as const },

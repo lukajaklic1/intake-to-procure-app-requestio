@@ -24,6 +24,9 @@ import RequestsPage from './pages/RequestsPage'
 import RequestFormPage from './pages/RequestFormPage'
 import RequestDetailPage from './pages/RequestDetailPage'
 import ApprovalsPage from './pages/ApprovalsPage'
+import ReceiptsPage from './pages/ReceiptsPage'
+import ReceiveFormPage from './pages/ReceiveFormPage'
+import ReceiptDetailPage from './pages/ReceiptDetailPage'
 import PrivacyPage from './pages/PrivacyPage'
 import TermsPage from './pages/TermsPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
@@ -72,6 +75,9 @@ export default function Root() {
             <Route path="/requests/:id"           element={<App><RequestDetailPage /></App>} />
             <Route path="/requests/:id/edit"      element={<App><RequestFormPage /></App>} />
             <Route path="/approvals"              element={<App><ApprovalsPage /></App>} />
+            <Route path="/receipts"               element={<App><ReceiptsPage /></App>} />
+            <Route path="/receipts/:id"           element={<App><ReceiptDetailPage /></App>} />
+            <Route path="/receive/:poId"          element={<App><ReceiveFormPage /></App>} />
             <Route path="/users"                  element={<App><UsersPage /></App>} />
             <Route path="/settings"               element={<App><SettingsPage /></App>} />
 

@@ -39,6 +39,7 @@ interface Row {
   projects: { name: string } | null
   categories: { name: string } | null
   suppliers: { name: string } | null
+  locations: { name: string } | null
 }
 
 function fmt(n: number, currency = 'EUR') {
@@ -101,7 +102,7 @@ export default function RequestsPage() {
     setLoading(true)
     let query = supabase
       .from('requests')
-      .select('id, request_number, status, total_estimate, created_at, created_by, approver_id, po_id, needed_by_date, project_id, supplier_id, supplier_name, category_id, department_id, projects(name), categories(name), suppliers(name)')
+      .select('id, request_number, status, total_estimate, created_at, created_by, approver_id, po_id, needed_by_date, project_id, supplier_id, supplier_name, category_id, department_id, projects(name), categories(name), suppliers(name), locations(name)')
       .eq('company_id', company.id)
       .order('created_at', { ascending: false })
     if (!canViewAll) query = query.eq('created_by', profile.id)
@@ -226,7 +227,7 @@ export default function RequestsPage() {
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[900px]">
             <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>{[s.requestNumber, s.project, s.supplier, s.neededBy, s.requestedBy, s.estTotal, t.common.status, s.poCol, ''].map((h, i) => (
+              <tr>{[s.requestNumber, s.project, s.supplier, s.location, s.neededBy, s.requestedBy, s.estTotal, t.common.status, s.poCol, ''].map((h, i) => (
                 <th key={i} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
               ))}</tr>
             </thead>
@@ -242,6 +243,7 @@ export default function RequestsPage() {
                     <p className="text-xs text-gray-400 mt-0.5">{r.categories?.name ?? '—'}</p>
                   </td>
                   <td className="px-4 py-3 text-gray-600">{r.suppliers?.name ?? r.supplier_name ?? '—'}</td>
+                  <td className="px-4 py-3 text-gray-600">{r.locations?.name ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{r.needed_by_date ? format(new Date(r.needed_by_date), 'dd.MM.yyyy') : '—'}</td>
                   <td className="px-4 py-3">
                     <p className="text-gray-700">{names[r.created_by] ?? '—'}</p>

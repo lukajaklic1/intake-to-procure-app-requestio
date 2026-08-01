@@ -20,6 +20,8 @@ export interface Company {
   team_edit_requests: boolean
   req_prefix: string
   req_next_number: number
+  rec_prefix: string
+  rec_next_number: number
   created_at: string
   updated_at: string
 }
@@ -143,8 +145,41 @@ export interface PurchaseOrder {
   request_id: string | null
   version: number
   change_note: string | null
+  prev_status: string | null
+  received_status: 'none' | 'partial' | 'full'
   created_at: string
   updated_at: string
+}
+
+export interface Receipt {
+  id: string
+  company_id: string
+  po_id: string
+  receipt_number: string
+  received_by: string
+  received_date: string
+  supplier_receipt_no: string | null
+  note: string | null
+  created_at: string
+}
+
+export interface ReceiptLineItem {
+  id: string
+  receipt_id: string
+  po_line_id: string
+  quantity_received: number
+  quantity_rejected: number
+  created_at: string
+}
+
+export interface ReceiptAttachment {
+  id: string
+  receipt_id: string
+  company_id: string
+  file_path: string
+  file_name: string
+  file_size: number | null
+  created_at: string
 }
 
 export interface PoActivityLog {
@@ -152,7 +187,7 @@ export interface PoActivityLog {
   company_id: string
   po_id: string
   actor_id: string | null
-  action: 'created' | 'edited' | 'issued' | 'sent' | 'closed' | 'cancelled' | 'reopened'
+  action: 'created' | 'edited' | 'issued' | 'sent' | 'closed' | 'cancelled' | 'reopened' | 'received'
   note: string | null
   created_at: string
 }
@@ -313,6 +348,9 @@ export interface Database {
       request_attachments: { Row: RequestAttachment; Insert: Omit<RequestAttachment, 'id' | 'created_at'>; Update: Partial<Omit<RequestAttachment, 'id'>> }
       activity_log: { Row: ActivityLog; Insert: Omit<ActivityLog, 'id' | 'created_at'>; Update: Partial<Omit<ActivityLog, 'id'>> }
       po_activity_log: { Row: PoActivityLog; Insert: Omit<PoActivityLog, 'id' | 'created_at'>; Update: Partial<Omit<PoActivityLog, 'id'>> }
+      receipts: { Row: Receipt; Insert: Omit<Receipt, 'id' | 'created_at'>; Update: Partial<Omit<Receipt, 'id'>> }
+      receipt_line_items: { Row: ReceiptLineItem; Insert: Omit<ReceiptLineItem, 'id' | 'created_at'>; Update: Partial<Omit<ReceiptLineItem, 'id'>> }
+      receipt_attachments: { Row: ReceiptAttachment; Insert: Omit<ReceiptAttachment, 'id' | 'created_at'>; Update: Partial<Omit<ReceiptAttachment, 'id'>> }
     }
   }
 }

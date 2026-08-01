@@ -16,6 +16,7 @@ interface Row {
   approver_id: string | null
   project_id: string
   projects: { name: string } | null
+  locations: { name: string } | null
 }
 
 function fmt(n: number, currency = 'EUR') {
@@ -61,7 +62,7 @@ export default function ApprovalsPage() {
     setLoading(true)
     let query = supabase
       .from('requests')
-      .select('id, request_number, total_estimate, created_at, needed_by_date, created_by, approver_id, project_id, projects(name)')
+      .select('id, request_number, total_estimate, created_at, needed_by_date, created_by, approver_id, project_id, projects(name), locations(name)')
       .eq('company_id', company.id)
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
@@ -146,7 +147,7 @@ export default function ApprovalsPage() {
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[680px]">
             <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>{[s.requestNumber, s.project, a.requestedBy, ...(isAdmin ? [s.approver] : []), s.neededBy, s.estTotal, ''].map((h, i) => (
+              <tr>{[s.requestNumber, s.project, s.location, a.requestedBy, ...(isAdmin ? [s.approver] : []), s.neededBy, s.estTotal, ''].map((h, i) => (
                 <th key={i} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
               ))}</tr>
             </thead>
@@ -158,6 +159,7 @@ export default function ApprovalsPage() {
                     <p className="text-xs text-gray-400 mt-0.5">{format(new Date(r.created_at), 'dd.MM.yyyy')}</p>
                   </td>
                   <td className="px-4 py-3 text-gray-700">{r.projects?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-gray-600">{r.locations?.name ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{names[r.created_by] ?? '—'}</td>
                   {isAdmin && <td className="px-4 py-3 text-gray-600">{r.approver_id ? names[r.approver_id] ?? '—' : '—'}</td>}
                   <td className="px-4 py-3 text-gray-500 text-xs">{r.needed_by_date ? format(new Date(r.needed_by_date), 'dd.MM.yyyy') : '—'}</td>

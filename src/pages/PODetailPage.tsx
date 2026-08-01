@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { ChevronLeft, Pencil, XCircle, CheckCircle, Download, FileText, RotateCcw } from 'lucide-react'
+import { ChevronLeft, Pencil, XCircle, CheckCircle, Download, FileText, RotateCcw, PackageCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -27,6 +27,7 @@ interface POFull {
   version: number
   change_note: string | null
   prev_status: string | null
+  received_status: 'none' | 'partial' | 'full'
   supplier_id: string; category_id: string; project_id: string; location_id: string; department_id: string | null
   suppliers: { name: string; email: string | null; address_street: string | null; address_city: string | null; address_postal_code: string | null; address_country: string | null; vat_number: string | null }
   categories: { name: string }
@@ -55,7 +56,7 @@ function Field({ label, value }: { label: string; value?: string | null }) {
 export default function PODetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { company, profile, isAdmin } = useCompany()
+  const { company, profile, isAdmin, hasPerm } = useCompany()
   const { t } = useLanguage()
   const s = t.po
   const [po, setPo] = useState<POFull | null>(null)
@@ -69,6 +70,7 @@ export default function PODetailPage() {
   const [linkedReq, setLinkedReq] = useState<{ id: string; request_number: string } | null>(null)
   const [activity, setActivity] = useState<PoActivityLog[]>([])
   const [actNames, setActNames] = useState<Record<string, string>>({})
+  const [receipts, setReceipts] = useState<{ id: string; receipt_number: string; received_date: string }[]>([])
 
   async function openAttachment(path: string) {
     const { data } = await supabase.storage.from('quotations').createSignedUrl(path, 3600)
@@ -96,6 +98,9 @@ export default function PODetailPage() {
 
     const { data: atts } = await supabase.from('po_attachments').select('id, file_name, file_path').eq('po_id', id!)
     setAttachments(atts ?? [])
+
+    const { data: recs } = await supabase.from('receipts').select('id, receipt_number, received_date').eq('po_id', id!).order('received_date', { ascending: false })
+    setReceipts(recs ?? [])
 
     const { data: acts } = await supabase.from('po_activity_log').select('*').eq('po_id', id!).order('created_at', { ascending: true })
     const aList = (acts as PoActivityLog[]) ?? []
@@ -147,7 +152,7 @@ export default function PODetailPage() {
   if (!po) return <div className="p-6 text-gray-500">{t.po.title} ni najdeno</div>
 
   const canEdit = ['draft', 'issued', 'sent'].includes(po.status)
-  const canCancel = ['issued', 'sent'].includes(po.status)
+  const canCancel = ['issued', 'sent'].includes(po.status) && po.received_status === 'none'
 
   // Action buttons — shared between desktop and mobile
   const actionButtons = (
@@ -161,13 +166,18 @@ export default function PODetailPage() {
         </Link>
       )}
       {po.status === 'issued' && (
-        <Button variant="secondary" onClick={() => setConfirmTransition({ label: t.po.markSent, status: 'sent' })}>
-          {t.po.markSent}
+        <Button onClick={() => setConfirmTransition({ label: t.po.markSent, status: 'sent' })}>
+          <CheckCircle className="w-4 h-4 mr-1.5" />{t.po.markSent}
         </Button>
       )}
-      {po.status === 'sent' && (
-        <Button onClick={() => setConfirmTransition({ label: t.po.markClosed, status: 'closed' })}>
-          <CheckCircle className="w-4 h-4 mr-1.5" />{t.po.markClosed}
+      {po.status === 'sent' && (hasPerm('receipts', 'create') || isAdmin) && (
+        <Link to={`/receive/${po.id}`}>
+          <Button><PackageCheck className="w-4 h-4 mr-1.5" />{t.receipts.receive}</Button>
+        </Link>
+      )}
+      {po.status === 'sent' && po.received_status === 'partial' && (hasPerm('purchase_orders', 'create') || isAdmin) && (
+        <Button variant="secondary" onClick={() => setConfirmTransition({ label: t.po.finalize, status: 'closed' })}>
+          <CheckCircle className="w-4 h-4 mr-1.5" />{t.po.finalize}
         </Button>
       )}
       {canCancel && (
@@ -196,7 +206,11 @@ export default function PODetailPage() {
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-2xl font-bold text-gray-900 font-mono">{po.po_number}</h1>
-                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${STATUS_BADGE[po.status]}`}>{t.status[po.status as keyof typeof t.status] ?? po.status}</span>
+                {po.status === 'sent' && po.received_status === 'partial'
+                  ? <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">{t.receipts.rsPartial}</span>
+                  : po.status === 'closed' && po.received_status !== 'full'
+                  ? <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">{t.po.statusFinalized}</span>
+                  : <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${STATUS_BADGE[po.status]}`}>{t.status[po.status as keyof typeof t.status] ?? po.status}</span>}
               </div>
               <p className="text-xs text-gray-400 mt-0.5">{t.common.created}: {format(new Date(po.created_at), 'dd.MM.yyyy')}</p>
             </div>
@@ -339,6 +353,21 @@ export default function PODetailPage() {
                 <FileText className="w-4 h-4 shrink-0" />
                 <span className="truncate">{att.file_name}</span>
               </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Receipts */}
+      {receipts.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5 mb-5">
+          <p className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1.5"><PackageCheck className="w-4 h-4" />{t.receipts.title}</p>
+          <div className="flex flex-col gap-2">
+            {receipts.map(r => (
+              <Link key={r.id} to={`/receipts/${r.id}`} className="flex items-center justify-between text-sm border border-gray-100 rounded-lg px-3 py-2 hover:bg-gray-50">
+                <span className="font-mono font-semibold text-blue-600">{r.receipt_number}</span>
+                <span className="text-gray-400 text-xs">{format(new Date(r.received_date), 'dd.MM.yyyy')}</span>
+              </Link>
             ))}
           </div>
         </div>

@@ -17,6 +17,7 @@ interface PO {
   id: string
   po_number: string
   status: string
+  received_status: 'none' | 'partial' | 'full'
   total_amount: number
   created_at: string
   created_by: string
@@ -106,7 +107,7 @@ export default function PurchaseOrdersPage() {
     setLoading(true)
     const { data } = await supabase
       .from('purchase_orders')
-      .select('id, po_number, status, total_amount, created_at, created_by, expected_delivery_date, supplier_id, category_id, project_id, department_id, request_id, suppliers(name), categories(name), projects(name), locations(name)')
+      .select('id, po_number, status, received_status, total_amount, created_at, created_by, expected_delivery_date, supplier_id, category_id, project_id, department_id, request_id, suppliers(name), categories(name), projects(name), locations(name)')
       .eq('company_id', company.id)
       .order('created_at', { ascending: false })
     const list = (data as unknown as PO[]) ?? []
@@ -256,7 +257,7 @@ export default function PurchaseOrdersPage() {
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                {[s.poNumber, s.supplier, s.project, s.category, s.deliveryDate, s.total, t.common.status, s.requestCol, ''].map((h, i) => (
+                {[s.poNumber, s.supplier, s.project, s.location, s.category, s.deliveryDate, s.total, t.common.status, s.requestCol, ''].map((h, i) => (
                   <th key={i} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -272,15 +273,20 @@ export default function PurchaseOrdersPage() {
                   </td>
                   <td className="px-4 py-3 font-medium text-gray-800">{po.suppliers?.name ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{po.projects?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-gray-600">{po.locations?.name ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{po.categories?.name ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
                     {po.expected_delivery_date ? format(new Date(po.expected_delivery_date), 'dd.MM.yyyy') : '—'}
                   </td>
                   <td className="px-4 py-3 font-medium text-gray-800">{fmt(po.total_amount ?? 0, company?.currency)}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_BADGE[po.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {t.status[po.status as keyof typeof t.status] ?? po.status}
-                    </span>
+                    {po.status === 'sent' && po.received_status === 'partial'
+                      ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">{t.receipts.rsPartial}</span>
+                      : po.status === 'closed' && po.received_status !== 'full'
+                      ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{t.po.statusFinalized}</span>
+                      : <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_BADGE[po.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                          {t.status[po.status as keyof typeof t.status] ?? po.status}
+                        </span>}
                   </td>
                   <td className="px-4 py-3">
                     {po.request_id
