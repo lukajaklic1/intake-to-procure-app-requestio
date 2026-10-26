@@ -198,7 +198,7 @@ export default function CatalogPage() {
         ))}
       </PageToolbar>
 
-      <div className="flex flex-col lg:flex-row gap-4 items-start">
+      <div className="flex flex-col lg:flex-row gap-4 items-start mt-0">
       {/* Categories panel */}
       <div className="w-full lg:w-60 shrink-0 bg-white rounded-lg border border-field p-2">
         <p className="px-2.5 pt-1.5 pb-1 text-xs font-medium text-muted">{t.categories.title}</p>
@@ -218,7 +218,7 @@ export default function CatalogPage() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 min-w-0 w-full data-card bg-white rounded-lg border border-field overflow-hidden">
+      <div className="flex-1 min-w-0 w-full data-card table-clean bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (

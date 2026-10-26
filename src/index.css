@@ -28,3 +28,43 @@ body {
 .data-flat:has([data-empty]) [data-pagination] {
   display: none;
 }
+
+/* ── Attio-style list tables ─────────────────────────────────────────────
+   A `table-bleed` card has no frame: it runs edge to edge directly under the
+   page toolbar, with a white header of small labels, hairline row dividers
+   and a plain footer. Combine with `data-card` for the minimal empty state. */
+:root { --page-px: 1rem; }
+@media (min-width: 1024px) { :root { --page-px: 1.5rem; } }
+
+.table-bleed {
+  margin-inline: calc(var(--page-px) * -1);
+  background: transparent;
+  border-width: 0;
+  border-radius: 0;
+}
+.table-bleed thead,
+.table-clean thead {
+  background: var(--color-page);
+  border-bottom: 1px solid var(--color-line);
+}
+.table-bleed thead th,
+.table-clean thead th {
+  font-size: 12px;
+  font-weight: 500;
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+}
+.table-bleed tbody td:not([data-empty]),
+.table-clean tbody td:not([data-empty]) {
+  padding-top: 0.875rem;
+  padding-bottom: 0.875rem;
+}
+.table-bleed th:first-child,
+.table-bleed td:first-child { padding-left: var(--page-px); }
+.table-bleed th:last-child,
+.table-bleed td:last-child { padding-right: var(--page-px); }
+.table-clean [data-pagination],
+.table-bleed [data-pagination] {
+  background: var(--color-page);
+}
+.table-bleed [data-pagination] { padding-inline: var(--page-px); }

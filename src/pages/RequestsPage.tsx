@@ -158,7 +158,7 @@ export default function RequestsPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar actions={<Button onClick={() => navigate('/requests/new')} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button>}>
+      <PageToolbar attached actions={<Button onClick={() => navigate('/requests/new')} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button>}>
           <div className="relative min-w-40 flex-1 max-w-[220px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder={s.requestNumber + ' / ' + s.supplier}
@@ -203,7 +203,7 @@ export default function RequestsPage() {
           )}
       </PageToolbar>
 
-      <div className="data-card bg-white rounded-lg border border-field overflow-hidden">
+      <div className="data-card table-bleed bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (

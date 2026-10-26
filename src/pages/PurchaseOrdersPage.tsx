@@ -162,7 +162,7 @@ export default function PurchaseOrdersPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar actions={<Button onClick={() => navigate('/purchase-orders/new')} className="gap-2"> <Plus className="w-4 h-4" />{s.new} </Button>}>
+      <PageToolbar attached actions={<Button onClick={() => navigate('/purchase-orders/new')} className="gap-2"> <Plus className="w-4 h-4" />{s.new} </Button>}>
 
           {/* Search */}
           <div className="relative min-w-40 flex-1 max-w-[220px]">
@@ -221,7 +221,7 @@ export default function PurchaseOrdersPage() {
       </PageToolbar>
 
       {/* Table */}
-      <div className="data-card bg-white rounded-lg border border-field overflow-hidden">
+      <div className="data-card table-bleed bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
