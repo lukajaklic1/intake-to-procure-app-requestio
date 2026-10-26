@@ -19,7 +19,7 @@ export default function FilterSelect({ label, value, onChange, children }: Filte
 
   return (
     <div className="relative inline-flex items-center gap-1.5 h-8 pl-3 pr-2 rounded-lg border border-field bg-white text-sm hover:border-field-hover focus-within:ring-2 focus-within:ring-accent transition-colors">
-      <span className="text-muted whitespace-nowrap">{label}:</span>
+      <span className="text-filter-label whitespace-nowrap">{label}:</span>
       <span className="text-ink whitespace-nowrap max-w-[160px] truncate">{selected ? textOf(selected.props.children) : ''}</span>
       <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
       <select value={value} onChange={onChange} aria-label={label}

@@ -12,6 +12,7 @@
   --color-muted: #6c6e6c;        /* small section labels */
   --color-placeholder: #9f9f9f;
   --color-icon: #5d5d5d;         /* sidebar icons */
+  --color-filter-label: #5b5b5b; /* filter name in filter chips */
 
   /* Surfaces */
   --color-page: #ffffff;         /* main content background */

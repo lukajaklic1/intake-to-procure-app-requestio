@@ -58,6 +58,7 @@ export default {
         muted: v('muted'),
         placeholder: v('placeholder'),
         icon: v('icon'),
+        'filter-label': v('filter-label'),
         hover: v('hover'),
 
         primary: v('primary'),
