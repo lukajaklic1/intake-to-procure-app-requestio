@@ -88,3 +88,7 @@ body {
 .badge-info { background: var(--badge-info-bg); border-color: var(--badge-info-border); color: var(--badge-info-text); }
 .badge-danger { background: var(--badge-danger-bg); border-color: var(--badge-danger-border); color: var(--badge-danger-text); }
 .badge-purple { background: var(--badge-purple-bg); border-color: var(--badge-purple-border); color: var(--badge-purple-text); }
+
+/* Bleed tables end with a hairline under the last row; the footer (when shown) sits below it. */
+.table-bleed tbody tr:last-child td:not([data-empty]) { border-bottom: 1px solid var(--color-line); }
+.table-bleed [data-pagination] { border-top-width: 0; }
