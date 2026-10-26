@@ -57,7 +57,7 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
   }
 
   const navLinkCls = ({ isActive }: { isActive: boolean }) => cn(
-    'group flex items-center gap-2.5 px-2.5 py-[6px] rounded-lg mb-px text-[15px] font-medium transition-colors',
+    'group flex items-center gap-2.5 px-2.5 py-[6px] rounded-lg mb-0.5 text-[15px] leading-5 font-medium transition-colors',
     isActive ? 'bg-selected text-ink' : 'text-ink hover:bg-hover',
   )
 

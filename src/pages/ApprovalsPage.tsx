@@ -130,7 +130,7 @@ export default function ApprovalsPage() {
 
       <div className="data-card bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
+          <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[680px]">
             <thead className="bg-surface border-b border-field">
