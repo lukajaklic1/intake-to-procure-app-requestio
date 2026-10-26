@@ -21,8 +21,10 @@ export default function SearchSelect({ id, label, value, onChange, options, popu
 
   // Keep a stored value that isn't in the list (e.g. typed in another language) selectable.
   const all = useMemo(() => (value && !options.includes(value) ? [value, ...options] : options), [options, value])
-  const q = query.trim().toLowerCase()
-  const filtered = q ? all.filter(o => o.toLowerCase().includes(q)) : all
+  // Match the beginning of the name (so "SL" finds Slovenija, not Islandija); ignore case and diacritics.
+  const fold = (v: string) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  const q = fold(query.trim())
+  const filtered = q ? all.filter(o => fold(o).startsWith(q)) : all
   const rest = q ? filtered : filtered.filter(o => !popular.includes(o))
   const shown = q ? filtered : [...popular, ...rest]
 
