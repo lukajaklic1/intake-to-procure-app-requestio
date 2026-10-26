@@ -1,39 +1,51 @@
-import { NavLink, useNavigate } from 'react-router-dom'
-import {
-  LayoutDashboard, FileText, Building2, Package,
-  Tag, FolderOpen, MapPin, Users, UserCog, Settings, LogOut, X,
-  ClipboardList, CheckCircle2, PackageCheck,
-} from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { LogOut, X, Building2, Settings, PanelLeftClose } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
+import { onRefreshCounts } from '../../lib/refreshCounts'
 import { useAuth } from '../../hooks/useAuth'
 import { useCompany } from '../../hooks/useCompany'
 import { useLanguage } from '../../hooks/useLanguage'
 import { cn } from '../../lib/cn'
 import AppLogo from '../ui/AppLogo'
-
-const NAV_KEYS = [
-  { to: '/dashboard',       icon: LayoutDashboard, key: 'dashboard' as const },
-  { to: '/requests',        icon: ClipboardList,    key: 'myRequests' as const },
-  { to: '/approvals',       icon: CheckCircle2,     key: 'approvals' as const },
-  { to: '/purchase-orders', icon: FileText,         key: 'purchaseOrders' as const },
-  { to: '/receipts',        icon: PackageCheck,     key: 'receipts' as const },
-  { to: '/suppliers',       icon: Building2,        key: 'suppliers' as const },
-  { to: '/items',           icon: Package,          key: 'items' as const },
-  { to: '/categories',      icon: Tag,              key: 'categories' as const },
-  { to: '/projects',        icon: FolderOpen,       key: 'projects' as const },
-  { to: '/locations',       icon: MapPin,           key: 'locations' as const },
-  { to: '/departments',     icon: Users,            key: 'departments' as const },
-  { to: '/users',           icon: UserCog,          key: 'users' as const, adminOnly: true },
-]
+import { NAV_GROUPS } from './navConfig'
 
 interface SidebarProps {
   onClose?: () => void
+  onCollapse?: () => void
 }
 
-export default function Sidebar({ onClose }: SidebarProps) {
+export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
   const { signOut } = useAuth()
-  const { company, profile } = useCompany()
+  const { company, profile, isAdmin } = useCompany()
   const { lang, setLang, t } = useLanguage()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const [pendingApprovals, setPendingApprovals] = useState(0)
+  const [readyForPO, setReadyForPO] = useState(0)
+  const [openReceipts, setOpenReceipts] = useState(0)
+
+  useEffect(() => {
+    if (!company || !profile) return
+    async function loadCounts() {
+      let approvalsQuery = supabase.from('requests').select('*', { count: 'exact', head: true })
+        .eq('company_id', company!.id).eq('status', 'pending')
+      if (!isAdmin) approvalsQuery = approvalsQuery.eq('approver_id', profile!.id)
+      const [{ count: pending }, { count: noPo }, { count: receiptsOpen }] = await Promise.all([
+        approvalsQuery,
+        supabase.from('requests').select('*', { count: 'exact', head: true })
+          .eq('company_id', company!.id).eq('status', 'approved').is('po_id', null),
+        supabase.from('purchase_orders').select('*', { count: 'exact', head: true })
+          .eq('company_id', company!.id).eq('status', 'sent').neq('received_status', 'full'),
+      ])
+      setPendingApprovals(pending ?? 0)
+      setReadyForPO(noPo ?? 0)
+      setOpenReceipts(receiptsOpen ?? 0)
+    }
+    loadCounts()
+    return onRefreshCounts(loadCounts)
+  }, [company, profile, isAdmin, location.pathname])
 
   async function handleSignOut() {
     await signOut()
@@ -44,63 +56,86 @@ export default function Sidebar({ onClose }: SidebarProps) {
     onClose?.()
   }
 
+  const navLinkCls = ({ isActive }: { isActive: boolean }) => cn(
+    'group flex items-center gap-2.5 px-2.5 py-[6px] rounded-lg mb-px text-[15px] font-medium transition-colors',
+    isActive ? 'bg-selected text-ink' : 'text-ink hover:bg-hover',
+  )
+
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen shrink-0">
-      {/* Logo + mobile close */}
-      <div className="px-5 py-5 border-b border-gray-100 flex items-center justify-between">
-        <AppLogo size="md" />
+    <aside className="w-72 bg-surface border-r border-line flex flex-col h-screen shrink-0">
+      {/* Logo row — its bottom line continues across the page header (AppLayout) */}
+      <div className="h-14 px-4 flex items-center justify-between border-b border-line shrink-0">
+        <AppLogo size="sm" />
         {onClose && (
-          <button onClick={onClose} className="lg:hidden p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+          <button onClick={onClose} className="lg:hidden p-1.5 text-ink2 hover:text-ink hover:bg-hover rounded-lg transition-colors">
             <X className="w-4 h-4" />
+          </button>
+        )}
+        {onCollapse && (
+          <button onClick={onCollapse} title={t.nav.hideSidebar} className="hidden lg:block p-1.5 text-icon hover:text-ink hover:bg-hover rounded-lg transition-colors">
+            <PanelLeftClose className="w-4 h-4" strokeWidth={1.75} />
           </button>
         )}
       </div>
 
-      {/* Company badge */}
+      {/* Company switcher (→ Settings), styled like Attio's search input */}
       {company && (
-        <div className="px-4 py-3 border-b border-gray-100">
-          <p className="text-xs text-gray-400 mb-0.5">{t.common.company}</p>
-          <p className="text-sm font-medium text-gray-800 truncate">{company.name}</p>
+        <div className="px-3 pt-3 pb-1">
+          <div className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-white border border-line">
+            <Building2 className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
+            <span className="flex-1 min-w-0 text-[15px] font-medium text-ink truncate">{company.name}</span>
+          </div>
         </div>
       )}
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-3 px-2">
-        {NAV_KEYS.filter(item => !item.adminOnly || profile?.is_admin).map(({ to, icon: Icon, key }) => (
-          <NavLink
-            key={to}
-            to={to}
-            onClick={handleNavClick}
-            className={({ isActive }) => cn(
-              'flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-colors',
-              isActive
-                ? 'bg-blue-50 text-blue-700'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
-            )}
-          >
-            <Icon className="w-4 h-4 shrink-0" />
-            {t.nav[key]}
-          </NavLink>
-        ))}
+        {NAV_GROUPS.map((group, gi) => {
+          const items = group.items.filter(item => !item.adminOnly || isAdmin)
+          if (items.length === 0) return null
+          return (
+            <div key={gi} className={gi > 0 ? 'mt-4' : undefined}>
+              {group.section && (
+                <p className="px-2.5 mb-1 text-xs font-medium text-muted">
+                  {t.nav[group.section]}
+                </p>
+              )}
+              {items.map(({ to, icon: Icon, key }) => {
+                const badge = key === 'approvals' ? pendingApprovals : key === 'myRequests' ? readyForPO : key === 'receipts' ? openReceipts : 0
+                return (
+                  <NavLink key={to} to={to} onClick={handleNavClick} className={navLinkCls}>
+                    {({ isActive }) => (
+                      <>
+                        <Icon className="w-4 h-4 shrink-0 text-icon" strokeWidth={1.75} />
+                        <span className="flex-1">{t.nav[key]}</span>
+                        {badge > 0 && (
+                          <span className={cn(
+                            'min-w-[18px] h-[18px] px-1 rounded-full text-accent-hover text-[11px] font-semibold flex items-center justify-center shrink-0',
+                            isActive ? 'bg-accent-active' : 'bg-accent-light',
+                          )}>
+                            {badge}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </NavLink>
+                )
+              })}
+            </div>
+          )
+        })}
       </nav>
 
       {/* Bottom */}
-      <div className="border-t border-gray-100 p-2">
-        <NavLink
-          to="/settings"
-          onClick={handleNavClick}
-          className={({ isActive }) => cn(
-            'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-0.5',
-            isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
-          )}
-        >
-          <Settings className="w-4 h-4" />
+      <div className="border-t border-line p-2">
+        <NavLink to="/settings" onClick={handleNavClick} className={navLinkCls}>
+          <Settings className="w-4 h-4 shrink-0 text-icon" strokeWidth={1.75} />
           {t.nav.settings}
         </NavLink>
 
         {/* Language switcher */}
-        <div className="flex items-center gap-2 px-3 py-2 mb-1">
-          <span className="text-xs text-gray-400 shrink-0">{t.language.label}:</span>
+        <div className="flex items-center gap-2 px-2.5 py-2 mb-1">
+          <span className="text-sm font-medium text-ink2 shrink-0">{t.language.label}:</span>
           <div className="flex gap-1">
             {(['en', 'sl'] as const).map(l => (
               <button
@@ -108,7 +143,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
                 onClick={() => setLang(l)}
                 className={cn(
                   'px-2 py-0.5 rounded text-xs font-medium transition-colors',
-                  lang === l ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100',
+                  lang === l ? 'bg-primary text-white' : 'text-gray-400 hover:text-ink2 hover:bg-hover',
                 )}
               >
                 {l === 'en' ? 'EN' : 'SL'}
@@ -117,16 +152,16 @@ export default function Sidebar({ onClose }: SidebarProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 px-3 py-2">
-          <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-semibold shrink-0">
+        <div className="flex items-center gap-3 px-2.5 py-2">
+          <div className="w-7 h-7 rounded-full bg-user text-white flex items-center justify-center text-xs font-semibold shrink-0">
             {profile ? `${profile.first_name[0]}${profile.last_name[0]}` : '?'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-gray-800 truncate">
+            <p className="text-[15px] font-medium text-ink truncate">
               {profile ? `${profile.first_name} ${profile.last_name}` : '—'}
             </p>
           </div>
-          <button onClick={handleSignOut} className="text-gray-400 hover:text-gray-600 transition-colors" title={t.nav.signOut}>
+          <button onClick={handleSignOut} className="text-icon hover:text-ink transition-colors" title={t.nav.signOut}>
             <LogOut className="w-4 h-4" />
           </button>
         </div>

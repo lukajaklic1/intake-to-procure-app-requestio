@@ -45,3 +45,32 @@ export function stNarocil(n: number) {
 export function stOdprtihNarocil(n: number) {
   return `${n} ${slPlural(n, 'odprto naročilo', 'odprti naročili', 'odprta naročila', 'odprtih naročil')}`
 }
+
+// ─── Locative case ("used ON n POs/items") — Slovenian locative only
+// distinguishes singular vs. non-singular (dual and plural share the -ih ending).
+
+export function poLocSl(n: number): string {
+  return `${n} ${n === 1 ? 'naročilu' : 'naročilih'}`
+}
+
+export function itemLocSl(n: number): string {
+  return `${n} ${n === 1 ? 'artiklu' : 'artiklih'}`
+}
+
+export function poLineLocSl(n: number): string {
+  return `${n} ${n === 1 ? 'postavki naročila' : 'postavkah naročila'}`
+}
+
+// ─── English singular/plural helpers (trivial, but kept alongside for symmetry) ──
+
+export function poCountEn(n: number): string {
+  return `${n} PO${n === 1 ? '' : 's'}`
+}
+
+export function itemCountEn(n: number): string {
+  return `${n} item${n === 1 ? '' : 's'}`
+}
+
+export function poLineCountEn(n: number): string {
+  return `${n} PO line${n === 1 ? '' : 's'}`
+}

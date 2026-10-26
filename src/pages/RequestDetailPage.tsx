@@ -2,6 +2,7 @@ import { useEffect, useState, Fragment } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, Pencil, XCircle, Check, X, FileText, ShoppingCart } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { refreshCounts } from '../lib/refreshCounts'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
 import { toast } from '../components/ui/Toast'
@@ -12,15 +13,15 @@ import { format } from 'date-fns'
 import type { Request, RequestLineItem, RequestStatus, Approval, ActivityLog } from '../types/database'
 
 const STATUS_BADGE: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-600',
-  pending: 'bg-amber-100 text-amber-700',
-  approved: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-600',
-  cancelled: 'bg-gray-100 text-gray-500',
+  draft: 'bg-selected text-ink2',
+  pending: 'bg-warn-light text-warn',
+  approved: 'bg-success-light text-success',
+  rejected: 'bg-danger-light text-danger',
+  cancelled: 'bg-selected text-muted',
+  completed: 'bg-accent-light text-accent-hover',
 }
 
 type ReqFull = Request & {
-  projects: { name: string } | null
   suppliers: { name: string } | null
   categories: { name: string } | null
   locations: { name: string } | null
@@ -42,7 +43,6 @@ export default function RequestDetailPage() {
   const [lines, setLines] = useState<RequestLineItem[]>([])
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [activity, setActivity] = useState<ActivityLog[]>([])
-  const [budget, setBudget] = useState<{ budget: number | null; ordered: number; approved: number; pending: number } | null>(null)
   const [linkedPo, setLinkedPo] = useState<{ id: string; po_number: string; status: string; total_amount: number; created_at: string } | null>(null)
   const [attachments, setAttachments] = useState<{ id: string; file_name: string; file_path: string }[]>([])
   const [names, setNames] = useState<Record<string, string>>({})
@@ -58,18 +58,14 @@ export default function RequestDetailPage() {
     setLoading(true)
     const { data } = await supabase
       .from('requests')
-      .select('*, projects(name), suppliers(name), categories(name), locations(name), departments(name)')
+      .select('*, suppliers(name), categories(name), locations(name), departments(name)')
       .eq('id', id!).single()
-    if (!data) { toast.error('Not found'); navigate('/requests'); return }
+    if (!data) { toast.error(t.common.notFound); navigate('/requests'); return }
     setReq(data as unknown as ReqFull)
     if (data.po_id) {
       const { data: po } = await supabase.from('purchase_orders').select('id, po_number, status, total_amount, created_at').eq('id', data.po_id).single()
       setLinkedPo(po ?? null)
     } else setLinkedPo(null)
-    if (data.project_id) {
-      const { data: b } = await (supabase as any).rpc('get_project_budget_status', { p_project_id: data.project_id })
-      setBudget(b ?? null)
-    }
     const { data: ls } = await supabase.from('request_line_items').select('*').eq('request_id', id!).order('position')
     setLines((ls as RequestLineItem[]) ?? [])
     const { data: aps } = await supabase.from('approvals').select('*').eq('request_id', id!).order('step')
@@ -102,7 +98,7 @@ export default function RequestDetailPage() {
     const { error } = await (supabase as any).rpc('cancel_request', { p_request_id: id })
     setActionLoading(false); setConfirmCancel(false)
     if (error) { toast.error(error.message); return }
-    toast.success(s.st.cancelled); load()
+    toast.success(s.st.cancelled); load(); refreshCounts()
   }
 
   async function doCreatePo() {
@@ -121,6 +117,7 @@ export default function RequestDetailPage() {
     }
     setActionLoading(false)
     toast.success(s.poCreatedToast)
+    refreshCounts()
     navigate(`/purchase-orders/${poId}/edit`)
   }
 
@@ -131,10 +128,10 @@ export default function RequestDetailPage() {
     setActionLoading(false); setDecision(null); setNote('')
     if (error) { toast.error(error.message); return }
     toast.success(decision === 'reject' ? s.st.rejected : (data?.status === 'pending' ? s.escalated : s.st.approved))
-    load()
+    load(); refreshCounts()
   }
 
-  if (loading || !req) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
+  if (loading || !req) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
 
   const isCreator = profile?.id === req.created_by
   const myPending = approvals.find(a => a.status === 'pending' && (a.approver_id === profile?.id || isAdmin))
@@ -187,7 +184,7 @@ export default function RequestDetailPage() {
 
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-gray-900 font-mono">{req.request_number}</h1>
+          <h1 className="text-2xl font-bold text-gray-900 ">{req.request_number}</h1>
           <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[st]}`}>{s.st[st]}</span>
         </div>
         <div className="flex items-center gap-2">
@@ -209,58 +206,32 @@ export default function RequestDetailPage() {
         </div>
       </div>
 
-      {linkedPo && (
+      {linkedPo && (linkedPo.status === 'cancelled' ? (
         <button onClick={() => navigate(`/purchase-orders/${linkedPo.id}`)}
-          className="w-full flex items-center gap-3 p-4 mb-5 bg-blue-50 border border-blue-200 rounded-xl text-left hover:bg-blue-100 transition-colors">
-          <ShoppingCart className="w-5 h-5 text-blue-600 shrink-0" />
+          className="w-full flex items-center gap-3 p-4 mb-5 bg-selected border border-field rounded-lg text-left hover:bg-hover transition-colors">
+          <XCircle className="w-5 h-5 text-gray-400 shrink-0" />
           <div className="flex-1">
-            <p className="text-xs text-blue-500">{s.linkedPO}</p>
-            <p className="text-sm font-semibold text-blue-700 font-mono">{linkedPo.po_number}</p>
-            <p className="text-xs text-blue-400 mt-0.5">{format(new Date(linkedPo.created_at), 'dd.MM.yyyy')}</p>
+            <p className="text-xs text-gray-400">{s.linkedPO} · {t.status.cancelled}</p>
+            <p className="text-sm font-semibold text-gray-500 line-through decoration-gray-300">{linkedPo.po_number}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{format(new Date(linkedPo.created_at), 'dd.MM.yyyy')}</p>
           </div>
-          <span className="text-sm font-medium text-blue-700">{fmt(linkedPo.total_amount ?? 0)}</span>
+          <span className="text-sm font-medium text-gray-400">{fmt(linkedPo.total_amount ?? 0)}</span>
         </button>
-      )}
-
-      {budget && budget.budget != null && (() => {
-        const committed = budget.ordered + budget.approved + budget.pending
-        const remaining = budget.budget - committed
-        const over = remaining < 0
-        const denom = Math.max(budget.budget, committed) || 1
-        const oPct = (budget.ordered / denom) * 100
-        const aPct = (budget.approved / denom) * 100
-        const pPct = (budget.pending / denom) * 100
-        return (
-          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-semibold text-gray-900">{s.budgetTitle}</p>
-              <p className={`text-sm font-bold ${over ? 'text-red-600' : 'text-gray-900'}`}>
-                {over ? `${s.budgetOver}: ` : `${s.budgetRemaining}: `}{fmt(Math.abs(remaining))}
-              </p>
-            </div>
-            <div className={`relative h-2.5 w-full rounded-full bg-gray-100 overflow-hidden mb-3 flex ${over ? 'ring-1 ring-red-300' : ''}`}>
-              <div className="h-full bg-blue-500" style={{ width: `${oPct}%` }} title={s.budgetOrdered} />
-              <div className="h-full bg-green-500" style={{ width: `${aPct}%` }} title={s.budgetApproved} />
-              <div className="h-full bg-amber-400" style={{ width: `${pPct}%` }} title={s.budgetPending} />
-              {over && (
-                <>
-                  <div className="absolute inset-y-0 bg-red-500/25" style={{ left: `${(budget.budget / committed) * 100}%`, right: 0 }} />
-                  <div className="absolute inset-y-0 w-0.5 bg-gray-800" style={{ left: `${(budget.budget / committed) * 100}%` }} title={s.budgetAmount} />
-                </>
-              )}
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-              <div><p className="text-xs text-gray-400">{s.budgetAmount}</p><p className="font-medium text-gray-800">{fmt(budget.budget)}</p></div>
-              <div><p className="text-xs text-gray-400 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" />{s.budgetOrdered}</p><p className="font-medium text-gray-800">{fmt(budget.ordered)}</p></div>
-              <div><p className="text-xs text-gray-400 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" />{s.budgetApproved}</p><p className="font-medium text-gray-800">{fmt(budget.approved)}</p></div>
-              <div><p className="text-xs text-gray-400 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400" />{s.budgetPending}</p><p className="font-medium text-gray-800">{fmt(budget.pending)}</p></div>
-            </div>
+      ) : (
+        <button onClick={() => navigate(`/purchase-orders/${linkedPo.id}`)}
+          className="w-full flex items-center gap-3 p-4 mb-5 bg-accent-light border border-accent-border rounded-lg text-left hover:bg-accent-light transition-colors">
+          <ShoppingCart className="w-5 h-5 text-accent shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs text-accent">{s.linkedPO}</p>
+            <p className="text-sm font-semibold text-accent-hover ">{linkedPo.po_number}</p>
+            <p className="text-xs text-accent mt-0.5">{format(new Date(linkedPo.created_at), 'dd.MM.yyyy')}</p>
           </div>
-        )
-      })()}
+          <span className="text-sm font-medium text-accent-hover">{fmt(linkedPo.total_amount ?? 0)}</span>
+        </button>
+      ))}
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5 grid grid-cols-2 sm:grid-cols-3 gap-5">
-        <Field label={s.project} value={req.projects?.name} />
+
+      <div className="bg-white rounded-lg border border-field p-6 mb-5 grid grid-cols-2 sm:grid-cols-3 gap-5">
         <Field label={s.supplier} value={req.suppliers?.name ?? req.supplier_name} />
         <Field label={s.category} value={req.categories?.name} />
         <Field label={s.location} value={req.locations?.name} />
@@ -272,7 +243,7 @@ export default function RequestDetailPage() {
       </div>
 
       {flowSteps.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5">
+        <div className="bg-white rounded-lg border border-field p-6 mb-5">
           <p className="text-sm font-semibold text-gray-900 mb-4">{s.flowTitle}</p>
           <div className="flex items-start overflow-x-auto py-2">
             {flowSteps.map((step, i) => {
@@ -280,8 +251,8 @@ export default function RequestDetailPage() {
                 step.state === 'done' ? 'bg-green-500 text-white border-2 border-green-500'
                 : step.state === 'rejected' ? 'bg-red-500 text-white border-2 border-red-500'
                 : step.state === 'cancelled' ? 'bg-gray-400 text-white border-2 border-gray-400'
-                : step.state === 'current' ? 'bg-amber-100 text-amber-600 border-2 border-amber-400'
-                : 'bg-gray-100 text-gray-300 border-2 border-gray-200'
+                : step.state === 'current' ? 'bg-warn-light text-amber-600 border-2 border-amber-400'
+                : 'bg-gray-100 text-gray-300 border-2 border-field'
               return (
                 <Fragment key={i}>
                   <div className="flex flex-col items-center text-center px-1.5 w-28 shrink-0">
@@ -302,33 +273,36 @@ export default function RequestDetailPage() {
       )}
 
       {attachments.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5">
+        <div className="bg-white rounded-lg border border-field p-6 mb-5">
           <p className="text-sm font-semibold text-gray-900 mb-3">{s.attachments}</p>
           <div className="flex flex-col gap-2">
             {attachments.map(att => (
               <button key={att.id} type="button" onClick={() => openAttachment(att.file_path)}
-                className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-left">
-                <FileText className="w-4 h-4 text-blue-500 shrink-0" />
-                <span className="text-sm text-blue-600 hover:underline font-medium flex-1 truncate">{att.file_name}</span>
+                className="flex items-center gap-2 p-2.5 bg-accent-light border border-accent-border rounded-lg text-left">
+                <FileText className="w-4 h-4 text-accent shrink-0" />
+                <span className="text-sm text-accent hover:underline font-medium flex-1 truncate">{att.file_name}</span>
               </button>
             ))}
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-5">
+      <div className="bg-white rounded-lg border border-field overflow-hidden mb-5">
         <div className="overflow-x-auto"><table className="w-full text-sm min-w-[500px]">
-          <thead className="bg-gray-50 border-b border-gray-100"><tr>
-            <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">{s.itemName}</th>
-            <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">{s.quantity}</th>
-            <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">{s.unit}</th>
-            <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">{s.estUnitPrice}</th>
-            <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">{s.lineTotal}</th>
+          <thead className="bg-surface border-b border-field"><tr>
+            <th className="text-left px-4 py-2.5 text-sm font-medium text-ink2">{s.itemName}</th>
+            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2">{s.quantity}</th>
+            <th className="text-left px-4 py-2.5 text-sm font-medium text-ink2">{s.unit}</th>
+            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2">{s.estUnitPrice}</th>
+            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2">{s.lineTotal}</th>
           </tr></thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-field">
             {lines.map(l => (
               <tr key={l.id}>
-                <td className="px-4 py-2.5 text-gray-800">{l.name}</td>
+                <td className="px-4 py-2.5 text-gray-800">
+                  {l.name}
+                  {l.long_description && <p className="text-xs text-gray-400 mt-0.5">{l.long_description}</p>}
+                </td>
                 <td className="px-4 py-2.5 text-right text-gray-600">{l.quantity}</td>
                 <td className="px-4 py-2.5 text-gray-600">{l.unit}</td>
                 <td className="px-4 py-2.5 text-right text-gray-600">{fmt(l.est_unit_price)}</td>
@@ -346,11 +320,11 @@ export default function RequestDetailPage() {
       </div>
 
       {activity.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5">
+        <div className="bg-white rounded-lg border border-field p-6 mb-5">
           <p className="text-sm font-semibold text-gray-900 mb-4">{s.auditTrail}</p>
           <ol className="flex flex-col gap-4">
             {activity.map(a => {
-              const dot = a.action === 'approved' ? 'bg-green-500' : a.action === 'rejected' ? 'bg-red-500' : a.action === 'cancelled' ? 'bg-gray-400' : a.action === 'submitted' ? 'bg-amber-500' : 'bg-blue-500'
+              const dot = a.action === 'approved' ? 'bg-green-500' : a.action === 'rejected' ? 'bg-red-500' : a.action === 'cancelled' ? 'bg-gray-400' : a.action === 'submitted' ? 'bg-amber-500' : 'bg-accent'
               return (
                 <li key={a.id} className="flex gap-3">
                   <div className="flex flex-col items-center">
@@ -379,7 +353,7 @@ export default function RequestDetailPage() {
         <div className="flex flex-col gap-1 mb-4">
           <label className="text-sm font-medium text-gray-700">{t.approvals.noteOptional}</label>
           <textarea value={note} onChange={e => setNote(e.target.value)} rows={3}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
         </div>
         <div className="flex gap-3 justify-end">
           <Button variant="secondary" onClick={() => setDecision(null)}>{t.common.cancel}</Button>

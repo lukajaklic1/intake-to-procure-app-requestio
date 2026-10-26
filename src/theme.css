@@ -1,0 +1,61 @@
+/*
+ * THEME — the single place where the app's colors live.
+ * tailwind.config.js maps its color names onto these variables, and chart
+ * code (Recharts) reads the --chart-* ones, so changing a value here
+ * restyles the whole app.
+ */
+:root {
+  /* Text */
+  --color-ink: #101112;          /* primary text, primary button background */
+  --color-ink-hover: #2b2c2e;    /* primary button hover */
+  --color-ink2: #6c6e6c;         /* secondary text: labels, table headers, subtitles */
+  --color-muted: #6c6e6c;        /* small section labels */
+  --color-placeholder: #9f9f9f;
+  --color-icon: #5d5d5d;         /* sidebar icons */
+
+  /* Surfaces */
+  --color-page: #ffffff;         /* main content background */
+  --color-surface: #fbfbfb;      /* sidebar, table header/footer, hover rows */
+  --color-selected: #f1f1f1;     /* sidebar selected item, neutral badges */
+  --color-hover: #f6f6f6;        /* sidebar hover */
+
+  /* Borders */
+  --color-line: #eeeff1;         /* sidebar, header, cards */
+  --color-field: #eeeff1;        /* tables, form fields */
+  --color-field-hover: #d4d5d8;
+
+  /* Primary (buttons, page-header icon) */
+  --color-primary: #266df0;
+  --color-primary-hover: #1a5cd4;
+
+  /* Accent (links, focus, "sent"/"completed" states) */
+  --color-accent: var(--color-primary);
+  --color-accent-hover: var(--color-primary-hover);
+  --color-accent-light: #e0edfa;
+  --color-accent-border: #b9d7f5;
+  --color-accent-active: #cedae6; /* accent-light on a selected sidebar row */
+
+  /* Status */
+  --color-warn: #d66b00;
+  --color-warn-light: #faf0dd;
+  --color-success: #219e3c;
+  --color-success-light: #def2de;
+  --color-danger: #e5484d;
+  --color-danger-light: #fee4e4;
+  --color-destructive: #da2f35;
+  --color-destructive-hover: #b9282d;
+
+  /* User avatar (sidebar, bottom) */
+  --color-user: #f26a1b;
+
+  /* Company avatar */
+  --color-company: #7c3aed;
+  --color-company-light: #f0e4fc;
+
+  /* Charts */
+  --chart-bar-fill: #e0edfa;
+  --chart-bar-stroke: var(--color-primary);
+  --chart-grid: #eeeff1;
+  --chart-axis: #8b8b8b;
+  --chart-cursor: #f1f1f1;
+}

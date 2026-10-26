@@ -11,7 +11,6 @@ import OnboardingPage from './pages/OnboardingPage'
 import DashboardPage from './pages/DashboardPage'
 import SuppliersPage from './pages/SuppliersPage'
 import CategoriesPage from './pages/CategoriesPage'
-import ProjectsPage from './pages/ProjectsPage'
 import LocationsPage from './pages/LocationsPage'
 import DepartmentsPage from './pages/DepartmentsPage'
 import ItemsPage from './pages/ItemsPage'
@@ -67,7 +66,6 @@ export default function Root() {
             <Route path="/suppliers"              element={<App><SuppliersPage /></App>} />
             <Route path="/items"                  element={<App><ItemsPage /></App>} />
             <Route path="/categories"             element={<App><CategoriesPage /></App>} />
-            <Route path="/projects"               element={<App><ProjectsPage /></App>} />
             <Route path="/locations"              element={<App><LocationsPage /></App>} />
             <Route path="/departments"            element={<App><DepartmentsPage /></App>} />
             <Route path="/requests"               element={<App><RequestsPage /></App>} />

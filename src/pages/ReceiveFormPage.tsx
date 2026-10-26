@@ -41,7 +41,7 @@ export default function ReceiveFormPage() {
 
   async function load() {
     const { data: po } = await supabase.from('purchase_orders').select('po_number, status, suppliers(name)').eq('id', poId!).single()
-    if (!po) { toast.error('Not found'); navigate('/receipts'); return }
+    if (!po) { toast.error(t.common.notFound); navigate('/receipts'); return }
     if ((po as any).status !== 'sent') { navigate('/receipts'); return }
     setPoNumber((po as any).po_number)
     setSupplierName((po as any).suppliers?.name ?? '—')
@@ -98,16 +98,16 @@ export default function ReceiveFormPage() {
     navigate(`/receipts/${receiptId}`)
   }
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
   if (!canReceive) return <Navigate to="/receipts" replace />
 
   return (
     <div className="p-4 lg:p-6 max-w-4xl mx-auto">
       <button onClick={() => navigate('/receipts')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-4"><ChevronLeft className="w-4 h-4" />{s.title}</button>
       <h1 className="text-2xl font-bold text-gray-900 mb-1">{s.receive}</h1>
-      <p className="text-gray-500 text-sm mb-5">{s.fromPo} <span className="font-mono font-semibold text-gray-700">{poNumber}</span> · {supplierName}</p>
+      <p className="text-gray-500 text-sm mb-5">{s.fromPo} <span className=" font-semibold text-gray-700">{poNumber}</span> · {supplierName}</p>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5">
+      <div className="bg-white rounded-lg border border-field p-6 mb-5">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Input id="r-date" label={s.receivedDate} type="date" value={receivedDate} onChange={e => setReceivedDate(e.target.value)} />
           <Input id="r-sup-no" label={s.supplierReceiptNo} value={supplierReceiptNo} onChange={e => setSupplierReceiptNo(e.target.value)} />
@@ -115,7 +115,7 @@ export default function ReceiveFormPage() {
         <div className="mt-4 flex flex-col gap-1">
           <label className="text-sm font-medium text-gray-700">{s.note}</label>
           <textarea rows={2} value={note} onChange={e => setNote(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none" />
         </div>
 
         {/* Attachment */}
@@ -124,11 +124,11 @@ export default function ReceiveFormPage() {
           {newFiles.map((f, i) => (
             <div key={i} className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-lg mb-2">
               <FileText className="w-4 h-4 text-green-500 shrink-0" />
-              <span className="text-sm text-green-700 font-medium flex-1 truncate">{f.name}</span>
+              <span className="text-sm text-success font-medium flex-1 truncate">{f.name}</span>
               <button type="button" onClick={() => setNewFiles(fs => fs.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4" /></button>
             </div>
           ))}
-          <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors w-full">
+          <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-accent hover:bg-accent-light transition-colors w-full">
             <UploadCloud className="w-4 h-4 text-gray-400 shrink-0" />
             <span className="text-sm text-gray-500">{t.po.uploadQuotation}</span>
             <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple className="hidden"
@@ -137,21 +137,21 @@ export default function ReceiveFormPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-5">
+      <div className="bg-white rounded-lg border border-field overflow-hidden mb-5">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-700">{t.po.lineItems}</h2>
           <Button variant="secondary" onClick={receiveAll}>{s.receiveAll}</Button>
         </div>
         <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
-          <thead className="bg-gray-50 border-b border-gray-100"><tr>
-            <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">{t.po.description}</th>
-            <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">{s.ordered}</th>
-            <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">{s.received}</th>
-            <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">{s.remaining}</th>
-            <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide w-28">{s.receiveNow}</th>
-            <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide w-28">{s.rejectNow}</th>
+          <thead className="bg-surface border-b border-field"><tr>
+            <th className="text-left px-4 py-2.5 text-sm font-medium text-ink2">{t.po.description}</th>
+            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2">{s.ordered}</th>
+            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2">{s.received}</th>
+            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2">{s.remaining}</th>
+            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2 w-28">{s.receiveNow}</th>
+            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2 w-28">{s.rejectNow}</th>
           </tr></thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-field">
             {lines.map((l, idx) => {
               const rem = remaining(l)
               return (
@@ -162,11 +162,11 @@ export default function ReceiveFormPage() {
                   <td className="px-4 py-2.5 text-right font-medium text-gray-800">{rem}</td>
                   <td className="px-4 py-2.5">
                     <input value={l.receiveNow} onChange={e => setReceiveNow(idx, e.target.value)} inputMode="decimal"
-                      className="w-full text-right rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      className="w-full text-right rounded-lg border border-field hover:border-field-hover px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
                   </td>
                   <td className="px-4 py-2.5">
                     <input value={l.rejectNow} onChange={e => setRejectNow(idx, e.target.value)} inputMode="decimal" placeholder="0"
-                      className="w-full text-right rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 placeholder-gray-300" />
+                      className="w-full text-right rounded-lg border border-field hover:border-field-hover px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 placeholder:text-placeholder" />
                   </td>
                 </tr>
               )

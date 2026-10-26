@@ -3,12 +3,14 @@ import { pdf } from '@react-pdf/renderer'
 import { supabase } from '../lib/supabase'
 import { toast } from '../components/ui/Toast'
 import PODocument, { type PODocData } from '../components/PODocument'
+import { useLanguage } from './useLanguage'
 import { format } from 'date-fns'
 import React from 'react'
 
 
 export function usePODownload() {
   const [downloading, setDownloading] = useState(false)
+  const { t, lang } = useLanguage()
 
   async function downloadPO(poId: string, companyId: string) {
     setDownloading(true)
@@ -19,12 +21,12 @@ export function usePODownload() {
         { data: companyRaw },
       ] = await Promise.all([
         supabase.from('purchase_orders')
-          .select('*, suppliers(*), categories(name), projects(name,project_code), locations(*), departments(name)')
+          .select('*, suppliers(*), categories(name), locations(*), departments(name)')
           .eq('id', poId).single(),
         supabase.from('companies').select('*').eq('id', companyId).single(),
       ])
 
-      if (!poRaw || !companyRaw) { toast.error('Could not load PO data'); return }
+      if (!poRaw || !companyRaw) { toast.error(t.common.couldNotLoadData); return }
       const po = poRaw as any
       const company = companyRaw as any
 
@@ -58,7 +60,6 @@ export function usePODownload() {
         },
         supplier: po.suppliers as PODocData['supplier'],
         location: po.locations as PODocData['location'],
-        project: po.projects as PODocData['project'],
         category: po.categories as PODocData['category'],
         department: po.departments as PODocData['department'],
         lines: lines.map(l => ({
@@ -75,10 +76,10 @@ export function usePODownload() {
 
       let blob: Blob
       try {
-        blob = await (pdf as any)(React.createElement(PODocument, { data })).toBlob()
+        blob = await (pdf as any)(React.createElement(PODocument, { data, lang })).toBlob()
       } catch (pdfErr: any) {
         console.error('PDF generation error:', pdfErr)
-        toast.error('PDF napaka: ' + (pdfErr?.message ?? String(pdfErr)))
+        toast.error(t.common.pdfGenerateFailed + ': ' + (pdfErr?.message ?? String(pdfErr)))
         setDownloading(false)
         return
       }
@@ -90,10 +91,10 @@ export function usePODownload() {
       a.download = `${po.po_number}_${supplierSlug}_${dateStr}.pdf`
       a.click()
       URL.revokeObjectURL(url)
-      toast.success('PDF downloaded')
+      toast.success(t.common.pdfDownloaded)
     } catch (err) {
       console.error(err)
-      toast.error('Failed to generate PDF')
+      toast.error(t.common.pdfGenerateFailed)
     } finally {
       setDownloading(false)
     }

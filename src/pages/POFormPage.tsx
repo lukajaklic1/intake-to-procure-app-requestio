@@ -8,7 +8,7 @@ import { useLanguage } from '../hooks/useLanguage'
 import { toast } from '../components/ui/Toast'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
-import type { Supplier, Category, Project, Location, Department, Item } from '../types/database'
+import type { Supplier, Category, Location, Department, Item } from '../types/database'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -26,7 +26,6 @@ interface LineItem {
 interface POHeader {
   supplier_id: string
   category_id: string
-  project_id: string
   location_id: string
   department_id: string
   payment_terms: string
@@ -37,7 +36,7 @@ interface POHeader {
 }
 
 const EMPTY_HEADER: POHeader = {
-  supplier_id: '', category_id: '', project_id: '', location_id: '', department_id: '',
+  supplier_id: '', category_id: '', location_id: '', department_id: '',
   payment_terms: '', expected_delivery_date: '', incoterm: '', supplier_quote_ref: '',
   notes: '',
 }
@@ -58,7 +57,7 @@ function ItemSearch({ items, onSelect, placeholder }: { items: Item[]; onSelect:
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-1 border border-gray-200 rounded-lg bg-white px-2 py-1.5 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
+      <div className="flex items-center gap-1 border border-field rounded-lg hover:border-field-hover bg-white px-2 py-1.5 focus-within:ring-2 focus-within:ring-accent focus-within:border-transparent">
         <Search className="w-3 h-3 text-gray-400 shrink-0" />
         <input
           value={query}
@@ -66,17 +65,17 @@ function ItemSearch({ items, onSelect, placeholder }: { items: Item[]; onSelect:
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder={placeholder}
-          className="text-xs bg-transparent outline-none flex-1 text-gray-600 placeholder-gray-400 min-w-0"
+          className="text-xs bg-transparent outline-none flex-1 text-ink placeholder:text-placeholder min-w-0"
         />
         {query && <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setQuery('')}><X className="w-3 h-3 text-gray-300" /></button>}
       </div>
       {open && filtered.length > 0 && (
-        <div className="absolute z-30 left-0 mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-lg overflow-y-auto max-h-56">
+        <div className="absolute z-30 left-0 mt-1 w-72 bg-white border border-field rounded-lg shadow-lg overflow-y-auto max-h-56">
           {filtered.map(item => (
             <button key={item.id} type="button" onMouseDown={e => e.preventDefault()}
               onClick={() => { onSelect(item); setQuery(''); setOpen(false) }}
-              className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors">
-              <span className="font-mono text-xs text-gray-400 mr-2">{item.item_number}</span>
+              className="w-full text-left px-3 py-2 hover:bg-accent-light transition-colors">
+              <span className=" text-xs text-gray-400 mr-2">{item.item_number}</span>
               <span className="text-sm font-medium text-gray-800">{item.name}</span>
               {item.default_unit && <span className="ml-2 text-xs text-gray-400">{item.default_unit}</span>}
             </button>
@@ -116,15 +115,15 @@ function SupplierSearch({ suppliers, value, onChange, label, disabled, placehold
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           readOnly={disabled}
           placeholder={placeholder}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-50"
+          className="w-full rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-accent bg-white disabled:bg-gray-50"
         />
         {open && !disabled && filtered.length > 0 && (
-          <div className="absolute z-30 left-0 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-y-auto max-h-56">
+          <div className="absolute z-30 left-0 mt-1 w-full bg-white border border-field rounded-lg shadow-lg overflow-y-auto max-h-56">
             {filtered.map(s => (
               <button key={s.id} type="button"
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => { onChange(s.id); setQuery(''); setOpen(false) }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors ${s.id === value ? 'bg-blue-50 font-medium text-blue-700' : 'text-gray-800'}`}>
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-accent-light transition-colors ${s.id === value ? 'bg-accent-light font-medium text-accent-hover' : 'text-gray-800'}`}>
                 {s.name}
                 {s.vat_number && <span className="ml-2 text-xs text-gray-400">{s.vat_number}</span>}
               </button>
@@ -138,17 +137,19 @@ function SupplierSearch({ suppliers, value, onChange, label, disabled, placehold
 
 // ─── Dropdown helper ──────────────────────────────────────────────────────────
 
-function Select({ id, label, value, onChange, required, children }: {
-  id: string; label: string; value: string; onChange: (v: string) => void; required?: boolean; children: React.ReactNode
+function Select({ id, label, value, onChange, required, hint, children }: {
+  id: string; label: string; value: string; onChange: (v: string) => void; required?: boolean; hint?: string; children: React.ReactNode
 }) {
+  const { t } = useLanguage()
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor={id} className="text-sm font-medium text-gray-700">{label}{required && ' *'}</label>
       <select id={id} value={value} onChange={e => onChange(e.target.value)}
-        className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-        <option value="">Izberi...</option>
+        className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent bg-white">
+        <option value="">{t.common.select}</option>
         {children}
       </select>
+      {hint && <p className="text-xs text-gray-400">{hint}</p>}
     </div>
   )
 }
@@ -184,15 +185,15 @@ function SearchCombobox({ items, value, onChange, label, required, disabled, pla
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           readOnly={disabled}
           placeholder={placeholder ?? 'Izberi...'}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          className="w-full rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-accent bg-white"
         />
         {open && !disabled && (
-          <div className="absolute z-30 left-0 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-y-auto max-h-56">
+          <div className="absolute z-30 left-0 mt-1 w-full bg-white border border-field rounded-lg shadow-lg overflow-y-auto max-h-56">
             {filtered.length > 0 ? filtered.map(item => (
               <button key={item.id} type="button"
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => { onChange(item.id); setQuery(''); setOpen(false) }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors ${item.id === value ? 'bg-blue-50 font-medium text-blue-700' : 'text-gray-800'}`}>
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-accent-light transition-colors ${item.id === value ? 'bg-accent-light font-medium text-accent-hover' : 'text-gray-800'}`}>
                 {item.name}
                 {item.sub && <span className="ml-2 text-xs text-gray-400">{item.sub}</span>}
               </button>
@@ -235,7 +236,6 @@ export default function POFormPage() {
   // Reference data
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [items, setItems] = useState<Item[]>([])
@@ -247,18 +247,18 @@ export default function POFormPage() {
   async function loadRefs() {
     if (!company) return
     const cid = company.id
-    const [s, cat, proj, loc, dept, itm] = await Promise.all([
+    const [s, cat, loc, dept, itm] = await Promise.all([
       supabase.from('suppliers').select('*').eq('company_id', cid).eq('status', 'active').order('name'),
-      supabase.from('categories').select('*').eq('company_id', cid).order('name'),
-      supabase.from('projects').select('*').eq('company_id', cid).eq('status', 'active').order('name'),
+      supabase.from('categories').select('*').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('locations').select('*').eq('company_id', cid).eq('status', 'active').order('name'),
-      supabase.from('departments').select('*').eq('company_id', cid).order('name'),
+      supabase.from('departments').select('*').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('items').select('*').eq('company_id', cid).eq('status', 'active').order('name'),
     ])
     setSuppliers(s.data ?? [])
     setCategories(cat.data ?? [])
-    setProjects(proj.data ?? [])
     setLocations(loc.data ?? [])
+    // Only one delivery location? Pre-select it for new orders.
+    if (isNew && loc.data?.length === 1) setHeader(h => ({ ...h, location_id: h.location_id || loc.data![0].id }))
     setDepartments(dept.data ?? [])
     setItems(itm.data ?? [])
   }
@@ -274,7 +274,6 @@ export default function POFormPage() {
     setHeader({
       supplier_id: po.supplier_id ?? '',
       category_id: po.category_id ?? '',
-      project_id: po.project_id ?? '',
       location_id: po.location_id ?? '',
       department_id: po.department_id ?? '',
       payment_terms: po.payment_terms ?? '',
@@ -356,15 +355,19 @@ export default function POFormPage() {
     return new Intl.NumberFormat('de-DE', { style: 'currency', currency: company?.currency ?? 'EUR' }).format(n)
   }
 
+  const selectedLoc = locations.find(l => l.id === header.location_id)
+  const locationHint = selectedLoc
+    ? [selectedLoc.address_street, [selectedLoc.address_postal_code, selectedLoc.address_city].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+    : undefined
+
   function validate() {
     if (!header.supplier_id) { toast.error(t.common.nameRequired); return false }
     if (!header.category_id) { toast.error(t.common.nameRequired); return false }
-    if (!header.project_id) { toast.error(t.common.nameRequired); return false }
     if (!header.location_id) { toast.error(t.common.nameRequired); return false }
     if (!header.payment_terms.trim()) { toast.error(t.common.nameRequired); return false }
     if (!header.expected_delivery_date) { toast.error(t.common.nameRequired); return false }
     if (lines.length === 0) { toast.error(t.po.lineItems); return false }
-    if (lines.some(l => !l.name.trim())) { toast.error('All line items must have a name'); return false }
+    if (lines.some(l => !l.name.trim())) { toast.error(t.common.lineItemsNeedName); return false }
     return true
   }
 
@@ -374,7 +377,7 @@ export default function POFormPage() {
     for (const file of newFiles) {
       const path = `${company.id}/${poId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
       const { error } = await supabase.storage.from('quotations').upload(path, file, { upsert: true })
-      if (error) { toast.error(`Upload ${file.name}: ${error.message}`); continue }
+      if (error) { toast.error(`${t.common.uploadPrefix} ${file.name}: ${error.message}`); continue }
       await supabase.from('po_attachments').insert({ po_id: poId, company_id: company.id, file_path: path, file_name: file.name, file_size: file.size })
     }
     setUploadingFiles(false)
@@ -415,7 +418,7 @@ export default function POFormPage() {
     if (isNew) {
       // Generate PO number atomically
       const { data: poNum, error: numErr } = await (supabase as any).rpc('generate_po_number', { p_company_id: company.id })
-      if (numErr || !poNum) { toast.error('Failed to generate PO number'); setSaving(false); return }
+      if (numErr || !poNum) { toast.error(t.common.numberGenerateFailed); setSaving(false); return }
 
       const { data: po, error: poErr } = await supabase.from('purchase_orders').insert({
         company_id: company.id,
@@ -482,7 +485,7 @@ export default function POFormPage() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
+    return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
   }
 
   const title = isNew ? t.po.newPO : `${t.common.edit} ${poNumber}`
@@ -492,7 +495,7 @@ export default function POFormPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/purchase-orders')} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+          <button onClick={() => navigate('/purchase-orders')} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-surface rounded-lg transition-colors">
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div>
@@ -520,7 +523,7 @@ export default function POFormPage() {
 
       {/* Mobile sticky bottom bar */}
       {!isReadOnly && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-200 px-4 py-3 flex gap-2 shadow-lg">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-field px-4 py-3 flex gap-2 shadow-lg">
           <Button variant="secondary" onClick={() => navigate(-1)} disabled={saving} className="flex-1">{t.common.cancel}</Button>
           {(poStatus === 'draft' || isNew) && (
             <Button variant="secondary" onClick={() => save('draft')} loading={saving} className="flex-1">
@@ -534,13 +537,21 @@ export default function POFormPage() {
       )}
 
       {/* Header fields */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5">
+      <div className="bg-white rounded-lg border border-field p-6 mb-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">{t.po.orderDetails}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <SupplierSearch
             suppliers={suppliers}
             value={header.supplier_id}
-            onChange={v => setHeader(h => ({ ...h, supplier_id: v }))}
+            onChange={v => {
+              const sup = suppliers.find(su => su.id === v)
+              setHeader(h => ({
+                ...h,
+                supplier_id: v,
+                payment_terms: h.payment_terms || sup?.payment_terms || '',
+                incoterm: h.incoterm || sup?.incoterm || '',
+              }))
+            }}
             label={s.supplier}
             disabled={isReadOnly}
             placeholder={t.common.search + '…'}
@@ -555,17 +566,7 @@ export default function POFormPage() {
             placeholder={t.common.search + '…'}
             emptyText={s.noResults}
           />
-          <SearchCombobox
-            items={projects.map(p => ({ id: p.id, name: p.name, sub: p.project_code ?? undefined }))}
-            value={header.project_id}
-            onChange={v => setHeader(h => ({ ...h, project_id: v }))}
-            label={s.project}
-            required
-            disabled={isReadOnly}
-            placeholder={t.common.search + '…'}
-            emptyText={s.noResults}
-          />
-          <Select id="location" label={s.location + ' *'} required value={header.location_id} onChange={v => setHeader(h => ({ ...h, location_id: v }))}>
+          <Select id="location" label={s.location} required hint={locationHint} value={header.location_id} onChange={v => setHeader(h => ({ ...h, location_id: v }))}>
             {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
           </Select>
           <Select id="department" label={s.department} value={header.department_id} onChange={v => setHeader(h => ({ ...h, department_id: v }))}>
@@ -601,7 +602,7 @@ export default function POFormPage() {
               onChange={e => setHeader(h => ({ ...h, notes: e.target.value }))}
               readOnly={isReadOnly}
               placeholder={s.notesPlaceholder}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
             />
           </div>
         </div>
@@ -615,10 +616,10 @@ export default function POFormPage() {
 
           {/* Saved attachments */}
           {attachments.map(att => (
-            <div key={att.id} className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg mb-2">
-              <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+            <div key={att.id} className="flex items-center gap-2 p-2.5 bg-accent-light border border-accent-border rounded-lg mb-2">
+              <FileText className="w-4 h-4 text-accent shrink-0" />
               <button type="button" onClick={() => openAttachment(att.file_path)}
-                className="text-sm text-blue-600 hover:underline font-medium flex-1 text-left truncate">
+                className="text-sm text-accent hover:underline font-medium flex-1 text-left truncate">
                 {att.file_name}
               </button>
               {!isReadOnly && (
@@ -634,7 +635,7 @@ export default function POFormPage() {
           {newFiles.map((f, i) => (
             <div key={i} className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-lg mb-2">
               <FileText className="w-4 h-4 text-green-500 shrink-0" />
-              <span className="text-sm text-green-700 font-medium flex-1 truncate">{f.name}</span>
+              <span className="text-sm text-success font-medium flex-1 truncate">{f.name}</span>
               <span className="text-xs text-green-500 shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
               <button type="button" onClick={() => setNewFiles(fs => fs.filter((_, j) => j !== i))}
                 className="text-gray-400 hover:text-red-500 transition-colors shrink-0">
@@ -645,46 +646,46 @@ export default function POFormPage() {
 
           {/* Upload drop zone */}
           {!isReadOnly && (
-            <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors w-full">
+            <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-accent hover:bg-accent-light transition-colors w-full">
               <UploadCloud className="w-4 h-4 text-gray-400 shrink-0" />
               <span className="text-sm text-gray-500">{t.po.uploadQuotation}</span>
               <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple className="hidden"
                 onChange={e => { addFiles(e.target.files); e.target.value = '' }} />
             </label>
           )}
-          {uploadingFiles && <p className="text-xs text-blue-500 mt-1">{s.uploading}</p>}
+          {uploadingFiles && <p className="text-xs text-accent mt-1">{s.uploading}</p>}
         </div>
       </div>
 
       {/* Line items */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-5">
+      <div className="bg-white rounded-lg border border-field overflow-hidden mb-5">
         <div className="px-6 py-4 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-700">{t.po.lineItems}</h2>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[900px]">
-            <thead className="bg-gray-50 border-b border-gray-100">
+            <thead className="bg-surface border-b border-field">
               <tr>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-12">{t.po.position}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">{s.catalog}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">{s.code}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">Ime / Opis</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">Kol.</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-20">EM</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-28">Cena/EM</th>
-                <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-500 w-28">Skupaj</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">{t.po.itemName}</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">{t.po.qty}</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-20">{t.po.unit}</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-28">{t.po.unitPrice}</th>
+                <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-500 w-28">{t.po.amount}</th>
                 {!isReadOnly && <th className="w-8" />}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-field">
               {lines.map((line, idx) => (
                 <tr key={idx} className="align-top">
-                  <td className="px-4 py-2.5 text-gray-400 font-mono text-xs pt-4">{line.position}</td>
+                  <td className="px-4 py-2.5 text-gray-400 text-xs pt-4">{line.position}</td>
                   <td className="px-4 py-2.5 pt-3">
                     {!isReadOnly && <ItemSearch items={items} onSelect={item => applyItem(idx, item)} placeholder={t.common.searchCatalog} />}
                   </td>
-                  <td className="px-4 py-2.5 pt-3 text-xs font-mono text-gray-400">
+                  <td className="px-4 py-2.5 pt-3 text-xs text-gray-400">
                     {line.item_id ? items.find(i => i.id === line.item_id)?.item_number ?? '—' : '—'}
                   </td>
                   <td className="px-4 py-2.5">
@@ -693,14 +694,14 @@ export default function POFormPage() {
                       onChange={e => setLine(idx, { name: e.target.value })}
                       readOnly={isReadOnly}
                       placeholder={s.itemNamePlaceholder}
-                      className="w-full text-sm border-0 bg-transparent outline-none text-gray-900 placeholder-gray-300 font-medium focus:ring-0 pb-0.5"
+                      className="w-full text-sm border-0 bg-transparent outline-none text-gray-900 placeholder:text-placeholder font-medium focus:ring-0 pb-0.5"
                     />
                     <input
                       value={line.long_description}
                       onChange={e => setLine(idx, { long_description: e.target.value })}
                       readOnly={isReadOnly}
                       placeholder={s.descPlaceholder}
-                      className="w-full text-xs border-0 bg-transparent outline-none text-gray-400 placeholder-gray-300 focus:ring-0 mt-0.5"
+                      className="w-full text-xs border-0 bg-transparent outline-none text-gray-400 placeholder:text-placeholder focus:ring-0 mt-0.5"
                     />
                   </td>
                   <td className="px-4 py-2.5 pt-3">
@@ -708,7 +709,7 @@ export default function POFormPage() {
                       type="text" inputMode="decimal"
                       {...numericInput(line.quantity, v => setLine(idx, { quantity: v }))}
                       readOnly={isReadOnly}
-                      className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-right"
+                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent text-right"
                     />
                   </td>
                   <td className="px-4 py-2.5 pt-3">
@@ -716,7 +717,7 @@ export default function POFormPage() {
                       value={line.unit}
                       onChange={e => setLine(idx, { unit: e.target.value })}
                       readOnly={isReadOnly}
-                      className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent"
                     />
                   </td>
                   <td className="px-4 py-2.5 pt-3">
@@ -724,7 +725,7 @@ export default function POFormPage() {
                       type="text" inputMode="decimal"
                       {...numericInput(line.unit_price, v => setLine(idx, { unit_price: v }))}
                       readOnly={isReadOnly}
-                      className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-right"
+                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent text-right"
                     />
                   </td>
                   <td className="px-4 py-2.5 pt-3 text-right font-medium text-gray-800">
@@ -743,14 +744,14 @@ export default function POFormPage() {
               {!isReadOnly && (
                 <tr>
                   <td colSpan={8} className="px-4 py-2 border-t border-gray-100 text-right">
-                    <button type="button" onClick={addLine} className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium">
+                    <button type="button" onClick={addLine} className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover font-medium">
                       <Plus className="w-4 h-4" />{s.addLine}
                     </button>
                   </td>
                 </tr>
               )}
             </tbody>
-            <tfoot className="border-t border-gray-200 bg-gray-50">
+            <tfoot className="border-t border-field bg-surface">
               {/* Subtotal */}
               {discountAmount > 0 && (
                 <tr>
@@ -770,25 +771,25 @@ export default function POFormPage() {
                 </td>
                 <td className="px-4 py-2 text-right">
                   {isReadOnly ? (
-                    <span className="text-sm font-semibold text-blue-600">
+                    <span className="text-sm font-semibold text-accent">
                       {discountAmount > 0 ? `- ${fmt(discountAmount)}` : '—'}
                     </span>
                   ) : (
                     <input
                       type="text" inputMode="decimal"
                       {...numericInput(discount, setDiscount)}
-                      className="w-28 text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-right ml-auto block"
+                      className="w-28 text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent text-right ml-auto block"
                     />
                   )}
                 </td>
                 {!isReadOnly && <td />}
               </tr>
               {/* Grand total */}
-              <tr className="border-t-2 border-gray-300">
+              <tr className="border-t-2 border-field">
                 <td colSpan={6} className="px-4 py-3 text-right text-sm font-bold text-gray-900">
                   {s.totalExVat}
                 </td>
-                <td className="px-4 py-3 text-right text-base font-bold text-blue-700">
+                <td className="px-4 py-3 text-right text-base font-bold text-accent-hover">
                   {fmt(grandTotal)}
                 </td>
                 {!isReadOnly && <td />}

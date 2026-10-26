@@ -16,6 +16,7 @@ export interface Company {
   bank_iban: string | null
   approval_auto_under: number | null
   approval_second_over: number | null
+  approver_id: string | null
   second_approver_id: string | null
   team_edit_requests: boolean
   req_prefix: string
@@ -53,6 +54,7 @@ export interface Supplier {
   address_postal_code: string | null
   address_country: string | null
   payment_terms: string | null
+  incoterm: string | null
   status: 'active' | 'inactive'
   created_at: string
   updated_at: string
@@ -62,6 +64,7 @@ export interface Category {
   id: string
   company_id: string
   name: string
+  status: 'active' | 'inactive'
   created_at: string
   updated_at: string
 }
@@ -98,6 +101,7 @@ export interface Department {
   id: string
   company_id: string
   name: string
+  status: 'active' | 'inactive'
   created_at: string
   updated_at: string
 }
@@ -251,7 +255,7 @@ export interface UserInvitation {
   accepted_at: string | null
 }
 
-export type RequestStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'cancelled'
+export type RequestStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'cancelled' | 'completed'
 
 export interface Request {
   id: string

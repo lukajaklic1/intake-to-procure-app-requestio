@@ -4,15 +4,23 @@ import { Menu } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import Sidebar from './Sidebar'
 import AppLogo from '../ui/AppLogo'
+import PageHeader from './PageHeader'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { session, loading, isPasswordRecovery } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem('sidebarCollapsed') === '1' } catch { return false }
+  })
+  function toggleCollapsed(v: boolean) {
+    setCollapsed(v)
+    try { localStorage.setItem('sidebarCollapsed', v ? '1' : '0') } catch { /* ignore */ }
+  }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      <div className="min-h-screen flex items-center justify-center bg-page">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ink" />
       </div>
     )
   }
@@ -20,7 +28,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!session || isPasswordRecovery) return <Navigate to={isPasswordRecovery ? '/reset-password' : '/'} replace />
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-page overflow-hidden">
 
       {/* Mobile backdrop */}
       {sidebarOpen && (
@@ -35,22 +43,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         fixed inset-y-0 left-0 z-50 lg:static lg:z-auto
         transform transition-transform duration-200 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        ${collapsed ? 'lg:hidden' : ''}
       `}>
-        <Sidebar onClose={() => setSidebarOpen(false)} />
+        <Sidebar onClose={() => setSidebarOpen(false)} onCollapse={() => toggleCollapsed(true)} />
       </div>
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Mobile top bar */}
-        <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 shrink-0">
+        <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-surface border-b border-line shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+            className="p-2 rounded-lg text-ink2 hover:bg-white transition-colors"
           >
             <Menu className="w-5 h-5" />
           </button>
           <AppLogo size="sm" />
         </header>
+
+        <PageHeader sidebarCollapsed={collapsed} onShowSidebar={() => toggleCollapsed(false)} />
 
         <main className="flex-1 overflow-y-auto">
           {children}

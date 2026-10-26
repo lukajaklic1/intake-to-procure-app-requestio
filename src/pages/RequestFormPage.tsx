@@ -19,20 +19,20 @@ function ItemSearch({ items, onSelect, placeholder }: { items: Item[]; onSelect:
     : items
   return (
     <div className="relative">
-      <div className="flex items-center gap-1 border border-gray-200 rounded-lg bg-white px-2 py-1.5 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
+      <div className="flex items-center gap-1 border border-field rounded-lg hover:border-field-hover bg-white px-2 py-1.5 focus-within:ring-2 focus-within:ring-accent focus-within:border-transparent">
         <Search className="w-3 h-3 text-gray-400 shrink-0" />
         <input value={query} onChange={e => { setQuery(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder={placeholder} className="text-xs bg-transparent outline-none flex-1 text-gray-600 placeholder-gray-400 min-w-0" />
+          placeholder={placeholder} className="text-xs bg-transparent outline-none flex-1 text-ink placeholder:text-placeholder min-w-0" />
         {query && <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setQuery('')}><X className="w-3 h-3 text-gray-300" /></button>}
       </div>
       {open && filtered.length > 0 && (
-        <div className="absolute z-30 left-0 mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-lg overflow-y-auto max-h-56">
+        <div className="absolute z-30 left-0 mt-1 w-72 bg-white border border-field rounded-lg shadow-lg overflow-y-auto max-h-56">
           {filtered.map(item => (
             <button key={item.id} type="button" onMouseDown={e => e.preventDefault()}
               onClick={() => { onSelect(item); setQuery(''); setOpen(false) }}
-              className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors">
-              <span className="font-mono text-xs text-gray-400 mr-2">{item.item_number}</span>
+              className="w-full text-left px-3 py-2 hover:bg-accent-light transition-colors">
+              <span className=" text-xs text-gray-400 mr-2">{item.item_number}</span>
               <span className="text-sm font-medium text-gray-800">{item.name}</span>
             </button>
           ))}
@@ -60,13 +60,13 @@ function SearchCombobox({ items, value, onChange, label, required, placeholder, 
           onFocus={() => { setQuery(''); setOpen(true) }}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder={placeholder}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+          className="w-full rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-ink placeholder:text-placeholder focus:outline-none focus:ring-2 focus:ring-accent bg-white" />
         {open && (
-          <div className="absolute z-30 left-0 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-y-auto max-h-56">
+          <div className="absolute z-30 left-0 mt-1 w-full bg-white border border-field rounded-lg shadow-lg overflow-y-auto max-h-56">
             {filtered.length > 0 ? filtered.map(item => (
               <button key={item.id} type="button" onMouseDown={e => e.preventDefault()}
                 onClick={() => { onChange(item.id); setQuery(''); setOpen(false) }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors ${item.id === value ? 'bg-blue-50 font-medium text-blue-700' : 'text-gray-800'}`}>
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-accent-light transition-colors ${item.id === value ? 'bg-accent-light font-medium text-accent-hover' : 'text-gray-800'}`}>
                 {item.name}{item.sub && <span className="ml-2 text-xs text-gray-400">{item.sub}</span>}
               </button>
             )) : <p className="px-3 py-2 text-sm text-gray-400">{emptyText}</p>}
@@ -77,17 +77,18 @@ function SearchCombobox({ items, value, onChange, label, required, placeholder, 
   )
 }
 
-function Select({ id, label, value, onChange, children, placeholder }: {
-  id: string; label: string; value: string; onChange: (v: string) => void; children: React.ReactNode; placeholder: string
+function Select({ id, label, value, onChange, children, placeholder, required, hint }: {
+  id: string; label: string; value: string; onChange: (v: string) => void; children: React.ReactNode; placeholder: string; required?: boolean; hint?: string
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium text-gray-700">{label}</label>
+      <label htmlFor={id} className="text-sm font-medium text-gray-700">{label}{required && ' *'}</label>
       <select id={id} value={value} onChange={e => onChange(e.target.value)}
-        className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+        className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent bg-white">
         <option value="">{placeholder}</option>
         {children}
       </select>
+      {hint && <p className="text-xs text-gray-400">{hint}</p>}
     </div>
   )
 }
@@ -104,7 +105,6 @@ interface Line {
 }
 
 interface Header {
-  project_id: string
   supplier_id: string
   supplier_name: string
   category_id: string
@@ -114,7 +114,7 @@ interface Header {
   note: string
 }
 
-const EMPTY: Header = { project_id: '', supplier_id: '', supplier_name: '', category_id: '', location_id: '', department_id: '', needed_by_date: '', note: '' }
+const EMPTY: Header = { supplier_id: '', supplier_name: '', category_id: '', location_id: '', department_id: '', needed_by_date: '', note: '' }
 function newLine(position: number): Line { return { position, item_id: null, name: '', long_description: '', quantity: '1', unit: 'kos', est_unit_price: '0' } }
 
 export default function RequestFormPage() {
@@ -137,11 +137,10 @@ export default function RequestFormPage() {
   const [newFiles, setNewFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
 
-  const [projects, setProjects] = useState<{ id: string; name: string; project_code?: string | null; manager_id?: string | null }[]>([])
   const [members, setMembers] = useState<{ id: string; first_name: string; last_name: string }[]>([])
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
-  const [locations, setLocations] = useState<{ id: string; name: string }[]>([])
+  const [locations, setLocations] = useState<{ id: string; name: string; address_street: string | null; address_city: string | null; address_postal_code: string | null }[]>([])
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
   const [items, setItems] = useState<Item[]>([])
 
@@ -151,27 +150,29 @@ export default function RequestFormPage() {
   async function loadRefs() {
     if (!company) return
     const cid = company.id
-    const [p, sup, c, l, d, itm] = await Promise.all([
-      supabase.from('projects').select('id, name, project_code, manager_id').eq('company_id', cid).eq('status', 'active').order('name'),
+    const [sup, c, l, d, itm] = await Promise.all([
       supabase.from('suppliers').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
-      supabase.from('categories').select('id, name').eq('company_id', cid).order('name'),
-      supabase.from('locations').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
-      supabase.from('departments').select('id, name').eq('company_id', cid).order('name'),
+      supabase.from('categories').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
+      supabase.from('locations').select('id, name, address_street, address_city, address_postal_code').eq('company_id', cid).eq('status', 'active').order('name'),
+      supabase.from('departments').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('items').select('*').eq('company_id', cid).eq('status', 'active').order('name'),
     ])
-    setProjects(p.data ?? []); setSuppliers(sup.data ?? []); setCategories(c.data ?? [])
-    setLocations(l.data ?? []); setDepartments(d.data ?? []); setItems((itm.data as Item[]) ?? [])
+    setSuppliers(sup.data ?? []); setCategories(c.data ?? [])
+    setLocations(l.data ?? [])
+    // Only one delivery location? Pre-select it for new requests.
+    if (!id && l.data?.length === 1) setHeader(h => ({ ...h, location_id: h.location_id || l.data![0].id }))
+    setDepartments(d.data ?? []); setItems((itm.data as Item[]) ?? [])
     const { data: us } = await supabase.from('users').select('id, first_name, last_name').eq('company_id', cid)
     setMembers(us ?? [])
   }
 
   async function loadRequest() {
     const { data: req } = await supabase.from('requests').select('*').eq('id', id!).single()
-    if (!req) { toast.error('Not found'); navigate('/requests'); return }
+    if (!req) { toast.error(t.common.notFound); navigate('/requests'); return }
     if (req.status === 'cancelled' || req.po_id) { navigate(`/requests/${id}`); return }
     setReqStatus(req.status)
     setHeader({
-      project_id: req.project_id ?? '', supplier_id: req.supplier_id ?? '', supplier_name: req.supplier_name ?? '',
+      supplier_id: req.supplier_id ?? '', supplier_name: req.supplier_name ?? '',
       category_id: req.category_id ?? '', location_id: req.location_id ?? '', department_id: req.department_id ?? '',
       needed_by_date: req.needed_by_date ?? '', note: req.note ?? '',
     })
@@ -200,7 +201,7 @@ export default function RequestFormPage() {
     for (const file of newFiles) {
       const path = `${company.id}/requests/${reqId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
       const { error } = await supabase.storage.from('quotations').upload(path, file, { upsert: true })
-      if (error) { toast.error(`Upload ${file.name}: ${error.message}`); continue }
+      if (error) { toast.error(`${t.common.uploadPrefix} ${file.name}: ${error.message}`); continue }
       await supabase.from('request_attachments').insert({ request_id: reqId, company_id: company.id, file_path: path, file_name: file.name, file_size: file.size })
     }
     setUploading(false); setNewFiles([])
@@ -228,16 +229,17 @@ export default function RequestFormPage() {
   const grandTotal = Math.max(0, subtotal - discountAmount)
   const fmt = (n: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: company?.currency ?? 'EUR' }).format(n)
 
+  const selectedLoc = locations.find(l => l.id === header.location_id)
+  const locationHint = selectedLoc ? [selectedLoc.address_street, [selectedLoc.address_postal_code, selectedLoc.address_city].filter(Boolean).join(' ')].filter(Boolean).join(', ') : undefined
+
   const approverName = (() => {
-    const mid = projects.find(p => p.id === header.project_id)?.manager_id
-    if (!mid) return null
-    const m = members.find(u => u.id === mid)
+    const m = members.find(u => u.id === company?.approver_id)
     return m ? `${m.first_name} ${m.last_name}` : null
   })()
 
   async function persist(): Promise<string | null> {
     if (!company || !profile) return null
-    if (!header.project_id) { toast.error(s.project + ' *'); return null }
+    if (!header.location_id) { toast.error(s.location + ' *'); return null }
     if (lines.length === 0 || lines.some(l => !l.name.trim())) { toast.error(s.lineItems); return null }
 
     const linePayload = lines.map((l, i) => ({
@@ -246,7 +248,6 @@ export default function RequestFormPage() {
       quantity: parseNum(l.quantity) || 1, unit: l.unit || 'kos', est_unit_price: parseNum(l.est_unit_price),
     }))
     const reqFields = {
-      project_id: header.project_id,
       supplier_id: header.supplier_id || null,
       supplier_name: header.supplier_name.trim() || null,
       category_id: header.category_id || null,
@@ -260,7 +261,7 @@ export default function RequestFormPage() {
 
     if (isNew) {
       const { data: num, error: numErr } = await (supabase as any).rpc('generate_request_number', { p_company_id: company.id })
-      if (numErr || !num) { toast.error('Failed to generate number'); return null }
+      if (numErr || !num) { toast.error(t.common.numberGenerateFailed); return null }
       const { data: req, error } = await supabase.from('requests').insert({ company_id: company.id, created_by: profile.id, request_number: num, status: 'draft', ...reqFields }).select().single()
       if (error || !req) { toast.error(error?.message ?? 'Error'); return null }
       await supabase.from('request_line_items').insert(linePayload.map(l => ({ ...l, request_id: req.id })))
@@ -296,14 +297,14 @@ export default function RequestFormPage() {
     navigate(`/requests/${reqId}`)
   }
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
 
   return (
     <div className="p-4 lg:p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/requests')} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"><ChevronLeft className="w-5 h-5" /></button>
+          <button onClick={() => navigate('/requests')} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-surface rounded-lg transition-colors"><ChevronLeft className="w-5 h-5" /></button>
           <h1 className="text-2xl font-bold text-gray-900">{isNew ? s.new : s.edit}</h1>
         </div>
         <div className="hidden lg:flex items-center gap-2">
@@ -314,14 +315,12 @@ export default function RequestFormPage() {
       </div>
 
       {/* Request details */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5">
+      <div className="bg-white rounded-lg border border-field p-6 mb-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">{t.po.orderDetails}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <SearchCombobox items={projects.map(p => ({ id: p.id, name: p.name, sub: p.project_code ?? undefined }))}
-            value={header.project_id} onChange={v => setHeader(h => ({ ...h, project_id: v }))} label={s.project} required placeholder={s.selectProject} emptyText={s.noMatch} />
           <SearchCombobox items={suppliers} value={header.supplier_id} onChange={v => setHeader(h => ({ ...h, supplier_id: v }))} label={s.supplier} placeholder={s.noSupplier} emptyText={s.noMatch} />
           <SearchCombobox items={categories} value={header.category_id} onChange={v => setHeader(h => ({ ...h, category_id: v }))} label={s.category} placeholder={t.common.select} emptyText={s.noMatch} />
-          <Select id="r-location" label={s.location} value={header.location_id} onChange={v => setHeader(h => ({ ...h, location_id: v }))} placeholder={t.common.select}>
+          <Select id="r-location" label={s.location} required hint={locationHint} value={header.location_id} onChange={v => setHeader(h => ({ ...h, location_id: v }))} placeholder={t.common.select}>
             {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
           </Select>
           <Select id="r-department" label={s.department} value={header.department_id} onChange={v => setHeader(h => ({ ...h, department_id: v }))} placeholder={t.common.select}>
@@ -337,43 +336,43 @@ export default function RequestFormPage() {
         <div className="mt-4 flex flex-col gap-1">
           <label className="text-sm font-medium text-gray-700">{s.note}</label>
           <textarea rows={3} value={header.note} onChange={e => setHeader(h => ({ ...h, note: e.target.value }))}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none" />
         </div>
 
         {/* Attachments */}
         <div className="mt-4">
           <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5 mb-2"><Paperclip className="w-3.5 h-3.5" />{s.attachOffer}</label>
           {attachments.map(att => (
-            <div key={att.id} className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg mb-2">
-              <FileText className="w-4 h-4 text-blue-500 shrink-0" />
-              <button type="button" onClick={() => openAttachment(att.file_path)} className="text-sm text-blue-600 hover:underline font-medium flex-1 text-left truncate">{att.file_name}</button>
+            <div key={att.id} className="flex items-center gap-2 p-2.5 bg-accent-light border border-accent-border rounded-lg mb-2">
+              <FileText className="w-4 h-4 text-accent shrink-0" />
+              <button type="button" onClick={() => openAttachment(att.file_path)} className="text-sm text-accent hover:underline font-medium flex-1 text-left truncate">{att.file_name}</button>
               <button type="button" onClick={() => deleteAttachment(att)} className="text-gray-400 hover:text-red-500 transition-colors shrink-0"><X className="w-4 h-4" /></button>
             </div>
           ))}
           {newFiles.map((f, i) => (
             <div key={i} className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-lg mb-2">
               <FileText className="w-4 h-4 text-green-500 shrink-0" />
-              <span className="text-sm text-green-700 font-medium flex-1 truncate">{f.name}</span>
+              <span className="text-sm text-success font-medium flex-1 truncate">{f.name}</span>
               <span className="text-xs text-green-500 shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
               <button type="button" onClick={() => setNewFiles(fs => fs.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 transition-colors shrink-0"><X className="w-4 h-4" /></button>
             </div>
           ))}
-          <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors w-full">
+          <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-accent hover:bg-accent-light transition-colors w-full">
             <UploadCloud className="w-4 h-4 text-gray-400 shrink-0" />
             <span className="text-sm text-gray-500">{s.uploadHint}</span>
             <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple className="hidden"
               onChange={e => { const fl = Array.from(e.target.files ?? []); setNewFiles(fs => [...fs, ...fl]); e.target.value = '' }} />
           </label>
-          {uploading && <p className="text-xs text-blue-500 mt-1">{s.uploading}</p>}
+          {uploading && <p className="text-xs text-accent mt-1">{s.uploading}</p>}
         </div>
       </div>
 
       {/* Line items */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-5">
+      <div className="bg-white rounded-lg border border-field overflow-hidden mb-5">
         <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-sm font-semibold text-gray-700">{s.lineItems}</h2></div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[900px]">
-            <thead className="bg-gray-50 border-b border-gray-100">
+            <thead className="bg-surface border-b border-field">
               <tr>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-12">{t.po.position}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">{s.catalog}</th>
@@ -386,32 +385,32 @@ export default function RequestFormPage() {
                 <th className="w-8" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-field">
               {lines.map((line, idx) => (
                 <tr key={idx} className="align-top">
-                  <td className="px-4 py-2.5 text-gray-400 font-mono text-xs pt-4">{line.position}</td>
+                  <td className="px-4 py-2.5 text-gray-400 text-xs pt-4">{line.position}</td>
                   <td className="px-4 py-2.5 pt-3"><ItemSearch items={items} onSelect={item => applyItem(idx, item)} placeholder={t.common.searchCatalog} /></td>
-                  <td className="px-4 py-2.5 pt-3 text-xs font-mono text-gray-400">{line.item_id ? items.find(i => i.id === line.item_id)?.item_number ?? '—' : '—'}</td>
+                  <td className="px-4 py-2.5 pt-3 text-xs text-gray-400">{line.item_id ? items.find(i => i.id === line.item_id)?.item_number ?? '—' : '—'}</td>
                   <td className="px-4 py-2.5">
                     <input value={line.name} onChange={e => setLine(idx, { name: e.target.value })} placeholder={s.itemPlaceholder}
-                      className="w-full text-sm border-0 bg-transparent outline-none text-gray-900 placeholder-gray-300 font-medium focus:ring-0 pb-0.5" />
+                      className="w-full text-sm border-0 bg-transparent outline-none text-gray-900 placeholder:text-placeholder font-medium focus:ring-0 pb-0.5" />
                     <input value={line.long_description} onChange={e => setLine(idx, { long_description: e.target.value })} placeholder={s.descPlaceholder}
-                      className="w-full text-xs border-0 bg-transparent outline-none text-gray-400 placeholder-gray-300 focus:ring-0 mt-0.5" />
+                      className="w-full text-xs border-0 bg-transparent outline-none text-gray-400 placeholder:text-placeholder focus:ring-0 mt-0.5" />
                   </td>
-                  <td className="px-4 py-2.5 pt-3"><input type="text" inputMode="decimal" {...numInput(line.quantity, v => setLine(idx, { quantity: v }))} className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-right" /></td>
-                  <td className="px-4 py-2.5 pt-3"><input value={line.unit} onChange={e => setLine(idx, { unit: e.target.value })} className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500" /></td>
-                  <td className="px-4 py-2.5 pt-3"><input type="text" inputMode="decimal" {...numInput(line.est_unit_price, v => setLine(idx, { est_unit_price: v }))} className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-right" /></td>
+                  <td className="px-4 py-2.5 pt-3"><input type="text" inputMode="decimal" {...numInput(line.quantity, v => setLine(idx, { quantity: v }))} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent text-right" /></td>
+                  <td className="px-4 py-2.5 pt-3"><input value={line.unit} onChange={e => setLine(idx, { unit: e.target.value })} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent" /></td>
+                  <td className="px-4 py-2.5 pt-3"><input type="text" inputMode="decimal" {...numInput(line.est_unit_price, v => setLine(idx, { est_unit_price: v }))} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent text-right" /></td>
                   <td className="px-4 py-2.5 pt-3 text-right font-medium text-gray-800">{fmt(lineTotal(line))}</td>
                   <td className="px-2 py-2.5 pt-3"><button type="button" onClick={() => removeLine(idx)} className="p-1 text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button></td>
                 </tr>
               ))}
               <tr>
                 <td colSpan={9} className="px-4 py-2 border-t border-gray-100 text-right">
-                  <button type="button" onClick={addLine} className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"><Plus className="w-4 h-4" />{s.addItem}</button>
+                  <button type="button" onClick={addLine} className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover font-medium"><Plus className="w-4 h-4" />{s.addItem}</button>
                 </td>
               </tr>
             </tbody>
-            <tfoot className="border-t border-gray-200 bg-gray-50">
+            <tfoot className="border-t border-field bg-surface">
               {discountAmount > 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 pt-3 pb-1 text-right text-sm text-gray-500">{s.estTotal}</td>
@@ -421,12 +420,12 @@ export default function RequestFormPage() {
               )}
               <tr>
                 <td colSpan={7} className="px-4 py-2 text-right text-sm text-gray-500">{s.discount} (€)</td>
-                <td className="px-4 py-2 text-right"><input type="text" inputMode="decimal" {...numInput(discount, setDiscount)} className="w-28 text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-right ml-auto block" /></td>
+                <td className="px-4 py-2 text-right"><input type="text" inputMode="decimal" {...numInput(discount, setDiscount)} className="w-28 text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent text-right ml-auto block" /></td>
                 <td />
               </tr>
-              <tr className="border-t-2 border-gray-300">
+              <tr className="border-t-2 border-field">
                 <td colSpan={7} className="px-4 py-3 text-right text-sm font-bold text-gray-900">{s.estTotal}</td>
-                <td className="px-4 py-3 text-right text-base font-bold text-blue-700">{fmt(grandTotal)}</td>
+                <td className="px-4 py-3 text-right text-base font-bold text-accent-hover">{fmt(grandTotal)}</td>
                 <td />
               </tr>
             </tfoot>
@@ -444,7 +443,7 @@ export default function RequestFormPage() {
         <div className="flex flex-col gap-1 mb-4">
           <label className="text-sm font-medium text-gray-700">{s.submitComment}</label>
           <textarea value={submitNote} onChange={e => setSubmitNote(e.target.value)} rows={3}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none" />
         </div>
         <div className="flex gap-3 justify-end">
           <Button variant="secondary" onClick={() => setSubmitOpen(false)}>{t.common.cancel}</Button>

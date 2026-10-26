@@ -9,6 +9,57 @@ Font.register({
   ]
 })
 
+const PDF_LABELS = {
+  en: {
+    title: 'Purchase Order',
+    orderDate: 'Order date',
+    desiredDelivery: 'Desired delivery date',
+    vat: 'VAT',
+    supplier: 'SUPPLIER',
+    deliveryAddress: 'DELIVERY ADDRESS',
+    pos: 'Pos',
+    code: 'Code',
+    desc: 'Description',
+    qty: 'Qty',
+    unit: 'Unit',
+    unitPrice: 'Price/unit',
+    amount: 'Amount',
+    subtotal: 'Subtotal',
+    discount: 'Discount',
+    totalExVat: 'Total excl. VAT',
+    note: 'NOTE',
+    bank: 'Bank',
+    pageOf: (p: number, n: number) => `Page ${p} of ${n}`,
+    paymentTerms: 'Payment terms',
+    incoterm: 'Incoterm',
+    quoteRef: 'Supplier quote no.',
+  },
+  sl: {
+    title: 'Nabavno naročilo',
+    orderDate: 'Datum naročila',
+    desiredDelivery: 'Željeni rok dobave',
+    vat: 'DDV',
+    supplier: 'DOBAVITELJ',
+    deliveryAddress: 'NASLOV ZA DOBAVO',
+    pos: 'Poz',
+    code: 'Šifra',
+    desc: 'Opis',
+    qty: 'Kol.',
+    unit: 'EM',
+    unitPrice: 'Cena/EM',
+    amount: 'Znesek',
+    subtotal: 'Vmesni znesek',
+    discount: 'Popust',
+    totalExVat: 'Skupaj brez DDV',
+    note: 'OPOMBA',
+    bank: 'Banka',
+    pageOf: (p: number, n: number) => `Stran ${p} od ${n}`,
+    paymentTerms: 'Plačilni pogoji',
+    incoterm: 'Pariteta',
+    quoteRef: 'Št. ponudbe dobavitelja',
+  },
+} as const
+
 export interface PODocData {
   po_number: string
   status: string
@@ -38,7 +89,6 @@ export interface PODocData {
     name: string; address_street: string | null; address_city: string | null
     address_postal_code: string | null; address_country: string | null
   }
-  project: { name: string; project_code: string | null }
   category: { name: string }
   department: { name: string } | null
   lines: {
@@ -181,14 +231,15 @@ function addrLines(obj: {
   ].filter((l): l is string => !!l)
 }
 
-export default function PODocument({ data }: { data: PODocData }) {
+export default function PODocument({ data, lang = 'sl' }: { data: PODocData; lang?: 'en' | 'sl' }) {
   const { company, supplier, location, lines } = data
+  const L = PDF_LABELS[lang]
 
   // Terms — only show fields that have values
   const termFields = [
-    { label: 'Plačilni pogoji', value: data.payment_terms },
-    ...(data.incoterm ? [{ label: 'Pariteta', value: data.incoterm }] : []),
-    ...(data.supplier_quote_ref ? [{ label: 'Št. ponudbe dobavitelja', value: data.supplier_quote_ref }] : []),
+    { label: L.paymentTerms, value: data.payment_terms },
+    ...(data.incoterm ? [{ label: L.incoterm, value: data.incoterm }] : []),
+    ...(data.supplier_quote_ref ? [{ label: L.quoteRef, value: data.supplier_quote_ref }] : []),
   ]
 
   return (
@@ -199,15 +250,15 @@ export default function PODocument({ data }: { data: PODocData }) {
         <View style={s.topRow}>
           <View />
           <View style={s.titleBlock}>
-            <Text style={s.titleText}>Nabavno naročilo</Text>
+            <Text style={s.titleText}>{L.title}</Text>
             <Text style={s.poNumber}>{data.po_number}</Text>
             <View style={s.datesRow}>
               <View style={s.dateBlock}>
-                <Text style={s.dateLabel}>Datum naročila</Text>
+                <Text style={s.dateLabel}>{L.orderDate}</Text>
                 <Text style={s.dateValue}>{fmtDate(data.created_at)}</Text>
               </View>
               <View style={s.dateBlock}>
-                <Text style={s.dateLabel}>Željeni rok dobave</Text>
+                <Text style={s.dateLabel}>{L.desiredDelivery}</Text>
                 <Text style={s.dateValue}>{fmtDate(data.expected_delivery_date)}</Text>
               </View>
             </View>
@@ -217,7 +268,7 @@ export default function PODocument({ data }: { data: PODocData }) {
         {/* ── 2. Our company ── */}
         <View style={s.companyBox}>
           <Text style={s.companyName}>{company.name}</Text>
-          {company.tax_id ? <Text style={s.companyLine}>DDV: {company.tax_id}</Text> : null}
+          {company.tax_id ? <Text style={s.companyLine}>{L.vat}: {company.tax_id}</Text> : null}
           {addrLines(company).map((l, i) => <Text key={i} style={s.companyLine}>{l}</Text>)}
           {company.email ? <Text style={s.companyLine}>{company.email}</Text> : null}
           {company.phone ? <Text style={s.companyLine}>{company.phone}</Text> : null}
@@ -226,16 +277,16 @@ export default function PODocument({ data }: { data: PODocData }) {
         {/* ── 3. Supplier + Delivery ── */}
         <View style={s.addressRow}>
           <View style={s.addressBox}>
-            <Text style={s.boxLabel}>DOBAVITELJ</Text>
+            <Text style={s.boxLabel}>{L.supplier}</Text>
             <Text style={s.addressName}>{supplier.name}</Text>
-            {supplier.vat_number ? <Text style={s.addressLine}>DDV: {supplier.vat_number}</Text> : null}
+            {supplier.vat_number ? <Text style={s.addressLine}>{L.vat}: {supplier.vat_number}</Text> : null}
             {supplier.contact_name ? <Text style={s.addressLine}>{supplier.contact_name}</Text> : null}
             {supplier.email ? <Text style={s.addressLine}>{supplier.email}</Text> : null}
             {supplier.phone ? <Text style={s.addressLine}>{supplier.phone}</Text> : null}
             {addrLines(supplier).map((l, i) => <Text key={i} style={s.addressLine}>{l}</Text>)}
           </View>
           <View style={s.addressBox}>
-            <Text style={s.boxLabel}>NASLOV ZA DOBAVO</Text>
+            <Text style={s.boxLabel}>{L.deliveryAddress}</Text>
             <Text style={s.addressName}>{location.name}</Text>
             {addrLines(location).map((l, i) => <Text key={i} style={s.addressLine}>{l}</Text>)}
           </View>
@@ -255,13 +306,13 @@ export default function PODocument({ data }: { data: PODocData }) {
 
         {/* ── 5. Line items ── */}
         <View style={s.tableHead}>
-          <Text style={[s.tableHeadText, s.colPos]}>Pos</Text>
-          <Text style={[s.tableHeadText, {width:52}]}>Šifra</Text>
-          <Text style={[s.tableHeadText, s.colDesc]}>Opis</Text>
-          <Text style={[s.tableHeadText, s.colQty]}>Kol.</Text>
-          <Text style={[s.tableHeadText, s.colUnit]}>EM</Text>
-          <Text style={[s.tableHeadText, s.colPrice]}>Cena/EM</Text>
-          <Text style={[s.tableHeadText, s.colTotal]}>Znesek</Text>
+          <Text style={[s.tableHeadText, s.colPos]}>{L.pos}</Text>
+          <Text style={[s.tableHeadText, {width:52}]}>{L.code}</Text>
+          <Text style={[s.tableHeadText, s.colDesc]}>{L.desc}</Text>
+          <Text style={[s.tableHeadText, s.colQty]}>{L.qty}</Text>
+          <Text style={[s.tableHeadText, s.colUnit]}>{L.unit}</Text>
+          <Text style={[s.tableHeadText, s.colPrice]}>{L.unitPrice}</Text>
+          <Text style={[s.tableHeadText, s.colTotal]}>{L.amount}</Text>
         </View>
 
         {lines.map((line, i) => (
@@ -283,7 +334,7 @@ export default function PODocument({ data }: { data: PODocData }) {
         {/* Vmesni znesek (samo ce je popust) */}
         {Number(data.discount_amount ?? 0) > 0 && (
           <View style={{ flexDirection: 'row', paddingVertical: 5, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: BORDER, borderBottomStyle: 'solid' }}>
-            <Text style={{ ...s.totalLabel, fontFamily: 'Roboto', color: MUTED, fontSize: 8 }}>Vmesni znesek</Text>
+            <Text style={{ ...s.totalLabel, fontFamily: 'Roboto', color: MUTED, fontSize: 8 }}>{L.subtotal}</Text>
             <Text style={{ width: 30, textAlign: 'right', fontSize: 8, color: MUTED }}>{data.currency}</Text>
             <Text style={{ width: 70, textAlign: 'right', fontSize: 9, color: MID }}>{fmtNum(Number(data.total_amount) + Number(data.discount_amount ?? 0))}</Text>
           </View>
@@ -291,14 +342,14 @@ export default function PODocument({ data }: { data: PODocData }) {
         {/* Popust */}
         {Number(data.discount_amount ?? 0) > 0 && (
           <View style={{ flexDirection: 'row', paddingVertical: 5, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: BORDER, borderBottomStyle: 'solid' }}>
-            <Text style={{ ...s.totalLabel, fontFamily: 'Roboto', color: MUTED, fontSize: 8 }}>Popust</Text>
+            <Text style={{ ...s.totalLabel, fontFamily: 'Roboto', color: MUTED, fontSize: 8 }}>{L.discount}</Text>
             <Text style={{ width: 30, textAlign: 'right', fontSize: 8, color: MUTED }}>{data.currency}</Text>
             <Text style={{ width: 70, textAlign: 'right', fontSize: 9, color: MID, fontFamily: 'Roboto' }}>- {fmtNum(Number(data.discount_amount ?? 0))}</Text>
           </View>
         )}
         {/* Skupaj */}
         <View style={s.tableFoot}>
-          <Text style={s.totalLabel}>Skupaj brez DDV</Text>
+          <Text style={s.totalLabel}>{L.totalExVat}</Text>
           <Text style={s.totalCurrency}>{data.currency}</Text>
           <Text style={s.totalValue}>{fmtNum(data.total_amount)}</Text>
         </View>
@@ -306,7 +357,7 @@ export default function PODocument({ data }: { data: PODocData }) {
         {/* ── Notes ── */}
         {data.notes ? (
           <View style={s.notesSection}>
-            <Text style={s.notesLabel}>OPOMBA</Text>
+            <Text style={s.notesLabel}>{L.note}</Text>
             <Text style={s.notesText}>{data.notes}</Text>
           </View>
         ) : null}
@@ -321,7 +372,7 @@ export default function PODocument({ data }: { data: PODocData }) {
               : null}
             {(company.bank_name || company.bank_iban) ? (
               <Text style={s.footerText}>
-                {company.bank_name ? `Banka: ${company.bank_name}` : ''}
+                {company.bank_name ? `${L.bank}: ${company.bank_name}` : ''}
                 {company.bank_name && company.bank_iban ? '   ' : ''}
                 {company.bank_iban ? `IBAN: ${company.bank_iban}` : ''}
               </Text>
@@ -329,7 +380,7 @@ export default function PODocument({ data }: { data: PODocData }) {
           </View>
           <Text
             style={s.footerPage}
-            render={({ pageNumber, totalPages }) => `Stran ${pageNumber} od ${totalPages}`}
+            render={({ pageNumber, totalPages }) => L.pageOf(pageNumber, totalPages)}
             fixed
           />
         </View>

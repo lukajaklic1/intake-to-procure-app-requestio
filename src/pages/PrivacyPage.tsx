@@ -14,7 +14,7 @@ export default function PrivacyPage() {
           <div className="flex gap-1">
             {(['en', 'sl'] as const).map(lng => (
               <button key={lng} onClick={() => setLang(lng)}
-                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${lang === lng ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}>
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${lang === lng ? 'bg-accent text-white' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}>
                 {lng.toUpperCase()}
               </button>
             ))}
@@ -123,12 +123,12 @@ export default function PrivacyPage() {
               <li><strong>{isSl ? 'Pravica do ugovora' : 'Right to object'}</strong> — {isSl ? 'ugovarjate lahko obdelavi vaših podatkov' : 'you can object to the processing of your data'}</li>
               <li><strong>{isSl ? 'Pravica do omejitve obdelave' : 'Right to restriction'}</strong> — {isSl ? 'zahtevate lahko omejitev obdelave vaših podatkov' : 'you can request restriction of processing of your data'}</li>
             </ul>
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-field">
               <p className="font-medium text-gray-800 mb-1">{isSl ? 'Kako uveljaviti pravice' : 'How to exercise your rights'}</p>
               <p>{isSl
                 ? 'Za uveljavljanje katerekoli od zgornjih pravic nam pišite na '
                 : 'To exercise any of the above rights, write to us at '}
-                <a href="mailto:info@tce.si" className="text-blue-600 hover:underline font-medium">info@tce.si</a>.
+                <a href="mailto:info@tce.si" className="text-accent hover:underline font-medium">info@tce.si</a>.
                 {isSl
                   ? ' Vašo zahtevo bomo obravnavali v 30 dneh od prejema.'
                   : ' We will handle your request within 30 days of receipt.'}
@@ -162,14 +162,14 @@ export default function PrivacyPage() {
             <p>{isSl
               ? 'Za vsa vprašanja v zvezi z zasebnostjo nas kontaktirajte na '
               : 'For all privacy-related questions, contact us at '}
-              <a href="mailto:info@tce.si" className="text-blue-600 hover:underline">info@tce.si</a>.
+              <a href="mailto:info@tce.si" className="text-accent hover:underline">info@tce.si</a>.
             </p>
           </section>
 
         </div>
 
         <div className="mt-12 pt-8 border-t border-gray-100">
-          <Link to="/" className="text-sm text-blue-600 hover:underline">{isSl ? '← Nazaj na domačo stran' : '← Back to home'}</Link>
+          <Link to="/" className="text-sm text-accent hover:underline">{isSl ? '← Nazaj na domačo stran' : '← Back to home'}</Link>
         </div>
       </div>
     </div>

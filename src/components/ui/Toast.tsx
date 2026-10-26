@@ -38,7 +38,7 @@ export function Toaster() {
         <div
           key={t.id}
           className={cn(
-            'flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium animate-in slide-in-from-bottom-2',
+            'flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in slide-in-from-bottom-2',
             t.type === 'success' ? 'bg-gray-900 text-white' : 'bg-red-600 text-white',
           )}
         >

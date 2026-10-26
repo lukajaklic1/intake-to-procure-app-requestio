@@ -16,10 +16,10 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         className={cn(
           'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed',
           {
-            'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500': variant === 'primary',
-            'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-blue-500': variant === 'secondary',
-            'text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:ring-gray-400': variant === 'ghost',
-            'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500': variant === 'danger',
+            'bg-primary text-white hover:bg-primary-hover focus:ring-primary': variant === 'primary',
+            'bg-white text-ink border border-line hover:bg-surface focus:ring-ink': variant === 'secondary',
+            'text-ink2 hover:text-ink hover:bg-surface focus:ring-gray-400': variant === 'ghost',
+            'bg-destructive text-white hover:bg-destructive-hover focus:ring-destructive': variant === 'danger',
           },
           {
             'px-3 py-1.5 text-sm': size === 'sm',

@@ -8,21 +8,22 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Pagination from '../components/ui/Pagination'
+import PageToolbar from '../components/layout/PageToolbar'
+import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Item, Category } from '../types/database'
 import { useLanguage } from '../hooks/useLanguage'
-import { stArtiklov } from '../utils/pluralize'
+import { poLineLocSl, poLineCountEn } from '../utils/pluralize'
+import { countByKey } from '../lib/usageCounts'
 
 interface ItemWithCategory extends Item {
   categories: { name: string } | null
 }
 
-const PAGE_SIZE = 20
-
 const EMPTY: Partial<Item> = { name: '', long_description: '', category_id: undefined, default_unit: '', default_unit_price: null, status: 'active' }
 
 export default function ItemsPage() {
   const { company } = useCompany()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const s = t.items
   const [items, setItems] = useState<ItemWithCategory[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -37,24 +38,26 @@ export default function ItemsPage() {
   const [confirmDelete, setConfirmDelete] = useState<ItemWithCategory | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [usage, setUsage] = useState<Map<string, number>>(new Map())
 
   useEffect(() => { if (company) { load(); loadCategories() } }, [company])
 
   async function load() {
     if (!company) return
     setLoading(true)
-    const { data } = await supabase
-      .from('items')
-      .select('*, categories(name)')
-      .eq('company_id', company.id)
-      .order('item_number')
+    const [{ data }, { data: lineRows }] = await Promise.all([
+      supabase.from('items').select('*, categories(name)').eq('company_id', company.id).order('item_number'),
+      supabase.from('po_line_items').select('item_id, purchase_orders!inner(company_id)').eq('purchase_orders.company_id', company.id),
+    ])
     setItems((data as ItemWithCategory[]) ?? [])
+    setUsage(countByKey(lineRows, 'item_id'))
     setLoading(false)
   }
 
   async function loadCategories() {
     if (!company) return
-    const { data } = await supabase.from('categories').select('*').eq('company_id', company.id).order('name')
+    const { data } = await supabase.from('categories').select('*').eq('company_id', company.id).eq('status', 'active').order('name')
     setCategories(data ?? [])
   }
 
@@ -118,7 +121,9 @@ export default function ItemsPage() {
 
     if ((count ?? 0) > 0) {
       setActionLoading(false); setConfirmDelete(null)
-      toast.error(`Cannot delete — used on ${count} PO line(s). Set status to Inactive instead.`)
+      toast.error(lang === 'sl'
+        ? `${t.common.cannotDelete} ${t.common.usedOn} ${poLineLocSl(count ?? 0)}. ${t.common.setInactiveInstead}`
+        : `${t.common.cannotDelete} ${t.common.usedOn} ${poLineCountEn(count ?? 0)}. ${t.common.setInactiveInstead}`)
       return
     }
     const { error } = await supabase.from('items').delete().eq('id', item.id)
@@ -136,92 +141,86 @@ export default function ItemsPage() {
   })
 
   useEffect(() => { setPage(1) }, [search, categoryFilter, statusFilter])
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   return (
     <div className="p-4 lg:p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{s.title}</h1>
-          <p className="text-gray-500 text-sm mt-1">{stArtiklov(items.filter(i => i.status === 'active').length)}</p>
-        </div>
-        <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-2 mb-5 flex-wrap">
+      <PageToolbar actions={<Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button>}>
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
-            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+            className="w-full pl-9 pr-4 py-1.5 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:ring-2 focus:ring-accent bg-white text-ink placeholder:text-placeholder" />
         </div>
         <select
           value={categoryFilter}
           onChange={e => setCategoryFilter(e.target.value)}
-          className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600"
+          className="px-3 py-2 text-sm border border-field rounded-lg hover:border-field-hover bg-white focus:outline-none focus:ring-2 focus:ring-accent text-ink"
         >
-          <option value="all">Vse kategorije</option>
+          <option value="all">{t.filters.allCategories}</option>
           {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         {(['all', 'active', 'inactive'] as const).map(v => (
           <button key={v} onClick={() => setStatusFilter(v)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${statusFilter === v ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${statusFilter === v ? 'bg-ink text-white' : 'bg-white border border-field text-gray-600 hover:bg-surface'}`}>
             {v === 'all' ? t.common.allM : v === 'active' ? t.common.activeM : t.common.inactiveM}
           </button>
         ))}
-      </div>
+      </PageToolbar>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 text-center">
-            <Package className="w-10 h-10 text-gray-200 mb-3" />
-            <p className="text-sm text-gray-400">{search ? s.noMatch : s.noData}</p>
-            {!search && <button onClick={openNew} className="mt-3 text-sm text-blue-600 hover:underline font-medium">{s.createFirst}</button>}
-          </div>
+          <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]">
-            <thead className="bg-gray-50 border-b border-gray-100">
+            <thead className="bg-surface border-b border-field">
               <tr>
                 {[s.itemNumber, t.common.name, t.categories.title, s.defaultUnit, s.defaultUnitPrice, t.common.status, ''].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
+                  <th key={h} className="text-left px-4 py-3 text-sm font-medium text-ink2">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
-              {paginated.map(item => (
-                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-gray-500 font-medium">{item.item_number}</td>
+            <tbody className="divide-y divide-field">
+              {filtered.length === 0 ? (
+                <TableEmptyState icon={Package} colSpan={7} subtitle={search ? s.noMatch : s.noData} />
+              ) : paginated.map(item => {
+                const count = usage.get(item.id) ?? 0
+                const inUse = count > 0
+                return (
+                <tr key={item.id} className="hover:bg-surface transition-colors">
+                  <td className="px-4 py-3 text-xs text-gray-500 font-medium">{item.item_number}</td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-900">{item.name}</p>
                     {item.long_description && (
                       <p className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{item.long_description}</p>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{item.categories?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-600">{item.default_unit ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-600">{item.default_unit_price != null ? `${item.default_unit_price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '—'}</td>
+                  <td className="px-4 py-3 text-ink2">{item.categories?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-ink2">{item.default_unit ?? '—'}</td>
+                  <td className="px-4 py-3 text-ink2">{item.default_unit_price != null ? `${item.default_unit_price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '—'}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{item.status === 'active' ? t.common.active : t.common.inactive}
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.status === 'active' ? 'bg-success-light text-success' : 'bg-selected text-muted'}`}>{item.status === 'active' ? t.common.active : t.common.inactive}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">
-                      <button onClick={() => openEdit(item)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => setConfirmDelete(item)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => openEdit(item)} className="p-1.5 text-gray-400 hover:text-accent hover:bg-accent-light rounded-lg transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                      <button disabled={inUse} onClick={() => !inUse && setConfirmDelete(item)}
+                        title={inUse ? (lang === 'sl' ? `${t.common.cannotDelete} ${t.common.usedOn} ${poLineLocSl(count)}. ${t.common.setInactiveInstead}` : `${t.common.cannotDelete} ${t.common.usedOn} ${poLineCountEn(count)}. ${t.common.setInactiveInstead}`) : undefined}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:bg-transparent">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table></div>
         )}
+        <Pagination total={filtered.length} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={handlePageSizeChange} />
       </div>
-
-      {/* Modal */}
-      <Pagination total={filtered.length} page={page} pageSize={PAGE_SIZE} onChange={setPage} />
 
       <Modal open={modalOpen} onClose={closeModal} title={editing.id ? t.common.editEntity : s.new} size="md">
         <div className="flex flex-col gap-4">
@@ -229,7 +228,7 @@ export default function ItemsPage() {
           {editing.id && (
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700">{s.itemNumber}</label>
-              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono text-gray-500">
+              <div className="px-3 py-2 bg-gray-50 border border-field rounded-lg hover:border-field-hover text-sm text-gray-500">
                 {editing.item_number}
               </div>
             </div>
@@ -241,30 +240,30 @@ export default function ItemsPage() {
           />
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="i-desc" className="text-sm font-medium text-gray-700">Podrobni opis</label>
+            <label htmlFor="i-desc" className="text-sm font-medium text-gray-700">{s.longDescription}</label>
             <textarea
               id="i-desc"
               rows={3}
               value={editing.long_description ?? ''}
               onChange={e => setEditing(f => ({ ...f, long_description: e.target.value }))}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
-              <label htmlFor="i-cat" className="text-sm font-medium text-gray-700">Kategorija</label>
+              <label htmlFor="i-cat" className="text-sm font-medium text-gray-700">{t.po.category}</label>
               <select id="i-cat"
                 value={editing.category_id ?? ''}
                 onChange={e => setEditing(f => ({ ...f, category_id: e.target.value || undefined }))}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="">{s.allCategories}</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <Input id="i-unit" label={s.defaultUnit}
-              placeholder="npr. kos, kg, m"
+              placeholder={lang === 'sl' ? 'npr. kos, kg, m' : 'e.g. pcs, kg, m'}
               value={editing.default_unit ?? ''}
               onChange={e => setEditing(f => ({ ...f, default_unit: e.target.value }))}
             />
@@ -283,7 +282,7 @@ export default function ItemsPage() {
 
           {/* Status toggle — only when editing */}
           {editing.id && (
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-field">
               <div>
                 <p className="text-sm font-medium text-gray-700">
                   {editing.status === 'active' ? t.common.statusActive : t.common.statusInactive}
@@ -295,7 +294,7 @@ export default function ItemsPage() {
               <button
                 type="button"
                 onClick={() => setEditing(f => ({ ...f, status: f.status === 'active' ? 'inactive' : 'active' }))}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${editing.status === 'active' ? 'bg-blue-600' : 'bg-gray-300'}`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${editing.status === 'active' ? 'bg-accent' : 'bg-gray-300'}`}
               >
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${editing.status === 'active' ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>

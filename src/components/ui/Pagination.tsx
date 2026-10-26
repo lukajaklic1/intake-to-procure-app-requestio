@@ -1,5 +1,5 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { cn } from '../../lib/cn'
+import { useRef } from 'react'
+import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { useLanguage } from '../../hooks/useLanguage'
 
 interface PaginationProps {
@@ -7,68 +7,64 @@ interface PaginationProps {
   page: number
   pageSize: number
   onChange: (page: number) => void
+  onPageSizeChange?: (size: number) => void
+  pageSizeOptions?: number[]
 }
 
-export default function Pagination({ total, page, pageSize, onChange }: PaginationProps) {
+export default function Pagination({ total, page, pageSize, onChange, onPageSizeChange, pageSizeOptions = [10, 20, 50, 100] }: PaginationProps) {
   const { t } = useLanguage()
-  const totalPages = Math.ceil(total / pageSize)
-  if (totalPages <= 1) return null
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const safePage = Math.min(Math.max(1, page), totalPages)
+  const rootRef = useRef<HTMLDivElement>(null)
 
-  const from = (page - 1) * pageSize + 1
-  const to = Math.min(page * pageSize, total)
-
-  // Build page numbers to show: always first, last, current ±1, with ellipsis
-  function getPages(): (number | '...')[] {
-    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1)
-    const pages: (number | '...')[] = [1]
-    if (page > 3) pages.push('...')
-    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) {
-      pages.push(i)
-    }
-    if (page < totalPages - 2) pages.push('...')
-    pages.push(totalPages)
-    return pages
+  function goTo(p: number) {
+    onChange(p)
+    rootRef.current?.closest('main')?.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const from = total === 0 ? 0 : (safePage - 1) * pageSize + 1
+  const to = Math.min(safePage * pageSize, total)
+
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-      <p className="text-xs text-gray-400">
-        {t.common.showing} <span className="font-medium text-gray-600">{from}–{to}</span> {t.common.of} <span className="font-medium text-gray-600">{total}</span>
-      </p>
-      <div className="flex items-center gap-1">
-        <button
-          onClick={() => onChange(page - 1)}
-          disabled={page === 1}
-          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-
-        {getPages().map((p, i) => p === '...'
-          ? <span key={`ellipsis-${i}`} className="w-8 text-center text-xs text-gray-400">…</span>
-          : (
-            <button
-              key={p}
-              onClick={() => onChange(p as number)}
-              className={cn(
-                'w-8 h-8 rounded-lg text-xs font-medium transition-colors',
-                p === page
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100',
-              )}
+    <div ref={rootRef} className="flex items-center px-4 py-2 border-t border-field bg-surface">
+      <div className="flex items-center gap-2 text-sm text-ink2">
+        <span>{t.common.show}</span>
+        {onPageSizeChange ? (
+          <div className="relative">
+            <select
+              value={pageSize}
+              onChange={e => onPageSizeChange(Number(e.target.value))}
+              className="appearance-none bg-transparent rounded-lg pl-0 pr-5 py-1 text-sm text-ink2 hover:text-ink focus:outline-none cursor-pointer"
             >
-              {p}
-            </button>
-          )
+              {pageSizeOptions.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        ) : (
+          <span className="text-ink2">{pageSize}</span>
         )}
+      </div>
 
-        <button
-          onClick={() => onChange(page + 1)}
-          disabled={page === totalPages}
-          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
+      <span className="ml-4 text-xs text-gray-400 tabular-nums hidden sm:inline">{from}–{to} {t.common.of} {total}</span>
+
+      <div className="flex items-center gap-3 ml-auto">
+        <span className="text-sm text-ink2 tabular-nums">{safePage} {t.common.of} {totalPages}</span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => goTo(safePage - 1)}
+            disabled={safePage <= 1}
+            className="p-1 rounded-lg border border-field text-gray-400 hover:text-ink hover:border-field-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => goTo(safePage + 1)}
+            disabled={safePage >= totalPages}
+            className="p-1 rounded-lg border border-field text-gray-400 hover:text-ink hover:border-field-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   )

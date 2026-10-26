@@ -14,7 +14,7 @@ export default function TermsPage() {
           <div className="flex gap-1">
             {(['en', 'sl'] as const).map(lng => (
               <button key={lng} onClick={() => setLang(lng)}
-                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${lang === lng ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}>
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${lang === lng ? 'bg-accent text-white' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}>
                 {lng.toUpperCase()}
               </button>
             ))}
@@ -114,13 +114,13 @@ export default function TermsPage() {
           <section>
             <h2 className="text-xl font-semibold text-gray-900 mb-3">{isSl ? '11. Kontakt' : '11. Contact'}</h2>
             <p>{isSl ? 'Za vprašanja v zvezi s pogoji nas kontaktirajte na ' : 'For questions regarding these terms, contact us at '}
-              <a href="mailto:info@tce.si" className="text-blue-600 hover:underline">info@tce.si</a>.
+              <a href="mailto:info@tce.si" className="text-accent hover:underline">info@tce.si</a>.
             </p>
           </section>
         </div>
 
         <div className="mt-12 pt-8 border-t border-gray-100">
-          <Link to="/" className="text-sm text-blue-600 hover:underline">{isSl ? '← Nazaj na domačo stran' : '← Back to home'}</Link>
+          <Link to="/" className="text-sm text-accent hover:underline">{isSl ? '← Nazaj na domačo stran' : '← Back to home'}</Link>
         </div>
       </div>
     </div>

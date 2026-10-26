@@ -13,7 +13,7 @@ import AppLogo from '../components/ui/AppLogo'
 // Plans are defined per language inside the component — see getPLans() below
 
 const FEATURE_ICONS = [
-  { icon: FileText, color: 'bg-blue-50 text-blue-600', k: 'feature1' },
+  { icon: FileText, color: 'bg-accent-light text-accent', k: 'feature1' },
   { icon: BarChart2, color: 'bg-purple-50 text-purple-600', k: 'feature2' },
   { icon: Building2, color: 'bg-green-50 text-green-600', k: 'feature3' },
   { icon: Package, color: 'bg-amber-50 text-amber-600', k: 'feature4' },
@@ -28,7 +28,7 @@ function Check({ included, soon, isSl }: { included: boolean; soon?: boolean; is
   return (
     <span className="flex items-center gap-1.5 text-gray-700">
       <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
-      {soon && <span className="text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-medium">{isSl ? 'kmalu' : 'soon'}</span>}
+      {soon && <span className="text-xs bg-warn-light text-amber-600 px-1.5 py-0.5 rounded font-medium">{isSl ? 'kmalu' : 'soon'}</span>}
     </span>
   )
 }
@@ -136,12 +136,12 @@ export default function LandingPage() {
             <div className="flex gap-1">
               {(['en', 'sl'] as const).map(lng => (
                 <button key={lng} onClick={() => setLang(lng)}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${lang === lng ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}>
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${lang === lng ? 'bg-accent text-white' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}>
                   {lng.toUpperCase()}
                 </button>
               ))}
             </div>
-            <Link to="/register" className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+            <Link to="/register" className="bg-accent text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-accent-hover transition-colors">
               {l.navCta}
             </Link>
           </div>
@@ -150,14 +150,14 @@ export default function LandingPage() {
 
       {/* ── Hero ── */}
       <section className="max-w-6xl mx-auto px-6 pt-24 pb-20 text-center">
-        <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 text-blue-700 text-xs font-medium px-3 py-1.5 rounded-full mb-8">
+        <div className="inline-flex items-center gap-2 bg-accent-light border border-accent-light text-accent-hover text-xs font-medium px-3 py-1.5 rounded-full mb-8">
           <Zap className="w-3.5 h-3.5" />
           {l.heroBadge}
         </div>
 
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 mb-6 leading-tight">
           {l.heroTitle1}<br />
-          <span className="text-blue-600">{l.heroTitle2}</span>
+          <span className="text-accent">{l.heroTitle2}</span>
         </h1>
 
         <p className="text-lg text-gray-500 max-w-2xl mx-auto mb-8 leading-relaxed">
@@ -166,17 +166,17 @@ export default function LandingPage() {
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12 lg:mb-16">
           <Link to="/register"
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold px-7 py-3.5 rounded-xl hover:bg-blue-700 transition-colors text-base shadow-sm shadow-blue-200">
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-accent text-white font-semibold px-7 py-3.5 rounded-lg hover:bg-accent-hover transition-colors text-base shadow-sm shadow-accent-border">
             {l.heroCtaPrimary} <ArrowRight className="w-4 h-4" />
           </Link>
-          <Link to="/login" className="w-full sm:w-auto text-gray-600 font-medium px-7 py-3.5 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors text-base">
+          <Link to="/login" className="w-full sm:w-auto text-gray-600 font-medium px-7 py-3.5 rounded-lg border border-field hover:bg-gray-50 transition-colors text-base">
             {l.heroCtaSecondary}
           </Link>
         </div>
 
         {/* App preview card */}
         <div className="relative mx-auto max-w-4xl hidden sm:block">
-          <div className="rounded-2xl border border-gray-200 shadow-2xl shadow-gray-200/60 overflow-hidden bg-gray-50">
+          <div className="rounded-lg border border-field shadow-2xl shadow-gray-200/60 overflow-hidden bg-gray-50">
             {/* Fake browser bar */}
             <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-2">
               <div className="flex gap-1.5">
@@ -191,13 +191,13 @@ export default function LandingPage() {
             {/* Mock dashboard */}
             <div className="bg-gray-50 p-6 flex gap-4 min-h-[280px]">
               {/* Sidebar mock */}
-              <div className="w-44 bg-white rounded-xl border border-gray-200 p-3 flex flex-col gap-1 shrink-0">
+              <div className="w-44 bg-white rounded-lg border border-field p-3 flex flex-col gap-1 shrink-0">
                 <div className="flex items-center gap-2 p-2 mb-2">
-                  <div className="w-6 h-6 bg-blue-600 rounded-md" />
+                  <div className="w-6 h-6 bg-accent rounded-md" />
                   <span className="text-xs font-semibold text-gray-800">Requestio</span>
                 </div>
                 {[t.nav.dashboard,t.nav.purchaseOrders,t.nav.suppliers,t.nav.items,t.nav.categories,t.nav.projects].map((item, i) => (
-                  <div key={item} className={`text-xs px-2 py-1.5 rounded-lg ${i === 0 ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-500'}`}>
+                  <div key={item} className={`text-xs px-2 py-1.5 rounded-lg ${i === 0 ? 'bg-accent-light text-accent-hover font-medium' : 'text-gray-500'}`}>
                     {item}
                   </div>
                 ))}
@@ -207,19 +207,19 @@ export default function LandingPage() {
                 {/* Stats row */}
                 <div className="grid grid-cols-4 gap-3">
                   {(isSl ? [['Skupni stroški','124.840 €'],['Odprta naročila','12'],['Dobavitelji','8'],['Povpr. vrednost','2.847 €']] : [['Total spend','€124,840'],['Open POs','12'],['Suppliers','8'],['Avg PO','€2,847']]).map(([label, val]) => (
-                    <div key={label} className="bg-white rounded-xl border border-gray-200 p-3">
+                    <div key={label} className="bg-white rounded-lg border border-field p-3">
                       <p className="text-xs text-gray-400 mb-1">{label}</p>
                       <p className="text-base font-bold text-gray-900">{val}</p>
                     </div>
                   ))}
                 </div>
                 {/* Chart placeholder */}
-                <div className="bg-white rounded-xl border border-gray-200 p-4 flex-1">
+                <div className="bg-white rounded-lg border border-field p-4 flex-1">
                   <p className="text-xs font-semibold text-gray-500 mb-3">{isSl ? 'Stroški skozi čas' : 'Spend over time'}</p>
                   <div className="flex items-end gap-2 h-20">
                     {[40, 65, 45, 80, 55, 90, 70, 95, 60, 85, 75, 100].map((h, i) => (
-                      <div key={i} className="flex-1 bg-blue-100 rounded-sm relative overflow-hidden">
-                        <div className="absolute bottom-0 left-0 right-0 bg-blue-500 rounded-sm" style={{ height: `${h}%` }} />
+                      <div key={i} className="flex-1 bg-accent-light rounded-sm relative overflow-hidden">
+                        <div className="absolute bottom-0 left-0 right-0 bg-accent rounded-sm" style={{ height: `${h}%` }} />
                       </div>
                     ))}
                   </div>
@@ -239,7 +239,7 @@ export default function LandingPage() {
             { icon: Zap, text: isSl ? 'Nastavitev v manj kot 2 minutah' : 'Setup in less than 2 minutes' },
           ].map(({ icon: Icon, text }) => (
             <div key={text} className="flex items-center gap-2.5 text-sm text-gray-500">
-              <Icon className="w-4 h-4 text-blue-500" />
+              <Icon className="w-4 h-4 text-accent" />
               {text}
             </div>
           ))}
@@ -249,14 +249,14 @@ export default function LandingPage() {
       {/* ── Features ── */}
       <section id="features" className="max-w-6xl mx-auto px-4 sm:px-6 py-16 lg:py-24">
         <div className="text-center mb-14">
-          <p className="text-sm font-semibold text-blue-600 uppercase tracking-widest mb-3">{l.featuresTitle}</p>
+          <p className="text-sm font-semibold text-accent uppercase tracking-widest mb-3">{l.featuresTitle}</p>
           <h2 className="text-4xl font-bold text-gray-900 tracking-tight">{l.featuresHeading}</h2>
           <p className="text-gray-500 mt-4 text-lg max-w-xl mx-auto">{l.featuresSubtitle}</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {FEATURE_ICONS.map(({ icon: Icon, color, k }) => (
-            <div key={k} className="bg-white rounded-2xl border border-gray-200 p-7 hover:shadow-sm transition-shadow">
-              <div className={`inline-flex p-3 rounded-xl ${color} mb-4`}>
+            <div key={k} className="bg-white rounded-lg border border-field p-7 hover:shadow-sm transition-shadow">
+              <div className={`inline-flex p-3 rounded-lg ${color} mb-4`}>
                 <Icon className="w-5 h-5" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">{l[`${k}Title` as keyof typeof l] as string}</h3>
@@ -270,13 +270,13 @@ export default function LandingPage() {
       <section id="how-it-works" className="bg-gray-50 border-y border-gray-100 py-24">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-14">
-            <p className="text-sm font-semibold text-blue-600 uppercase tracking-widest mb-3">{l.howTitle}</p>
+            <p className="text-sm font-semibold text-accent uppercase tracking-widest mb-3">{l.howTitle}</p>
             <h2 className="text-4xl font-bold text-gray-900 tracking-tight">{l.howHeading}</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
             {STEP_NUMS.map((num, i) => (
               <div key={num} className="text-center">
-                <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white font-bold text-xl flex items-center justify-center mx-auto mb-5">
+                <div className="w-14 h-14 rounded-lg bg-accent text-white font-bold text-xl flex items-center justify-center mx-auto mb-5">
                   {num}
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">{l[`step${i + 1}Title` as keyof typeof l] as string}</h3>
@@ -290,15 +290,15 @@ export default function LandingPage() {
       {/* ── Pricing ── */}
       <section id="pricing" className="max-w-6xl mx-auto px-4 sm:px-6 py-16 lg:py-24">
         <div className="text-center mb-14">
-          <p className="text-sm font-semibold text-blue-600 uppercase tracking-widest mb-3">{l.pricingTitle}</p>
+          <p className="text-sm font-semibold text-accent uppercase tracking-widest mb-3">{l.pricingTitle}</p>
           <h2 className="text-4xl font-bold text-gray-900 tracking-tight">{l.pricingHeading}</h2>
           <p className="text-gray-500 mt-4 text-lg">{l.pricingSubtitle}</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           {PLANS.map(plan => (
-            <div key={plan.name} className={`rounded-2xl border p-5 flex flex-col ${plan.featured ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-200'}`}>
+            <div key={plan.name} className={`rounded-lg border p-5 flex flex-col ${plan.featured ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-field'}`}>
               {plan.featured && (
-                <div className="text-xs font-semibold bg-blue-600 text-white px-3 py-1 rounded-full self-start mb-4">{isSl ? 'Najbolj priljubljen' : 'Most popular'}</div>
+                <div className="text-xs font-semibold bg-accent text-white px-3 py-1 rounded-full self-start mb-4">{isSl ? 'Najbolj priljubljen' : 'Most popular'}</div>
               )}
               <p className={`text-sm font-semibold uppercase tracking-widest mb-3 ${plan.featured ? 'text-gray-400' : 'text-gray-400'}`}>{plan.name}</p>
               <div className="flex items-baseline gap-1 mb-1">
@@ -317,10 +317,10 @@ export default function LandingPage() {
                 {plan.desc}
               </p>
               <Link to="/register"
-                className={`text-center py-2.5 rounded-xl font-medium text-sm transition-colors mb-6 ${
+                className={`text-center py-2.5 rounded-lg font-medium text-sm transition-colors mb-6 ${
                   plan.featured
-                    ? 'bg-blue-600 text-white hover:bg-blue-500'
-                    : 'bg-gray-900 text-white hover:bg-gray-800'
+                    ? 'bg-accent text-white hover:bg-accent'
+                    : 'bg-ink text-white hover:bg-ink-hover'
                 }`}>
                 {plan.cta}
               </Link>
@@ -341,16 +341,16 @@ export default function LandingPage() {
       </section>
 
       {/* ── CTA Banner ── */}
-      <section className="bg-blue-600 py-20">
+      <section className="bg-accent py-20">
         <div className="max-w-3xl mx-auto px-6 text-center">
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 tracking-tight">
             {l.ctaHeading}
           </h2>
-          <p className="text-blue-200 text-lg mb-8">
+          <p className="text-accent-border text-lg mb-8">
             {l.ctaSubtitle}
           </p>
           <Link to="/register"
-            className="inline-flex items-center gap-2 bg-white text-blue-600 font-semibold px-8 py-4 rounded-xl hover:bg-blue-50 transition-colors text-base">
+            className="inline-flex items-center gap-2 bg-white text-accent font-semibold px-8 py-4 rounded-lg hover:bg-accent-light transition-colors text-base">
             {l.ctaButton} <ArrowRight className="w-4 h-4" />
           </Link>
         </div>

@@ -7,7 +7,10 @@ import { useLanguage } from '../hooks/useLanguage'
 import { toast } from '../components/ui/Toast'
 import Modal from '../components/ui/Modal'
 import Button from '../components/ui/Button'
+import PageToolbar from '../components/layout/PageToolbar'
 import Input from '../components/ui/Input'
+import Pagination from '../components/ui/Pagination'
+import TableEmptyState from '../components/ui/TableEmptyState'
 import type { User as AppUser, UserPermission, UserInvitation } from '../types/database'
 
 const MODULES: UserPermission['module'][] = ['requests', 'purchase_orders', 'receipts', 'invoices', 'budgets', 'reports']
@@ -24,7 +27,7 @@ function emptyPerms(): PermMap {
 function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
     <button type="button" onClick={onChange}
-      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${checked ? 'bg-blue-600' : 'bg-gray-300'}`}>
+      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${checked ? 'bg-accent' : 'bg-gray-300'}`}>
       <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-1'}`} />
     </button>
   )
@@ -68,6 +71,8 @@ export default function UsersPage() {
   const [invites, setInvites] = useState<UserInvitation[]>([])
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
   const [dataLoading, setDataLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
 
   // Permission-matrix labels (built once from translations)
   const permLabels: Record<string, string> = {}
@@ -97,7 +102,7 @@ export default function UsersPage() {
       supabase.from('users').select('*').eq('company_id', company.id).order('first_name'),
       supabase.from('user_permissions').select('*'),
       supabase.from('user_invitations').select('*').eq('company_id', company.id).eq('status', 'pending').order('created_at', { ascending: false }),
-      supabase.from('departments').select('id, name').eq('company_id', company.id).order('name'),
+      supabase.from('departments').select('id, name').eq('company_id', company.id).eq('status', 'active').order('name'),
     ])
     setUsers((usersData as AppUser[]) ?? [])
     const map: Record<string, PermMap> = {}
@@ -204,72 +209,71 @@ export default function UsersPage() {
     load()
   }
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
   if (!isAdmin) return <Navigate to="/dashboard" replace />
+
+  const totalRows = users.length + invites.length
+  const startIdx = (page - 1) * pageSize
+  const endIdx = startIdx + pageSize
+  const visibleUsers = users.slice(Math.max(0, startIdx), Math.max(0, Math.min(users.length, endIdx)))
+  const visibleInvites = invites.slice(Math.max(0, startIdx - users.length), Math.max(0, endIdx - users.length))
+  function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   return (
     <div className="p-4 lg:p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t.nav.users}</h1>
-          <p className="text-gray-500 text-sm mt-1">{users.length + invites.length} {s.usersCount}</p>
-        </div>
-        <Button onClick={openInvite} className="gap-2"><Plus className="w-4 h-4" />{s.addUser}</Button>
-      </div>
+      <PageToolbar actions={<Button onClick={openInvite} className="gap-2"><Plus className="w-4 h-4" />{s.addUser}</Button>} />
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-field overflow-hidden">
         {dataLoading ? (
-          <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
-        ) : users.length === 0 && invites.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 text-center">
-            <Users className="w-10 h-10 text-gray-200 mb-3" />
-            <p className="text-sm text-gray-400">{s.noUsers}</p>
-          </div>
+          <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[700px]">
-            <thead className="bg-gray-50 border-b border-gray-100">
+            <thead className="bg-surface border-b border-field">
               <tr>
                 {[t.common.name, t.common.email, s.department, s.jobTitle, s.role, t.common.status, ''].map((h, i) => (
-                  <th key={i} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
+                  <th key={i} className="text-left px-4 py-3 text-sm font-medium text-ink2">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
-              {users.map(u => (
-                <tr key={u.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-900">{u.first_name} {u.last_name}</td>
-                  <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                  <td className="px-4 py-3 text-gray-600">{deptName(u.department_id)}</td>
-                  <td className="px-4 py-3 text-gray-600">{u.job_title ?? '—'}</td>
+            <tbody className="divide-y divide-field">
+              {totalRows === 0 ? (
+                <TableEmptyState icon={Users} colSpan={7} subtitle={s.noUsers} />
+              ) : <>
+              {visibleUsers.map(u => (
+                <tr key={u.id} className="hover:bg-surface transition-colors">
+                  <td className="px-4 py-3 font-medium text-ink">{u.first_name} {u.last_name}</td>
+                  <td className="px-4 py-3 text-ink2">{u.email}</td>
+                  <td className="px-4 py-3 text-ink2">{deptName(u.department_id)}</td>
+                  <td className="px-4 py-3 text-ink2">{u.job_title ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.is_admin ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.is_admin ? 'bg-accent-light text-accent-hover' : 'bg-selected text-ink2'}`}>
                       {u.is_admin ? s.admin : s.member}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">{t.common.active}</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-success-light text-success">{t.common.active}</span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">
                       <button onClick={() => openEdit(u)} title={s.editPermissions}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                        className="p-1.5 text-gray-400 hover:text-accent hover:bg-accent-light rounded-lg transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
                     </div>
                   </td>
                 </tr>
               ))}
-              {invites.map(invite => (
-                <tr key={invite.id} className="hover:bg-gray-50 transition-colors bg-amber-50/30">
+              {visibleInvites.map(invite => (
+                <tr key={invite.id} className="hover:bg-surface transition-colors bg-amber-50/30">
                   <td className="px-4 py-3 text-gray-500 flex items-center gap-2"><Mail className="w-3.5 h-3.5" />{invite.first_name} {invite.last_name}</td>
-                  <td className="px-4 py-3 text-gray-600">{invite.email}</td>
-                  <td className="px-4 py-3 text-gray-600">{deptName(invite.department_id)}</td>
-                  <td className="px-4 py-3 text-gray-600">{invite.job_title ?? '—'}</td>
+                  <td className="px-4 py-3 text-ink2">{invite.email}</td>
+                  <td className="px-4 py-3 text-ink2">{deptName(invite.department_id)}</td>
+                  <td className="px-4 py-3 text-ink2">{invite.job_title ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${invite.is_admin ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${invite.is_admin ? 'bg-accent-light text-accent-hover' : 'bg-selected text-ink2'}`}>
                       {invite.is_admin ? s.admin : s.member}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">{s.invited}</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-warn-light text-warn">{s.invited}</span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">
@@ -279,9 +283,11 @@ export default function UsersPage() {
                   </td>
                 </tr>
               ))}
+              </>}
             </tbody>
           </table></div>
         )}
+        <Pagination total={totalRows} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={handlePageSizeChange} />
       </div>
 
       {/* Invite modal */}
@@ -304,7 +310,7 @@ export default function UsersPage() {
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-gray-700">{s.department}</label>
                 <select value={inv.department_id} onChange={e => setInv(v => ({ ...v, department_id: e.target.value }))}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent bg-white">
                   <option value="">{s.noDepartment}</option>
                   {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
@@ -314,7 +320,7 @@ export default function UsersPage() {
 
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={inviteAsAdmin} onChange={e => setInviteAsAdmin(e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                className="rounded border-field text-accent focus:ring-accent" />
               {s.inviteAsAdmin}
             </label>
 
@@ -345,12 +351,12 @@ export default function UsersPage() {
             <div className="col-span-1 sm:col-span-2 flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700">{t.common.email}</label>
               <input value={editUser?.email ?? ''} disabled
-                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 cursor-not-allowed" />
+                className="rounded-lg border border-field bg-gray-50 px-3 py-2 text-sm text-gray-500 cursor-not-allowed" />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700">{s.department}</label>
               <select value={editForm.department_id} onChange={e => setEditForm(v => ({ ...v, department_id: e.target.value }))}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent bg-white">
                 <option value="">{s.noDepartment}</option>
                 {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
@@ -361,7 +367,7 @@ export default function UsersPage() {
           {editUser?.id !== primaryAdminId && (
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={editForm.is_admin} onChange={e => setEditForm(v => ({ ...v, is_admin: e.target.checked }))}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                className="rounded border-field text-accent focus:ring-accent" />
               {s.admin}
             </label>
           )}
