@@ -5,6 +5,7 @@ import { useLanguage } from '../../hooks/useLanguage'
 interface SearchSelectProps {
   id?: string
   label: string
+  required?: boolean
   value: string
   onChange: (value: string) => void
   options: string[]
@@ -14,7 +15,7 @@ interface SearchSelectProps {
 }
 
 /** Input with a searchable dropdown. The value is the chosen option's text. */
-export default function SearchSelect({ id, label, value, onChange, options, popular = [], placeholder }: SearchSelectProps) {
+export default function SearchSelect({ id, label, required, value, onChange, options, popular = [], placeholder }: SearchSelectProps) {
   const { t } = useLanguage()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -32,7 +33,7 @@ export default function SearchSelect({ id, label, value, onChange, options, popu
 
   return (
     <div className="flex flex-col gap-1 relative">
-      <label htmlFor={id} className="text-sm font-medium text-gray-700">{label}</label>
+      <label htmlFor={id} className="text-sm font-medium text-gray-700">{label}{required && ' *'}</label>
       <div className="relative">
         <input id={id} value={open ? query : value} placeholder={placeholder ?? t.common.select}
           onChange={e => { setQuery(e.target.value); setOpen(true) }}

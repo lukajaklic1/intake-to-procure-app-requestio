@@ -63,6 +63,8 @@ export default function LocationsPage() {
     if (!company || !editing.name?.trim()) { toast.error(t.common.nameRequired); return }
     if (!editing.address_street?.trim()) { toast.error(t.common.streetRequired); return }
     if (!editing.address_city?.trim()) { toast.error(t.common.cityRequired); return }
+    if (!editing.address_postal_code?.trim()) { toast.error(t.common.postalRequired); return }
+    if (!editing.address_country?.trim()) { toast.error(t.common.countryRequired); return }
     setSaving(true)
     if (editing.id) {
       const { error } = await supabase.from('locations').update({ ...editing, updated_at: new Date().toISOString() }).eq('id', editing.id)
@@ -166,10 +168,10 @@ export default function LocationsPage() {
         templateName="locations"
         columns={[
           { key: 'name', label: t.common.import.cols.name, required: true, example: 'Hotel Jezero' },
-          { key: 'street', label: t.common.import.cols.street, example: 'Cesta 1' },
-          { key: 'postalCode', label: t.common.import.cols.postalCode, example: '4264' },
-          { key: 'city', label: t.common.import.cols.city, example: 'Bohinjsko jezero' },
-          { key: 'country', label: t.common.import.cols.country, example: 'Slovenija' },
+          { key: 'street', label: t.common.import.cols.street, required: true, example: 'Cesta 1' },
+          { key: 'postalCode', label: t.common.import.cols.postalCode, required: true, example: '4264' },
+          { key: 'city', label: t.common.import.cols.city, required: true, example: 'Bohinjsko jezero' },
+          { key: 'country', label: t.common.import.cols.country, required: true, example: 'Slovenija' },
         ]}
         existing={new Set(locations.map(l => l.name.toLowerCase()))}
         keyOf={row => row.name.toLowerCase()}
@@ -188,8 +190,8 @@ export default function LocationsPage() {
           <div className="sm:col-span-2"><Input id="l-name" label={s.locationName + " *"} {...field('name')} /></div>
           <div className="col-span-2"><Input id="l-street" label={t.common.streetAddress + ' *'} {...field('address_street')} /></div>
           <Input id="l-city" label={t.common.city + ' *'} {...field('address_city')} />
-          <Input id="l-postal" label={t.common.postalCode} {...field('address_postal_code')} />
-          <div className="col-span-2"><CountrySelect id="l-country" label={t.common.country} value={editing.address_country ?? ''} onChange={v => setEditing(f => ({ ...f, address_country: v }))} /></div>
+          <Input id="l-postal" label={t.common.postalCode + ' *'} {...field('address_postal_code')} />
+          <div className="col-span-2"><CountrySelect id="l-country" label={t.common.country} required value={editing.address_country ?? ''} onChange={v => setEditing(f => ({ ...f, address_country: v }))} /></div>
 
           {editing.id && (
             <div className="col-span-2 flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-field">
