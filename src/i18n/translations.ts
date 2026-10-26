@@ -215,12 +215,15 @@ export const translations = {
       last3Months: 'Last 3 months',
       last6Months: 'Last 6 months',
       last12Months: 'Last 12 months',
-      allTime: 'All time',
+      allTime: 'All',
       allSuppliers: 'All suppliers',
       allCategories: 'All categories',
       allProjects: 'All projects',
       allDepartments: 'All departments',
       allStatuses: 'All statuses',
+      allM: 'All',
+      allF: 'All',
+      labels: { period: 'Period', supplier: 'Supplier', category: 'Category', department: 'Department', status: 'Status', requester: 'Requested by', poStatus: 'Order status', approver: 'Approver' },
     },
 
     // Purchase Orders
@@ -944,12 +947,15 @@ export const translations = {
       last3Months: 'Zadnje 3 mesece',
       last6Months: 'Zadnjih 6 mesecev',
       last12Months: 'Zadnjih 12 mesecev',
-      allTime: 'Celotno obdobje',
+      allTime: 'Vse',
       allSuppliers: 'Vsi dobavitelji',
       allCategories: 'Vse kategorije',
       allProjects: 'Vsi projekti',
       allDepartments: 'Vsi oddelki',
       allStatuses: 'Vsi statusi',
+      allM: 'Vsi',
+      allF: 'Vse',
+      labels: { period: 'Obdobje', supplier: 'Dobavitelj', category: 'Kategorija', department: 'Oddelek', status: 'Status', requester: 'Kreator', poStatus: 'Status naročila', approver: 'Potrjevalec' },
     },
 
     // Purchase Orders

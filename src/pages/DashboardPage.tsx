@@ -14,6 +14,7 @@ import Pagination from '../components/ui/Pagination'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import EmptyState from '../components/ui/EmptyState'
 import PageToolbar from '../components/layout/PageToolbar'
+import FilterSelect from '../components/ui/FilterSelect'
 
 const SANS = '"Inter Variable", ui-sans-serif, system-ui, sans-serif'
 const CHART_BLUE = 'var(--chart-bar-stroke)'
@@ -325,7 +326,6 @@ export default function DashboardPage() {
     { value: '1y', label: t.filters.last12Months },
     { value: 'all', label: t.filters.allTime },
   ]
-  const selectCls = 'text-sm border border-field rounded-lg hover:border-field-hover px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-ink truncate max-w-[150px]'
 
   const checklistItems = [
     { done: true,                    label: t.checklist.companyCreated,                  to: null },
@@ -345,24 +345,24 @@ export default function DashboardPage() {
     <div className="p-4 lg:p-6">
       <PageToolbar>
 
-          <select value={filters.dateRange} onChange={e => setFilter('dateRange', e.target.value as Filters['dateRange'])} className={selectCls}>
+          <FilterSelect label={t.filters.labels.period} value={filters.dateRange} onChange={e => setFilter('dateRange', e.target.value as Filters['dateRange'])}>
             {dateRanges.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-          </select>
+          </FilterSelect>
 
-          <select value={filters.supplierId} onChange={e => setFilter('supplierId', e.target.value)} className={selectCls}>
-            <option value="">{t.filters.allSuppliers}</option>
+          <FilterSelect label={t.filters.labels.supplier} value={filters.supplierId} onChange={e => setFilter('supplierId', e.target.value)}>
+            <option value="">{t.filters.allM}</option>
             {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+          </FilterSelect>
 
-          <select value={filters.categoryId} onChange={e => setFilter('categoryId', e.target.value)} className={selectCls}>
-            <option value="">{t.filters.allCategories}</option>
+          <FilterSelect label={t.filters.labels.category} value={filters.categoryId} onChange={e => setFilter('categoryId', e.target.value)}>
+            <option value="">{t.filters.allF}</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          </FilterSelect>
 
-          <select value={filters.departmentId} onChange={e => setFilter('departmentId', e.target.value)} className={selectCls}>
-            <option value="">{t.filters.allDepartments}</option>
+          <FilterSelect label={t.filters.labels.department} value={filters.departmentId} onChange={e => setFilter('departmentId', e.target.value)}>
+            <option value="">{t.filters.allM}</option>
             {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
+          </FilterSelect>
 
           {hasActiveFilters && (
             <button onClick={clearFilters} className="flex items-center gap-1.5 text-sm text-ink2 hover:text-ink bg-white border border-field hover:border-field-hover rounded-lg px-2.5 py-1.5 font-medium whitespace-nowrap transition-colors">

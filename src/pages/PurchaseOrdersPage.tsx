@@ -9,6 +9,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Button from '../components/ui/Button'
 import Pagination from '../components/ui/Pagination'
 import PageToolbar from '../components/layout/PageToolbar'
+import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import { format, subMonths, startOfMonth } from 'date-fns'
 
@@ -158,8 +159,6 @@ export default function PurchaseOrdersPage() {
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
-  const selectCls = 'text-sm border border-field rounded-lg hover:border-field-hover px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-ink truncate max-w-[150px]'
-
   return (
     <div className="p-4 lg:p-6">
       <PageToolbar attached actions={<Button onClick={() => navigate('/purchase-orders/new')} className="gap-2"> <Plus className="w-4 h-4" />{s.new} </Button>}>
@@ -173,45 +172,45 @@ export default function PurchaseOrdersPage() {
           </div>
 
           {/* Status */}
-          <select value={status} onChange={e => setStatus(e.target.value)} className={selectCls}>
-            <option value="all">{t.filters.allStatuses}</option>
+          <FilterSelect label={t.filters.labels.status} value={status} onChange={e => setStatus(e.target.value)}>
+            <option value="all">{t.filters.allM}</option>
             {['draft','issued','sent','closed','cancelled'].map(s => (
               <option key={s} value={s}>{t.status[s as keyof typeof t.status]}</option>
             ))}
-          </select>
+          </FilterSelect>
 
           {/* Date range */}
-          <select value={dateRange} onChange={e => setDateRange(e.target.value)} className={selectCls}>
+          <FilterSelect label={t.filters.labels.period} value={dateRange} onChange={e => setDateRange(e.target.value)}>
             <option value="all">{t.filters.allTime}</option>
             <option value="1m">{t.filters.lastMonth}</option>
             <option value="3m">{t.filters.last3Months}</option>
             <option value="6m">{t.filters.last6Months}</option>
             <option value="1y">{t.filters.last12Months}</option>
-          </select>
+          </FilterSelect>
 
           {/* Supplier */}
-          <select value={supplierId} onChange={e => setSupplierId(e.target.value)} className={selectCls}>
-            <option value="">{t.filters.allSuppliers}</option>
+          <FilterSelect label={t.filters.labels.supplier} value={supplierId} onChange={e => setSupplierId(e.target.value)}>
+            <option value="">{t.filters.allM}</option>
             {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+          </FilterSelect>
 
           {/* Category */}
-          <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className={selectCls}>
-            <option value="">{t.filters.allCategories}</option>
+          <FilterSelect label={t.filters.labels.category} value={categoryId} onChange={e => setCategoryId(e.target.value)}>
+            <option value="">{t.filters.allF}</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          </FilterSelect>
 
           {/* Department */}
-          <select value={departmentId} onChange={e => setDepartmentId(e.target.value)} className={selectCls}>
-            <option value="">{t.filters.allDepartments}</option>
+          <FilterSelect label={t.filters.labels.department} value={departmentId} onChange={e => setDepartmentId(e.target.value)}>
+            <option value="">{t.filters.allM}</option>
             {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
+          </FilterSelect>
 
           {/* Creator */}
-          <select value={creatorId} onChange={e => setCreatorId(e.target.value)} className={selectCls}>
+          <FilterSelect label={t.filters.labels.requester} value={creatorId} onChange={e => setCreatorId(e.target.value)}>
             <option value="">{s.creatorAll}</option>
             {members.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
-          </select>
+          </FilterSelect>
 
           {hasActiveFilters && (
             <button onClick={clearFilters} className="flex items-center gap-1.5 text-sm text-ink2 hover:text-ink bg-white border border-field hover:border-field-hover rounded-lg px-2.5 py-1.5 font-medium whitespace-nowrap transition-colors">

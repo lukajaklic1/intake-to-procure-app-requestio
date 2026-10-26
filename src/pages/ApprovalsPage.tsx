@@ -6,6 +6,7 @@ import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
 import Pagination from '../components/ui/Pagination'
 import PageToolbar from '../components/layout/PageToolbar'
+import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import { format, subMonths, startOfMonth } from 'date-fns'
 
@@ -96,8 +97,6 @@ export default function ApprovalsPage() {
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
-  const selectCls = 'text-sm border border-field rounded-lg hover:border-field-hover px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-ink truncate max-w-[150px]'
-
   return (
     <div className="p-4 lg:p-6">
       {rows.length > 0 && (
@@ -107,18 +106,18 @@ export default function ApprovalsPage() {
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder={s.requestNumber + ' / ' + a.requestedBy}
                 className="w-full pl-9 pr-3 py-1.5 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:ring-2 focus:ring-accent bg-white text-ink placeholder:text-placeholder" />
             </div>
-            <select value={dateRange} onChange={e => setDateRange(e.target.value)} className={selectCls}>
+            <FilterSelect label={t.filters.labels.period} value={dateRange} onChange={e => setDateRange(e.target.value)}>
               <option value="all">{t.filters.allTime}</option>
               <option value="1m">{t.filters.lastMonth}</option>
               <option value="3m">{t.filters.last3Months}</option>
               <option value="6m">{t.filters.last6Months}</option>
               <option value="1y">{t.filters.last12Months}</option>
-            </select>
+            </FilterSelect>
             {isAdmin && (
-              <select value={approverId} onChange={e => setApproverId(e.target.value)} className={selectCls}>
-                <option value="">{a.approverAll}</option>
+              <FilterSelect label={t.filters.labels.approver} value={approverId} onChange={e => setApproverId(e.target.value)}>
+                <option value="">{t.filters.allM}</option>
                 {members.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
-              </select>
+              </FilterSelect>
             )}
             {hasActiveFilters && (
               <button onClick={clearFilters} className="flex items-center gap-1.5 text-sm text-ink2 hover:text-ink bg-white border border-field hover:border-field-hover rounded-lg px-2.5 py-1.5 font-medium whitespace-nowrap transition-colors">

@@ -7,6 +7,7 @@ import { useLanguage } from '../hooks/useLanguage'
 import Button from '../components/ui/Button'
 import Pagination from '../components/ui/Pagination'
 import PageToolbar from '../components/layout/PageToolbar'
+import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import { format, subMonths, startOfMonth } from 'date-fns'
 
@@ -101,7 +102,6 @@ export default function ReceiptsPage() {
   function handleQueuePageSizeChange(n: number) { setQueuePageSize(n); setQueuePage(1) }
   const paginatedReceipts = filteredReceipts.slice((histPage - 1) * histPageSize, histPage * histPageSize)
   function handleHistPageSizeChange(n: number) { setHistPageSize(n); setHistPage(1) }
-  const selectCls = 'text-sm border border-field rounded-lg hover:border-field-hover px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-ink truncate max-w-[150px]'
 
   return (
     <div className="p-4 lg:p-6">
@@ -118,13 +118,13 @@ export default function ReceiptsPage() {
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder={s.receiptNumber + ' / ' + t.po.poNumber}
                   className="w-full pl-9 pr-3 py-1.5 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:ring-2 focus:ring-accent bg-white text-ink placeholder:text-placeholder" />
               </div>
-              <select value={dateRange} onChange={e => setDateRange(e.target.value)} className={selectCls}>
+              <FilterSelect label={t.filters.labels.period} value={dateRange} onChange={e => setDateRange(e.target.value)}>
                 <option value="all">{t.filters.allTime}</option>
                 <option value="1m">{t.filters.lastMonth}</option>
                 <option value="3m">{t.filters.last3Months}</option>
                 <option value="6m">{t.filters.last6Months}</option>
                 <option value="1y">{t.filters.last12Months}</option>
-              </select>
+              </FilterSelect>
               {hasFilters && (
                 <button onClick={() => { setSearch(''); setDateRange('all') }} className="flex items-center gap-1.5 text-sm text-ink2 hover:text-ink bg-white border border-field hover:border-field-hover rounded-lg px-2.5 py-1.5 font-medium whitespace-nowrap transition-colors">
                   <X className="w-3.5 h-3.5" />{t.common.clearFilters}

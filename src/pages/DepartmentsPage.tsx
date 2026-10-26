@@ -10,6 +10,7 @@ import Input from '../components/ui/Input'
 import Pagination from '../components/ui/Pagination'
 import ImportModal from '../components/ui/ImportModal'
 import PageToolbar from '../components/layout/PageToolbar'
+import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Department } from '../types/database'
 import { useLanguage } from '../hooks/useLanguage'
@@ -91,12 +92,9 @@ export default function DepartmentsPage() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
             className="w-full pl-9 pr-4 py-1.5 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:ring-2 focus:ring-accent bg-white text-ink placeholder:text-placeholder" />
         </div>
-        {(['all', 'active', 'inactive'] as const).map(v => (
-          <button key={v} onClick={() => setStatusFilter(v)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${statusFilter === v ? 'bg-ink text-white' : 'bg-white border border-field text-gray-600 hover:bg-surface'}`}>
-            {v === 'all' ? t.common.allM : v === 'active' ? t.common.activeM : t.common.inactiveM}
-          </button>
-        ))}
+        <FilterSelect label={t.filters.labels.status} value={statusFilter} onChange={e => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}>
+          {(['all', 'active', 'inactive'] as const).map(v => <option key={v} value={v}>{v === 'all' ? t.common.allM : v === 'active' ? t.common.activeM : t.common.inactiveM}</option>)}
+        </FilterSelect>
       </PageToolbar>
 
       <div className="data-card table-bleed bg-white rounded-lg border border-field overflow-hidden">
