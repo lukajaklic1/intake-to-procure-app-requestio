@@ -13,6 +13,7 @@ import PageToolbar from '../components/layout/PageToolbar'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Item, Category } from '../types/database'
 import { useLanguage } from '../hooks/useLanguage'
+import { useRequired } from '../lib/useRequired'
 import { poLineLocSl, poLineCountEn } from '../utils/pluralize'
 import { countByKey, mergeUsage } from '../lib/usageCounts'
 
@@ -35,6 +36,8 @@ export default function CatalogPage() {
   const [confirmDeleteCat, setConfirmDeleteCat] = useState<Category | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const req = useRequired(t.common.fieldRequired)
+  const catReq = useRequired(t.common.fieldRequired)
   const [importOpen, setImportOpen] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
@@ -73,12 +76,12 @@ export default function CatalogPage() {
     setCatUsage(mergeUsage(countByKey(poLines, 'category_id'), countByKey(reqLines, 'category_id')))
   }
 
-  function openNewCategory() { setCatEditing({ name: '', status: 'active' }); setCatModalOpen(true) }
-  function openEditCategory(c: Category) { setCatEditing({ id: c.id, name: c.name, status: c.status }); setCatModalOpen(true) }
+  function openNewCategory() { catReq.reset(); setCatEditing({ name: '', status: 'active' }); setCatModalOpen(true) }
+  function openEditCategory(c: Category) { catReq.reset(); setCatEditing({ id: c.id, name: c.name, status: c.status }); setCatModalOpen(true) }
   function closeCategoryModal() { setCatModalOpen(false); setCatEditing({ name: '', status: 'active' }) }
 
   async function saveCategory() {
-    if (!company || !catEditing.name.trim()) { toast.error(t.common.nameRequired); return }
+    if (!company || !catReq.check(catEditing, ['name'], { name: 'cat-name' })) return
     setCatSaving(true)
     const { error } = catEditing.id
       ? await supabase.from('categories').update({ name: catEditing.name, status: catEditing.status, updated_at: new Date().toISOString() }).eq('id', catEditing.id)
@@ -112,13 +115,12 @@ export default function CatalogPage() {
     return String(isNaN(last) ? 100001 : last + 1)
   }
 
-  function openNew() { setEditing({ ...EMPTY, category_id: categoryFilter !== 'all' ? categoryFilter : undefined }); setPriceStr(''); setModalOpen(true) }
-  function openEdit(i: ItemWithCategory) { setEditing({ ...i }); setPriceStr(i.default_unit_price != null ? String(i.default_unit_price).replace('.', ',') : ''); setModalOpen(true) }
+  function openNew() { req.reset(); setEditing({ ...EMPTY, category_id: categoryFilter !== 'all' ? categoryFilter : undefined }); setPriceStr(''); setModalOpen(true) }
+  function openEdit(i: ItemWithCategory) { req.reset(); setEditing({ ...i }); setPriceStr(i.default_unit_price != null ? String(i.default_unit_price).replace('.', ',') : ''); setModalOpen(true) }
   function closeModal() { setModalOpen(false); setEditing(EMPTY); setPriceStr('') }
 
   async function save() {
-    if (!company || !editing.name?.trim()) { toast.error(t.common.nameRequired); return }
-    if (!editing.category_id) { toast.error(t.po.category + ' *'); return }
+    if (!company || !req.check(editing as Record<string, unknown>, ['name', 'category_id'], { name: 'i-name', category_id: 'i-cat' })) return
     setSaving(true)
 
     if (editing.id) {
@@ -325,8 +327,8 @@ export default function CatalogPage() {
           )}
 
           <Input id="i-name" label={t.common.name + " *"}
-            value={editing.name ?? ''}
-            onChange={e => setEditing(f => ({ ...f, name: e.target.value }))}
+            value={editing.name ?? ''} error={req.errors.name}
+            onChange={e => { req.clear('name'); setEditing(f => ({ ...f, name: e.target.value })) }}
           />
 
           <div className="flex flex-col gap-1">
@@ -345,12 +347,13 @@ export default function CatalogPage() {
               <label htmlFor="i-cat" className="text-sm font-medium text-gray-700">{t.po.category} *</label>
               <select id="i-cat"
                 value={editing.category_id ?? ''}
-                onChange={e => setEditing(f => ({ ...f, category_id: e.target.value || undefined }))}
-                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                onChange={e => { req.clear('category_id'); setEditing(f => ({ ...f, category_id: e.target.value || undefined })) }}
+                className={`rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${req.errors.category_id ? 'border-red-400 focus:ring-red-400' : 'border-field hover:border-field-hover focus:ring-accent'}`}
               >
                 <option value="">{t.common.select}</option>
                 {allCategories.filter(c => c.status === 'active' || c.id === editing.category_id).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+              {req.errors.category_id && <p className="text-xs text-red-600">{req.errors.category_id}</p>}
             </div>
             <Input id="i-unit" label={s.defaultUnit}
               placeholder={lang === 'sl' ? 'npr. kos, kg, m' : 'e.g. pcs, kg, m'}
@@ -399,7 +402,7 @@ export default function CatalogPage() {
       </Modal>
 
       <Modal open={catModalOpen} onClose={closeCategoryModal} title={catEditing.id ? t.common.editEntity : t.categories.new} size="sm">
-        <Input id="cat-name" label={t.categories.categoryName + ' *'} value={catEditing.name} onChange={e => setCatEditing(f => ({ ...f, name: e.target.value }))} />
+        <Input id="cat-name" label={t.categories.categoryName + ' *'} value={catEditing.name} error={catReq.errors.name} onChange={e => { catReq.clear('name'); setCatEditing(f => ({ ...f, name: e.target.value })) }} />
         {catEditing.id && (
           <div className="flex items-center justify-between p-3 mt-4 bg-gray-50 rounded-lg border border-field">
             <div>

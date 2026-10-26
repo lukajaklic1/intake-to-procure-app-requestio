@@ -13,6 +13,7 @@ import PageToolbar from '../components/layout/PageToolbar'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Department } from '../types/database'
 import { useLanguage } from '../hooks/useLanguage'
+import { useRequired } from '../lib/useRequired'
 import { poLocSl, poCountEn } from '../utils/pluralize'
 import { countByKey } from '../lib/usageCounts'
 
@@ -23,6 +24,7 @@ export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<Department[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const req = useRequired(t.common.fieldRequired)
   const [importOpen, setImportOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [modalOpen, setModalOpen] = useState(false)
@@ -48,12 +50,12 @@ export default function DepartmentsPage() {
     setLoading(false)
   }
 
-  function openNew() { setEditing({ name: '', status: 'active' }); setModalOpen(true) }
-  function openEdit(d: Department) { setEditing({ id: d.id, name: d.name, status: d.status }); setModalOpen(true) }
+  function openNew() { req.reset(); setEditing({ name: '', status: 'active' }); setModalOpen(true) }
+  function openEdit(d: Department) { req.reset(); setEditing({ id: d.id, name: d.name, status: d.status }); setModalOpen(true) }
   function closeModal() { setModalOpen(false); setEditing({ name: '', status: 'active' }) }
 
   async function save() {
-    if (!company || !editing.name.trim()) { toast.error(t.common.nameRequired); return }
+    if (!company || !req.check(editing, ['name'], { name: 'dept-name' })) return
     setSaving(true)
     if (editing.id) {
       const { error } = await supabase.from('departments').update({ name: editing.name, status: editing.status, updated_at: new Date().toISOString() }).eq('id', editing.id)
@@ -154,7 +156,7 @@ export default function DepartmentsPage() {
         }} />
 
       <Modal open={modalOpen} onClose={closeModal} title={editing.id ? t.common.editEntity : s.new} size="sm">
-        <Input id="dept-name" label={s.departmentName + " *"} value={editing.name} onChange={e => setEditing(f => ({ ...f, name: e.target.value }))} />
+        <Input id="dept-name" label={s.departmentName + " *"} value={editing.name} error={req.errors.name} onChange={e => { req.clear('name'); setEditing(f => ({ ...f, name: e.target.value })) }} />
         {editing.id && (
           <div className="flex items-center justify-between p-3 mt-4 bg-gray-50 rounded-lg border border-field">
             <div>

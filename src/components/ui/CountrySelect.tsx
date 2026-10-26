@@ -7,13 +7,14 @@ interface CountrySelectProps {
   id?: string
   label: string
   required?: boolean
+  error?: string
   value: string
   onChange: (value: string) => void
 }
 
 /** Searchable country dropdown; names follow the app language. */
-export default function CountrySelect({ id, label, required, value, onChange }: CountrySelectProps) {
+export default function CountrySelect({ id, label, required, error, value, onChange }: CountrySelectProps) {
   const { lang } = useLanguage()
   const list = useMemo(() => countryList(lang), [lang])
-  return <SearchSelect id={id} label={label} required={required} value={value} onChange={onChange} options={list.all} popular={list.popular} />
+  return <SearchSelect id={id} label={label} required={required} error={error} value={value} onChange={onChange} options={list.all} popular={list.popular} />
 }

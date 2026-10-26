@@ -14,6 +14,7 @@ import PageToolbar from '../components/layout/PageToolbar'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Location } from '../types/database'
 import { useLanguage } from '../hooks/useLanguage'
+import { useRequired } from '../lib/useRequired'
 import { poLocSl, poCountEn } from '../utils/pluralize'
 import { countByKey } from '../lib/usageCounts'
 
@@ -26,6 +27,7 @@ export default function LocationsPage() {
   const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const req = useRequired(t.common.fieldRequired)
   const [importOpen, setImportOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [modalOpen, setModalOpen] = useState(false)
@@ -51,20 +53,18 @@ export default function LocationsPage() {
     setLoading(false)
   }
 
-  function openNew() { setEditing({ ...EMPTY }); setModalOpen(true) }
-  function openEdit(l: Location) { setEditing({ ...l }); setModalOpen(true) }
+  function openNew() { req.reset(); setEditing({ ...EMPTY }); setModalOpen(true) }
+  function openEdit(l: Location) { req.reset(); setEditing({ ...l }); setModalOpen(true) }
   function closeModal() { setModalOpen(false); setEditing(EMPTY) }
 
   function field(key: keyof Location) {
-    return { value: (editing[key] as string) ?? '', onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEditing(f => ({ ...f, [key]: e.target.value })) }
+    return { value: (editing[key] as string) ?? '', onChange: (e: React.ChangeEvent<HTMLInputElement>) => { req.clear(key); setEditing(f => ({ ...f, [key]: e.target.value })) }, error: req.errors[key] }
   }
 
   async function save() {
-    if (!company || !editing.name?.trim()) { toast.error(t.common.nameRequired); return }
-    if (!editing.address_street?.trim()) { toast.error(t.common.streetRequired); return }
-    if (!editing.address_city?.trim()) { toast.error(t.common.cityRequired); return }
-    if (!editing.address_postal_code?.trim()) { toast.error(t.common.postalRequired); return }
-    if (!editing.address_country?.trim()) { toast.error(t.common.countryRequired); return }
+    if (!company) return
+    if (!req.check(editing as Record<string, unknown>, ['name', 'address_street', 'address_city', 'address_postal_code', 'address_country'],
+      { name: 'l-name', address_street: 'l-street', address_city: 'l-city', address_postal_code: 'l-postal', address_country: 'l-country' })) return
     setSaving(true)
     if (editing.id) {
       const { error } = await supabase.from('locations').update({ ...editing, updated_at: new Date().toISOString() }).eq('id', editing.id)
@@ -191,7 +191,7 @@ export default function LocationsPage() {
           <div className="col-span-2"><Input id="l-street" label={t.common.streetAddress + ' *'} {...field('address_street')} /></div>
           <Input id="l-city" label={t.common.city + ' *'} {...field('address_city')} />
           <Input id="l-postal" label={t.common.postalCode + ' *'} {...field('address_postal_code')} />
-          <div className="col-span-2"><CountrySelect id="l-country" label={t.common.country} required value={editing.address_country ?? ''} onChange={v => setEditing(f => ({ ...f, address_country: v }))} /></div>
+          <div className="col-span-2"><CountrySelect id="l-country" label={t.common.country} required value={editing.address_country ?? ''} onChange={v => { req.clear('address_country'); setEditing(f => ({ ...f, address_country: v })) }} error={req.errors.address_country} /></div>
 
           {editing.id && (
             <div className="col-span-2 flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-field">

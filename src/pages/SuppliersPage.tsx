@@ -14,6 +14,7 @@ import PageToolbar from '../components/layout/PageToolbar'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Supplier } from '../types/database'
 import { useLanguage } from '../hooks/useLanguage'
+import { useRequired } from '../lib/useRequired'
 import { poLocSl, poCountEn } from '../utils/pluralize'
 import { countByKey } from '../lib/usageCounts'
 
@@ -26,6 +27,7 @@ export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const req = useRequired(t.common.fieldRequired)
   const [importOpen, setImportOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [modalOpen, setModalOpen] = useState(false)
@@ -51,22 +53,22 @@ export default function SuppliersPage() {
     setLoading(false)
   }
 
-  function openNew() { setEditing({ ...EMPTY }); setModalOpen(true) }
-  function openEdit(s: Supplier) { setEditing({ ...s }); setModalOpen(true) }
+  function openNew() { req.reset(); setEditing({ ...EMPTY }); setModalOpen(true) }
+  function openEdit(s: Supplier) { req.reset(); setEditing({ ...s }); setModalOpen(true) }
   function closeModal() { setModalOpen(false); setEditing(EMPTY) }
 
   function field(key: keyof Supplier) {
     return {
       value: (editing[key] as string) ?? '',
-      onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEditing(f => ({ ...f, [key]: e.target.value })),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => { req.clear(key); setEditing(f => ({ ...f, [key]: e.target.value })) },
+      error: req.errors[key],
     }
   }
 
   async function save() {
-    if (!company || !editing.name?.trim()) { toast.error(t.common.nameRequired); return }
-    if (!editing.vat_number?.trim()) { toast.error(t.common.nameRequired); return }
-    if (!editing.address_street?.trim()) { toast.error(t.common.nameRequired); return }
-    if (!editing.address_city?.trim()) { toast.error(t.common.nameRequired); return }
+    if (!company) return
+    if (!req.check(editing as Record<string, unknown>, ['name', 'vat_number', 'address_street', 'address_city'],
+      { name: 's-name', vat_number: 's-vat', address_street: 's-street', address_city: 's-city' })) return
     setSaving(true)
     if (editing.id) {
       const { error } = await supabase.from('suppliers').update({ ...editing, updated_at: new Date().toISOString() }).eq('id', editing.id)
