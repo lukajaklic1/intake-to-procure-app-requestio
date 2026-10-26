@@ -140,7 +140,7 @@ export default function ApprovalsPage() {
             </thead>
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={CheckCircle2} colSpan={isAdmin ? 8 : 7} subtitle={hasActiveFilters ? s.noMatch : a.noData} />
+                <TableEmptyState icon={CheckCircle2} colSpan={isAdmin ? 8 : 7} title={hasActiveFilters ? t.common.empty.noResults.title : t.common.empty.approvals.title} subtitle={hasActiveFilters ? t.common.empty.noResults.text : t.common.empty.approvals.text} />
               ) : paginated.map(r => (
                 <tr key={r.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/requests/${r.id}`)}>
                   <td className="px-4 py-3 whitespace-nowrap">

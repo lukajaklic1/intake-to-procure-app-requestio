@@ -12,6 +12,7 @@ import { cn } from '../lib/cn'
 import { format, subMonths, startOfMonth } from 'date-fns'
 import Pagination from '../components/ui/Pagination'
 import TableEmptyState from '../components/ui/TableEmptyState'
+import EmptyState from '../components/ui/EmptyState'
 import PageToolbar from '../components/layout/PageToolbar'
 
 const SANS = '"Inter Variable", ui-sans-serif, system-ui, sans-serif'
@@ -94,14 +95,6 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
   )
 }
 
-function EmptyChart({ height = 180, label = 'No data for selected period' }: { height?: number; label?: string }) {
-  return (
-    <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>
-      {label}
-    </div>
-  )
-}
-
 type SortKey = 'name' | 'sentAmount' | 'sentCount' | 'receivedAmount' | 'receivedCount'
 
 function BreakdownTable({ rows, currency }: { rows: BreakdownRow[]; currency: string }) {
@@ -151,7 +144,7 @@ function BreakdownTable({ rows, currency }: { rows: BreakdownRow[]; currency: st
         </thead>
         <tbody className="divide-y divide-field">
           {rows.length === 0 ? (
-            <TableEmptyState icon={BarChart2} colSpan={columns.length + 1} subtitle={t.common.noData} />
+            <TableEmptyState icon={BarChart2} colSpan={columns.length + 1} title={t.common.empty.analytics.title} subtitle={t.common.empty.analytics.text} />
           ) : paginated.map((r, i) => {
             const pct = r.sentCount > 0 ? (r.receivedCount / r.sentCount) * 100 : 0
             return (
@@ -431,7 +424,7 @@ export default function DashboardPage() {
                 </BarChart>
               </ResponsiveContainer>
             </>
-          ) : <EmptyChart height={220} label={t.common.noData} />}
+          ) : <div className="py-12"><EmptyState icon={BarChart2} title={t.common.empty.analytics.title} subtitle={t.common.empty.analytics.text} /></div>}
         </ChartCard>
       </div>
 

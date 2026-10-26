@@ -235,7 +235,7 @@ export default function PurchaseOrdersPage() {
             </thead>
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={FileText} colSpan={10} subtitle={hasActiveFilters ? s.noMatch : s.noData} />
+                <TableEmptyState icon={FileText} colSpan={10} title={hasActiveFilters ? t.common.empty.noResults.title : t.common.empty.purchaseOrders.title} subtitle={hasActiveFilters ? t.common.empty.noResults.text : t.common.empty.purchaseOrders.text} />
               ) : paginated.map(po => (
                 <tr key={po.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/purchase-orders/${po.id}`)}>
                   <td className="px-4 py-3">

@@ -145,7 +145,7 @@ export default function ReceiptsPage() {
               </tr></thead>
               <tbody className="divide-y divide-field">
                 {queue.length === 0 ? (
-                  <TableEmptyState icon={PackageCheck} colSpan={6} subtitle={s.noToReceive} />
+                  <TableEmptyState icon={PackageCheck} colSpan={6} title={t.common.empty.toReceive.title} subtitle={t.common.empty.toReceive.text} />
                 ) : paginatedQueue.map(po => (
                   <tr key={po.id} className="hover:bg-surface transition-colors">
                     <td className="px-4 py-3"><Link to={`/purchase-orders/${po.id}`} className=" text-sm font-medium text-gray-400 hover:text-gray-600">{po.po_number}</Link></td>
@@ -172,7 +172,7 @@ export default function ReceiptsPage() {
                 </tr></thead>
                 <tbody className="divide-y divide-field">
                   {filteredReceipts.length === 0 ? (
-                    <TableEmptyState icon={PackageCheck} colSpan={6} subtitle={hasFilters ? t.common.noMatch : s.noReceipts} />
+                    <TableEmptyState icon={PackageCheck} colSpan={6} title={hasFilters ? t.common.empty.noResults.title : t.common.empty.receipts.title} subtitle={hasFilters ? t.common.empty.noResults.text : t.common.empty.receipts.text} />
                   ) : paginatedReceipts.map(r => (
                     <tr key={r.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/receipts/${r.id}`)}>
                       <td className="px-4 py-3"><Link to={`/receipts/${r.id}`} onClick={e => e.stopPropagation()} className=" text-sm font-medium text-gray-400 hover:text-gray-600">{r.receipt_number}</Link></td>

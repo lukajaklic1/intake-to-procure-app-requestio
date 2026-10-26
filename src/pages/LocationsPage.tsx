@@ -126,7 +126,7 @@ export default function LocationsPage() {
             </thead>
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={MapPin} colSpan={5} subtitle={search ? s.noMatch : s.noData} />
+                <TableEmptyState icon={MapPin} colSpan={5} title={search ? t.common.empty.noResults.title : t.common.empty.locations.title} subtitle={search ? t.common.empty.noResults.text : t.common.empty.locations.text} />
               ) : paginated.map(l => (
                 <tr key={l.id} className="hover:bg-surface transition-colors">
                   <td className="px-4 py-3 font-medium text-ink">{l.name}</td>

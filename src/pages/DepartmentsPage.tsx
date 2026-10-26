@@ -110,7 +110,7 @@ export default function DepartmentsPage() {
             </thead>
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={Users} colSpan={4} subtitle={search ? s.noMatch : s.noData} />
+                <TableEmptyState icon={Users} colSpan={4} title={search ? t.common.empty.noResults.title : t.common.empty.departments.title} subtitle={search ? t.common.empty.noResults.text : t.common.empty.departments.text} />
               ) : paginated.map(d => {
                 const count = usage.get(d.id) ?? 0
                 const inUse = count > 0

@@ -237,7 +237,7 @@ export default function UsersPage() {
             </thead>
             <tbody className="divide-y divide-field">
               {totalRows === 0 ? (
-                <TableEmptyState icon={Users} colSpan={7} subtitle={s.noUsers} />
+                <TableEmptyState icon={Users} colSpan={7} title={t.common.empty.users.title} subtitle={t.common.empty.users.text} />
               ) : <>
               {visibleUsers.map(u => (
                 <tr key={u.id} className="hover:bg-surface transition-colors">

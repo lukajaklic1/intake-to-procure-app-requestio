@@ -232,7 +232,7 @@ export default function CatalogPage() {
             </thead>
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={Package} colSpan={7} subtitle={search ? s.noMatch : s.noData} />
+                <TableEmptyState icon={Package} colSpan={7} title={(search || categoryFilter !== 'all') ? t.common.empty.noResults.title : t.common.empty.items.title} subtitle={(search || categoryFilter !== 'all') ? t.common.empty.noResults.text : t.common.empty.items.text} />
               ) : paginated.map(item => {
                 const count = usage.get(item.id) ?? 0
                 const inUse = count > 0

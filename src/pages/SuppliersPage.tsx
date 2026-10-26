@@ -133,7 +133,7 @@ export default function SuppliersPage() {
             </thead>
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={Building2} colSpan={7} subtitle={search ? s.noMatch : s.noData} />
+                <TableEmptyState icon={Building2} colSpan={7} title={search ? t.common.empty.noResults.title : t.common.empty.suppliers.title} subtitle={search ? t.common.empty.noResults.text : t.common.empty.suppliers.text} />
               ) : paginated.map(s => (
                 <tr key={s.id} className="hover:bg-surface transition-colors">
                   <td className="px-4 py-3 font-medium text-ink">
