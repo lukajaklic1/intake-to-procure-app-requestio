@@ -1,0 +1,144 @@
+import { useRef, useState } from 'react'
+import { Download, FileSpreadsheet } from 'lucide-react'
+import { readSheet } from 'read-excel-file/browser'
+import writeExcelFile from 'write-excel-file/browser'
+import Modal from './Modal'
+import Button from './Button'
+import { toast } from './Toast'
+import { useLanguage } from '../../hooks/useLanguage'
+
+export type ImportRow = Record<string, string>
+
+export interface ImportColumn {
+  key: string
+  label: string
+  required?: boolean
+  example?: string
+}
+
+interface ImportModalProps {
+  open: boolean
+  onClose: () => void
+  title: string
+  columns: ImportColumn[]
+  templateName: string
+  /** Lower-cased duplicate keys that already exist in the database. */
+  existing: Set<string>
+  /** Duplicate key of a row (lower-cased), e.g. its name. */
+  keyOf: (row: ImportRow) => string
+  /** Extra per-row check; return an error message or null. */
+  validate?: (row: ImportRow) => string | null
+  onImport: (rows: ImportRow[]) => Promise<void>
+}
+
+interface Parsed {
+  valid: ImportRow[]
+  duplicates: number
+  errors: { line: number; message: string }[]
+}
+
+const cell = (v: unknown) => (v == null ? '' : String(v).trim())
+
+/** Excel (.xlsx) import: download a template, upload a filled one, review, import. */
+export default function ImportModal({ open, onClose, title, columns, templateName, existing, keyOf, validate, onImport }: ImportModalProps) {
+  const { t } = useLanguage()
+  const s = t.common.import
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [fileName, setFileName] = useState('')
+  const [parsed, setParsed] = useState<Parsed | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  function reset() { setFileName(''); setParsed(null); if (fileRef.current) fileRef.current.value = '' }
+  function close() { reset(); onClose() }
+
+  async function downloadTemplate() {
+    const header = columns.map(c => ({ value: c.label + (c.required ? ' *' : ''), fontWeight: 'bold' as const }))
+    const example = columns.map(c => ({ value: c.example ?? '' }))
+    await writeExcelFile([header, example]).toFile(templateName + '.xlsx')
+  }
+
+  async function handleFile(file: File) {
+    setFileName(file.name)
+    try {
+      const rows = await readSheet(file)
+      if (rows.length < 2) { setParsed({ valid: [], duplicates: 0, errors: [{ line: 0, message: s.noRows }] }); return }
+      const norm = (v: unknown) => cell(v).replace(/\*/g, '').trim().toLowerCase()
+      const headers = rows[0].map(norm)
+      const idx = columns.map(c => headers.findIndex(h => h === c.label.toLowerCase() || h === c.key.toLowerCase()))
+      const missing = columns.filter((c, i) => c.required && idx[i] < 0)
+      if (missing.length) { setParsed({ valid: [], duplicates: 0, errors: [{ line: 1, message: `${s.missingColumn}: ${missing.map(c => c.label).join(', ')}` }] }); return }
+
+      const seen = new Set(existing)
+      const out: Parsed = { valid: [], duplicates: 0, errors: [] }
+      rows.slice(1).forEach((r, i) => {
+        const line = i + 2
+        if (r.every(v => cell(v) === '')) return
+        const row: ImportRow = {}
+        columns.forEach((c, ci) => { row[c.key] = idx[ci] >= 0 ? cell(r[idx[ci]]) : '' })
+        const empty = columns.find(c => c.required && !row[c.key])
+        if (empty) { out.errors.push({ line, message: `${s.missingValue}: ${empty.label}` }); return }
+        const err = validate?.(row)
+        if (err) { out.errors.push({ line, message: err }); return }
+        const key = keyOf(row)
+        if (seen.has(key)) { out.duplicates++; return }
+        seen.add(key)
+        out.valid.push(row)
+      })
+      setParsed(out)
+    } catch {
+      setParsed({ valid: [], duplicates: 0, errors: [{ line: 0, message: s.badFile }] })
+    }
+  }
+
+  async function run() {
+    if (!parsed || parsed.valid.length === 0) return
+    setBusy(true)
+    try {
+      await onImport(parsed.valid)
+      toast.success(`${s.imported}: ${parsed.valid.length}`)
+      close()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={close} title={title} size="lg">
+      <p className="text-sm text-ink2 mb-4">{s.intro}</p>
+
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <Button variant="secondary" onClick={downloadTemplate} className="gap-2"><Download className="w-4 h-4" />{s.downloadTemplate}</Button>
+        <input ref={fileRef} type="file" accept=".xlsx" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+        <Button onClick={() => fileRef.current?.click()} className="gap-2"><FileSpreadsheet className="w-4 h-4" />{s.chooseFile}</Button>
+        {fileName && <span className="text-sm text-ink2 truncate max-w-[220px]">{fileName}</span>}
+      </div>
+
+      <p className="text-xs text-gray-400 mb-4">
+        {s.columns}: {columns.map(c => c.label + (c.required ? ' *' : '')).join(' · ')}
+      </p>
+
+      {parsed && (
+        <div className="rounded-lg border border-field p-4 mb-4 text-sm flex flex-col gap-2">
+          <div className="flex flex-wrap gap-2">
+            <span className="badge badge-success">{s.toImport}: {parsed.valid.length}</span>
+            {parsed.duplicates > 0 && <span className="badge badge-neutral">{s.skipped}: {parsed.duplicates}</span>}
+            {parsed.errors.length > 0 && <span className="badge badge-danger">{s.errors}: {parsed.errors.length}</span>}
+          </div>
+          {parsed.errors.slice(0, 6).map((e, i) => (
+            <p key={i} className="text-xs text-danger">{e.line > 0 ? `${s.row} ${e.line}: ` : ''}{e.message}</p>
+          ))}
+          {parsed.errors.length > 6 && <p className="text-xs text-gray-400">… +{parsed.errors.length - 6}</p>}
+        </div>
+      )}
+
+      <div className="flex gap-3 justify-end">
+        <Button variant="secondary" onClick={close}>{t.common.cancel}</Button>
+        <Button loading={busy} disabled={!parsed || parsed.valid.length === 0} onClick={run}>
+          {s.importBtn}{parsed && parsed.valid.length > 0 ? ` (${parsed.valid.length})` : ''}
+        </Button>
+      </div>
+    </Modal>
+  )
+}

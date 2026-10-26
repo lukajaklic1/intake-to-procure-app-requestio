@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, Pencil, Trash2, MapPin } from 'lucide-react'
+import { Upload, Plus, Search, Pencil, Trash2, MapPin } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { toast } from '../components/ui/Toast'
@@ -8,6 +8,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Pagination from '../components/ui/Pagination'
+import ImportModal from '../components/ui/ImportModal'
 import PageToolbar from '../components/layout/PageToolbar'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Location } from '../types/database'
@@ -24,6 +25,7 @@ export default function LocationsPage() {
   const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [importOpen, setImportOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Partial<Location>>(EMPTY)
@@ -100,7 +102,7 @@ export default function LocationsPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button>}>
+      <PageToolbar attached actions={<><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}</Button><Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
@@ -158,6 +160,27 @@ export default function LocationsPage() {
         )}
         <Pagination total={filtered.length} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={handlePageSizeChange} />
       </div>
+
+      <ImportModal open={importOpen} onClose={() => setImportOpen(false)} title={t.common.import.title}
+        templateName="locations"
+        columns={[
+          { key: 'name', label: t.common.import.cols.name, required: true, example: 'Hotel Jezero' },
+          { key: 'street', label: t.common.import.cols.street, example: 'Cesta 1' },
+          { key: 'postalCode', label: t.common.import.cols.postalCode, example: '4264' },
+          { key: 'city', label: t.common.import.cols.city, example: 'Bohinjsko jezero' },
+          { key: 'country', label: t.common.import.cols.country, example: 'Slovenija' },
+        ]}
+        existing={new Set(locations.map(l => l.name.toLowerCase()))}
+        keyOf={row => row.name.toLowerCase()}
+        onImport={async rows => {
+          const { error } = await supabase.from('locations').insert(rows.map(r => ({
+            company_id: company!.id, name: r.name, status: 'active',
+            address_street: r.street || null, address_postal_code: r.postalCode || null,
+            address_city: r.city || null, address_country: r.country || null,
+          })))
+          if (error) throw error
+          load()
+        }} />
 
       <Modal open={modalOpen} onClose={closeModal} title={editing.id ? t.common.editEntity : s.new} size="md">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

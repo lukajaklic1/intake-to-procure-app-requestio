@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, Pencil, Trash2, Users } from 'lucide-react'
+import { Upload, Plus, Search, Pencil, Trash2, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { toast } from '../components/ui/Toast'
@@ -8,6 +8,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Pagination from '../components/ui/Pagination'
+import ImportModal from '../components/ui/ImportModal'
 import PageToolbar from '../components/layout/PageToolbar'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Department } from '../types/database'
@@ -22,6 +23,7 @@ export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<Department[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [importOpen, setImportOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<{ id?: string; name: string; status: 'active' | 'inactive' }>({ name: '', status: 'active' })
@@ -81,7 +83,7 @@ export default function DepartmentsPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button>}>
+      <PageToolbar attached actions={<><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}</Button><Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
@@ -139,6 +141,17 @@ export default function DepartmentsPage() {
         )}
         <Pagination total={filtered.length} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={handlePageSizeChange} />
       </div>
+
+      <ImportModal open={importOpen} onClose={() => setImportOpen(false)} title={t.common.import.title}
+        templateName="departments"
+        columns={[{ key: 'name', label: t.common.import.cols.name, required: true, example: 'Kuhinja' }]}
+        existing={new Set(departments.map(d => d.name.toLowerCase()))}
+        keyOf={row => row.name.toLowerCase()}
+        onImport={async rows => {
+          const { error } = await supabase.from('departments').insert(rows.map(r => ({ company_id: company!.id, name: r.name, status: 'active' })))
+          if (error) throw error
+          load()
+        }} />
 
       <Modal open={modalOpen} onClose={closeModal} title={editing.id ? t.common.editEntity : s.new} size="sm">
         <Input id="dept-name" label={s.departmentName + " *"} value={editing.name} onChange={e => setEditing(f => ({ ...f, name: e.target.value }))} />

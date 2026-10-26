@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, Pencil, Trash2, Package, Tag } from 'lucide-react'
+import { Upload, Plus, Search, Pencil, Trash2, Package, Tag } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { toast } from '../components/ui/Toast'
@@ -8,6 +8,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Pagination from '../components/ui/Pagination'
+import ImportModal from '../components/ui/ImportModal'
 import PageToolbar from '../components/layout/PageToolbar'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Item, Category } from '../types/database'
@@ -34,6 +35,7 @@ export default function CatalogPage() {
   const [confirmDeleteCat, setConfirmDeleteCat] = useState<Category | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [importOpen, setImportOpen] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [modalOpen, setModalOpen] = useState(false)
@@ -184,7 +186,7 @@ export default function CatalogPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar actions={<><Button variant="secondary" onClick={openNewCategory} className="gap-2"><Tag className="w-4 h-4" />{t.categories.new}</Button><Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
+      <PageToolbar actions={<><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}</Button><Button variant="secondary" onClick={openNewCategory} className="gap-2"><Tag className="w-4 h-4" />{t.categories.new}</Button><Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
@@ -271,6 +273,44 @@ export default function CatalogPage() {
         <Pagination total={filtered.length} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={handlePageSizeChange} />
       </div>
       </div>
+
+      <ImportModal open={importOpen} onClose={() => setImportOpen(false)} title={t.common.import.title}
+        templateName="catalog"
+        columns={[
+          { key: 'name', label: t.common.import.cols.name, required: true, example: 'Olivno olje 1 L' },
+          { key: 'category', label: t.common.import.cols.category, required: true, example: 'Hrana' },
+          { key: 'unit', label: t.common.import.cols.unit, example: 'kos' },
+          { key: 'price', label: t.common.import.cols.price, example: '5,90' },
+          { key: 'description', label: t.common.import.cols.description, example: 'Ekstra deviško' },
+        ]}
+        existing={new Set(items.map(i => i.name.toLowerCase()))}
+        keyOf={row => row.name.toLowerCase()}
+        validate={row => (row.price && Number.isNaN(Number(row.price.replace(',', '.')))) ? t.common.import.invalidNumber + ': ' + row.price : null}
+        onImport={async rows => {
+          // Categories named in the file that don't exist yet are created first.
+          const byName = new Map(allCategories.map(c => [c.name.toLowerCase(), c.id]))
+          const missing = [...new Set(rows.map(r => r.category).filter(n => !byName.has(n.toLowerCase())))]
+          if (missing.length) {
+            const { data, error } = await supabase.from('categories')
+              .insert(missing.map(name => ({ company_id: company!.id, name, status: 'active' }))).select('id, name')
+            if (error) throw error
+            for (const c of data ?? []) byName.set(c.name.toLowerCase(), c.id)
+          }
+          // Item numbers continue after the highest existing one.
+          const last = items.reduce((m, i) => Math.max(m, parseInt(i.item_number, 10) || 0), 100000)
+          const payload = rows.map((r, i) => ({
+            company_id: company!.id, item_number: String(last + 1 + i), name: r.name,
+            long_description: r.description || null, category_id: byName.get(r.category.toLowerCase()),
+            default_unit: r.unit || null,
+            default_unit_price: r.price ? Number(r.price.replace(',', '.')) : null,
+            status: 'active',
+          }))
+          for (let i = 0; i < payload.length; i += 500) {
+            const { error } = await supabase.from('items').insert(payload.slice(i, i + 500))
+            if (error) throw error
+          }
+          load(); loadCategories()
+        }} />
 
       <Modal open={modalOpen} onClose={closeModal} title={editing.id ? t.common.editEntity : s.new} size="md">
         <div className="flex flex-col gap-4">
