@@ -5,6 +5,7 @@ import { useLanguage } from '../hooks/useLanguage'
 import { toast } from '../components/ui/Toast'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import CountrySelect from '../components/ui/CountrySelect'
 import type { Company } from '../types/database'
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HRK']
@@ -127,7 +128,7 @@ export default function SettingsPage() {
             <Input id="address_street" label={t.common.streetAddress} {...field('address_street')} />
             <Input id="address_city" label={t.common.city} {...field('address_city')} />
             <Input id="address_postal_code" label={t.common.postalCode} {...field('address_postal_code')} />
-            <Input id="address_country" label={t.common.country} {...field('address_country')} />
+            <CountrySelect id="address_country" label={t.common.country} value={(form.address_country as string) ?? ''} onChange={v => setForm(f => ({ ...f, address_country: v }))} />
           </div>
         </Section>
 

@@ -7,6 +7,7 @@ import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import CountrySelect from '../components/ui/CountrySelect'
 import Pagination from '../components/ui/Pagination'
 import ImportModal from '../components/ui/ImportModal'
 import PageToolbar from '../components/layout/PageToolbar'
@@ -188,7 +189,7 @@ export default function LocationsPage() {
           <div className="col-span-2"><Input id="l-street" label={t.common.streetAddress + ' *'} {...field('address_street')} /></div>
           <Input id="l-city" label={t.common.city + ' *'} {...field('address_city')} />
           <Input id="l-postal" label={t.common.postalCode} {...field('address_postal_code')} />
-          <div className="col-span-2"><Input id="l-country" label={t.common.country} {...field('address_country')} /></div>
+          <div className="col-span-2"><CountrySelect id="l-country" label={t.common.country} value={editing.address_country ?? ''} onChange={v => setEditing(f => ({ ...f, address_country: v }))} /></div>
 
           {editing.id && (
             <div className="col-span-2 flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-field">

@@ -7,6 +7,7 @@ import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import CountrySelect from '../components/ui/CountrySelect'
 import Pagination from '../components/ui/Pagination'
 import ImportModal from '../components/ui/ImportModal'
 import PageToolbar from '../components/layout/PageToolbar'
@@ -213,7 +214,7 @@ export default function SuppliersPage() {
           <Input id="s-street" label={t.common.streetAddress + ' *'} {...field('address_street')} />
           <Input id="s-city" label={t.common.city + ' *'} {...field('address_city')} />
           <Input id="s-postal" label={t.common.postalCode} {...field('address_postal_code')} />
-          <Input id="s-country" label={t.common.country} {...field('address_country')} />
+          <CountrySelect id="s-country" label={t.common.country} value={editing.address_country ?? ''} onChange={v => setEditing(f => ({ ...f, address_country: v }))} />
           <Input id="s-email" label={t.common.email} type="email" {...field('email')} />
           <Input id="s-phone" label={t.common.phone} {...field('phone')} />
           <Input id="s-terms" label={s.paymentTerms} placeholder={lang === 'sl' ? 'npr. 30 dni' : 'e.g. 30 days'} {...field('payment_terms')} />
