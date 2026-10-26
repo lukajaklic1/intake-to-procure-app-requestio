@@ -28,9 +28,8 @@ interface POFull {
   change_note: string | null
   prev_status: string | null
   received_status: 'none' | 'partial' | 'full'
-  supplier_id: string; category_id: string; location_id: string; department_id: string | null
+  supplier_id: string; location_id: string; department_id: string | null
   suppliers: { name: string; email: string | null; address_street: string | null; address_city: string | null; address_postal_code: string | null; address_country: string | null; vat_number: string | null }
-  categories: { name: string }
   locations: { name: string; address_street: string | null; address_city: string | null; address_postal_code: string | null }
   departments: { name: string } | null
 }
@@ -82,7 +81,7 @@ export default function PODetailPage() {
     setLoading(true)
     const { data } = await supabase
       .from('purchase_orders')
-      .select('*, suppliers(name,email,address_street,address_city,address_postal_code,address_country,vat_number), categories(name), locations(name,address_street,address_city,address_postal_code), departments(name)')
+      .select('*, suppliers(name,email,address_street,address_city,address_postal_code,address_country,vat_number), locations(name,address_street,address_city,address_postal_code), departments(name)')
       .eq('id', id!)
       .single()
     setPo(data as unknown as POFull)
@@ -92,7 +91,7 @@ export default function PODetailPage() {
       setLinkedReq(r ?? null)
     } else setLinkedReq(null)
 
-    const { data: lineData } = await supabase.from('po_line_items').select('*, items(item_number)').eq('po_id', id!).order('position')
+    const { data: lineData } = await supabase.from('po_line_items').select('*, items(item_number), categories(name)').eq('po_id', id!).order('position')
     setLines(lineData ?? [])
 
     const { data: atts } = await supabase.from('po_attachments').select('id, file_name, file_path').eq('po_id', id!)
@@ -269,7 +268,6 @@ export default function PODetailPage() {
         <div className="bg-white rounded-lg border border-field p-5">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">{s.orderDetails}</p>
           <div className="flex flex-col gap-2">
-            <Field label={s.category} value={po.categories?.name} />
             {po.departments && <Field label={s.department} value={po.departments.name} />}
             <Field label={t.po.paymentTermsLabel} value={po.payment_terms} />
             {po.incoterm && <Field label={t.po.incoterm} value={po.incoterm} />}
@@ -289,6 +287,7 @@ export default function PODetailPage() {
               <th className="text-left px-5 py-2.5 text-xs font-medium text-gray-500 w-12">{t.po.position}</th>
               <th className="text-left px-5 py-2.5 text-xs font-medium text-gray-500 w-24">{t.po.itemCode}</th>
               <th className="text-left px-5 py-2.5 text-xs font-medium text-gray-500">{t.po.description}</th>
+              <th className="text-left px-5 py-2.5 text-xs font-medium text-gray-500 w-32">{s.category}</th>
               <th className="text-right px-5 py-2.5 text-xs font-medium text-gray-500 w-24">{t.po.qty}</th>
               <th className="text-left px-5 py-2.5 text-xs font-medium text-gray-500 w-20">{t.po.unit}</th>
               <th className="text-right px-5 py-2.5 text-xs font-medium text-gray-500 w-28">{t.po.unitPrice}</th>
@@ -304,6 +303,7 @@ export default function PODetailPage() {
                   <p className="font-medium text-gray-900">{line.name}</p>
                   {line.long_description && <p className="text-xs text-gray-400 mt-0.5">{line.long_description}</p>}
                 </td>
+                <td className="px-5 py-3 text-gray-500">{(line as any).categories?.name ?? '—'}</td>
                 <td className="px-5 py-3 text-right text-gray-700">{line.quantity}</td>
                 <td className="px-5 py-3 text-gray-500">{line.unit}</td>
                 <td className="px-5 py-3 text-right text-gray-700">{fmt(line.unit_price)}</td>
@@ -314,18 +314,18 @@ export default function PODetailPage() {
           <tfoot className="border-t border-field bg-surface">
             {(po.discount_amount ?? 0) > 0 && (
               <tr>
-                <td colSpan={6} className="px-5 pt-3 pb-1 text-right text-sm text-gray-500">Vmesni znesek</td>
+                <td colSpan={7} className="px-5 pt-3 pb-1 text-right text-sm text-gray-500">Vmesni znesek</td>
                 <td className="px-5 pt-3 pb-1 text-right text-sm text-gray-700">{fmt((po.total_amount) + (po.discount_amount ?? 0))}</td>
               </tr>
             )}
             {(po.discount_amount ?? 0) > 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-1 text-right text-sm text-gray-500">Popust</td>
+                <td colSpan={7} className="px-5 py-1 text-right text-sm text-gray-500">Popust</td>
                 <td className="px-5 py-1 text-right text-sm font-semibold text-accent">- {fmt(po.discount_amount ?? 0)}</td>
               </tr>
             )}
             <tr className="border-t-2 border-field">
-              <td colSpan={6} className="px-5 py-3 text-right text-sm font-bold text-gray-900">Skupaj (brez DDV)</td>
+              <td colSpan={7} className="px-5 py-3 text-right text-sm font-bold text-gray-900">Skupaj (brez DDV)</td>
               <td className="px-5 py-3 text-right text-base font-bold text-accent-hover">{fmt(po.total_amount)}</td>
             </tr>
           </tfoot>

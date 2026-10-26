@@ -200,6 +200,7 @@ export interface PoLineItem {
   id: string
   po_id: string
   item_id: string | null
+  category_id: string | null
   position: number
   name: string
   long_description: string | null
@@ -286,6 +287,7 @@ export interface RequestLineItem {
   id: string
   request_id: string
   item_id: string | null
+  category_id: string | null
   position: number
   name: string
   long_description: string | null

@@ -22,6 +22,13 @@ const STATUS_BADGE: Record<string, string> = {
 
 const STATUSES: RequestStatus[] = ['draft', 'pending', 'approved', 'rejected', 'cancelled', 'completed']
 
+// Distinct line categories of a document: "Food", or "Food +2" when mixed.
+function catLabel(lines: { categories: { name: string } | null }[] | null | undefined) {
+  const names = [...new Set((lines ?? []).map(l => l.categories?.name).filter(Boolean) as string[])]
+  if (names.length === 0) return '—'
+  return names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`
+}
+
 interface Row {
   id: string
   request_number: string
@@ -34,9 +41,8 @@ interface Row {
   needed_by_date: string | null
   supplier_id: string | null
   supplier_name: string | null
-  category_id: string | null
   department_id: string | null
-  categories: { name: string } | null
+  request_line_items: { category_id: string | null; categories: { name: string } | null }[]
   suppliers: { name: string } | null
   locations: { name: string } | null
 }
@@ -99,7 +105,7 @@ export default function RequestsPage() {
     setLoading(true)
     let query = supabase
       .from('requests')
-      .select('id, request_number, status, total_estimate, created_at, created_by, approver_id, po_id, needed_by_date, supplier_id, supplier_name, category_id, department_id, categories(name), suppliers(name), locations(name)')
+      .select('id, request_number, status, total_estimate, created_at, created_by, approver_id, po_id, needed_by_date, supplier_id, supplier_name, department_id, request_line_items(category_id, categories(name)), suppliers(name), locations(name)')
       .eq('company_id', company.id)
       .order('created_at', { ascending: false })
     if (!canViewAll) query = query.eq('created_by', profile.id)
@@ -138,7 +144,7 @@ export default function RequestsPage() {
     if (status !== 'all' && r.status !== status) return false
     if (dateFrom && r.created_at < dateFrom) return false
     if (supplierId && r.supplier_id !== supplierId) return false
-    if (categoryId && r.category_id !== categoryId) return false
+    if (categoryId && !r.request_line_items?.some(l => l.category_id === categoryId)) return false
     if (departmentId && r.department_id !== departmentId) return false
     if (poFilter === 'ordered' && !r.po_id) return false
     if (poFilter === 'not' && r.po_id) return false
@@ -216,7 +222,7 @@ export default function RequestsPage() {
                     <Link to={`/requests/${r.id}`} className=" text-sm font-medium text-gray-400 hover:text-gray-600" onClick={e => e.stopPropagation()}>{r.request_number}</Link>
                     <p className="text-xs text-gray-400 mt-0.5">{format(new Date(r.created_at), 'dd.MM.yyyy')}</p>
                   </td>
-                  <td className="px-4 py-3 text-ink2">{r.categories?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-ink2">{catLabel(r.request_line_items)}</td>
                   <td className="px-4 py-3 text-ink2 max-w-[200px] truncate" title={r.suppliers?.name ?? r.supplier_name ?? undefined}>{r.suppliers?.name ?? r.supplier_name ?? '—'}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <p className="text-sm text-ink">{r.needed_by_date ? format(new Date(r.needed_by_date), 'dd.MM.yyyy') : '—'}</p>

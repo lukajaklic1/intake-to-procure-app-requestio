@@ -338,7 +338,7 @@ export default function DashboardPage() {
     { done: true,                    label: t.checklist.companyCreated,                  to: null },
     { done: checklist.companyInfo,   label: t.checklist.addAddress,        to: '/settings' },
     { done: checklist.supplier,      label: t.checklist.createSupplier,       to: '/suppliers' },
-    { done: checklist.category,      label: t.checklist.createCategory,                to: '/categories' },
+    { done: checklist.category,      label: t.checklist.createCategory,                to: '/catalog' },
     { done: checklist.location,      label: t.checklist.createLocation,       to: '/locations' },
     { done: checklist.department,    label: t.checklist.createDepartment,              to: '/departments' },
     { done: checklist.teamMember,    label: t.checklist.inviteTeam,                    to: '/users' },

@@ -23,7 +23,6 @@ const STATUS_BADGE: Record<string, string> = {
 
 type ReqFull = Request & {
   suppliers: { name: string } | null
-  categories: { name: string } | null
   locations: { name: string } | null
   departments: { name: string } | null
 }
@@ -40,7 +39,7 @@ export default function RequestDetailPage() {
   const navigate = useNavigate()
 
   const [req, setReq] = useState<ReqFull | null>(null)
-  const [lines, setLines] = useState<RequestLineItem[]>([])
+  const [lines, setLines] = useState<(RequestLineItem & { categories?: { name: string } | null })[]>([])
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [activity, setActivity] = useState<ActivityLog[]>([])
   const [linkedPo, setLinkedPo] = useState<{ id: string; po_number: string; status: string; total_amount: number; created_at: string } | null>(null)
@@ -58,7 +57,7 @@ export default function RequestDetailPage() {
     setLoading(true)
     const { data } = await supabase
       .from('requests')
-      .select('*, suppliers(name), categories(name), locations(name), departments(name)')
+      .select('*, suppliers(name), locations(name), departments(name)')
       .eq('id', id!).single()
     if (!data) { toast.error(t.common.notFound); navigate('/requests'); return }
     setReq(data as unknown as ReqFull)
@@ -66,8 +65,8 @@ export default function RequestDetailPage() {
       const { data: po } = await supabase.from('purchase_orders').select('id, po_number, status, total_amount, created_at').eq('id', data.po_id).single()
       setLinkedPo(po ?? null)
     } else setLinkedPo(null)
-    const { data: ls } = await supabase.from('request_line_items').select('*').eq('request_id', id!).order('position')
-    setLines((ls as RequestLineItem[]) ?? [])
+    const { data: ls } = await supabase.from('request_line_items').select('*, categories(name)').eq('request_id', id!).order('position')
+    setLines((ls as any[]) ?? [])
     const { data: aps } = await supabase.from('approvals').select('*').eq('request_id', id!).order('step')
     const apList = (aps as Approval[]) ?? []
     setApprovals(apList)
@@ -233,7 +232,6 @@ export default function RequestDetailPage() {
 
       <div className="bg-white rounded-lg border border-field p-6 mb-5 grid grid-cols-2 sm:grid-cols-3 gap-5">
         <Field label={s.supplier} value={req.suppliers?.name ?? req.supplier_name} />
-        <Field label={s.category} value={req.categories?.name} />
         <Field label={s.location} value={req.locations?.name} />
         <Field label={s.department} value={req.departments?.name} />
         <Field label={s.neededBy} value={req.needed_by_date ? format(new Date(req.needed_by_date), 'dd.MM.yyyy') : null} />
@@ -291,6 +289,7 @@ export default function RequestDetailPage() {
         <div className="overflow-x-auto"><table className="w-full text-sm min-w-[500px]">
           <thead className="bg-surface border-b border-field"><tr>
             <th className="text-left px-4 py-2.5 text-sm font-medium text-ink2">{s.itemName}</th>
+            <th className="text-left px-4 py-2.5 text-sm font-medium text-ink2">{s.category}</th>
             <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2">{s.quantity}</th>
             <th className="text-left px-4 py-2.5 text-sm font-medium text-ink2">{s.unit}</th>
             <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2">{s.estUnitPrice}</th>
@@ -303,6 +302,7 @@ export default function RequestDetailPage() {
                   {l.name}
                   {l.long_description && <p className="text-xs text-gray-400 mt-0.5">{l.long_description}</p>}
                 </td>
+                <td className="px-4 py-2.5 text-gray-600">{l.categories?.name ?? '—'}</td>
                 <td className="px-4 py-2.5 text-right text-gray-600">{l.quantity}</td>
                 <td className="px-4 py-2.5 text-gray-600">{l.unit}</td>
                 <td className="px-4 py-2.5 text-right text-gray-600">{fmt(l.est_unit_price)}</td>

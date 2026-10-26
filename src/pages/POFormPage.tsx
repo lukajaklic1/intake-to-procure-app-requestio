@@ -15,6 +15,7 @@ import type { Supplier, Category, Location, Department, Item } from '../types/da
 interface LineItem {
   id?: string
   item_id?: string | null
+  category_id: string
   position: number
   name: string
   long_description: string
@@ -25,7 +26,6 @@ interface LineItem {
 
 interface POHeader {
   supplier_id: string
-  category_id: string
   location_id: string
   department_id: string
   payment_terms: string
@@ -36,13 +36,13 @@ interface POHeader {
 }
 
 const EMPTY_HEADER: POHeader = {
-  supplier_id: '', category_id: '', location_id: '', department_id: '',
+  supplier_id: '', location_id: '', department_id: '',
   payment_terms: '', expected_delivery_date: '', incoterm: '', supplier_quote_ref: '',
   notes: '',
 }
 
 function newLine(position: number): LineItem {
-  return { position, name: '', long_description: '', quantity: '1', unit: 'kos', unit_price: '0', item_id: null }
+  return { position, name: '', long_description: '', quantity: '1', unit: 'kos', unit_price: '0', item_id: null, category_id: '' }
 }
 
 // ─── Item search component ────────────────────────────────────────────────────
@@ -153,60 +153,6 @@ function Select({ id, label, value, onChange, required, hint, children }: {
     </div>
   )
 }
-
-// ─── Generic search combobox ─────────────────────────────────────────────────
-
-function SearchCombobox({ items, value, onChange, label, required, disabled, placeholder, emptyText }: {
-  items: { id: string; name: string; sub?: string }[]
-  value: string
-  onChange: (id: string) => void
-  label: string
-  required?: boolean
-  disabled?: boolean
-  placeholder?: string
-  emptyText: string
-}) {
-  const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
-  const selected = items.find(i => i.id === value)
-
-  const filtered = query.length > 0
-    ? items.filter(i => i.name.toLowerCase().includes(query.toLowerCase()))
-    : items
-
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-gray-700">{label}{required && ' *'}</label>
-      <div className="relative">
-        <input
-          value={open ? query : (selected?.name ?? '')}
-          onChange={e => { setQuery(e.target.value); setOpen(true) }}
-          onFocus={() => { setQuery(''); setOpen(true) }}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-          readOnly={disabled}
-          placeholder={placeholder ?? 'Izberi...'}
-          className="w-full rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-accent bg-white"
-        />
-        {open && !disabled && (
-          <div className="absolute z-30 left-0 mt-1 w-full bg-white border border-field rounded-lg shadow-lg overflow-y-auto max-h-56">
-            {filtered.length > 0 ? filtered.map(item => (
-              <button key={item.id} type="button"
-                onMouseDown={e => e.preventDefault()}
-                onClick={() => { onChange(item.id); setQuery(''); setOpen(false) }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-accent-light transition-colors ${item.id === value ? 'bg-accent-light font-medium text-accent-hover' : 'text-gray-800'}`}>
-                {item.name}
-                {item.sub && <span className="ml-2 text-xs text-gray-400">{item.sub}</span>}
-              </button>
-            )) : (
-              <p className="px-3 py-2 text-sm text-gray-400">{emptyText}</p>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function POFormPage() {
@@ -273,7 +219,6 @@ export default function POFormPage() {
     setPoNumber(po.po_number)
     setHeader({
       supplier_id: po.supplier_id ?? '',
-      category_id: po.category_id ?? '',
       location_id: po.location_id ?? '',
       department_id: po.department_id ?? '',
       payment_terms: po.payment_terms ?? '',
@@ -292,6 +237,7 @@ export default function POFormPage() {
     setLines((lineData ?? []).map(l => ({
       id: l.id,
       item_id: l.item_id,
+      category_id: l.category_id ?? '',
       position: l.position,
       name: l.name,
       long_description: l.long_description ?? '',
@@ -321,6 +267,7 @@ export default function POFormPage() {
   function applyItem(idx: number, item: Item) {
     setLine(idx, {
       item_id: item.id,
+      category_id: item.category_id ?? '',
       name: item.name,
       long_description: item.long_description ?? '',
       unit: item.default_unit ?? lines[idx].unit,
@@ -362,12 +309,12 @@ export default function POFormPage() {
 
   function validate() {
     if (!header.supplier_id) { toast.error(t.common.nameRequired); return false }
-    if (!header.category_id) { toast.error(t.common.nameRequired); return false }
     if (!header.location_id) { toast.error(t.common.nameRequired); return false }
     if (!header.payment_terms.trim()) { toast.error(t.common.nameRequired); return false }
     if (!header.expected_delivery_date) { toast.error(t.common.nameRequired); return false }
     if (lines.length === 0) { toast.error(t.po.lineItems); return false }
     if (lines.some(l => !l.name.trim())) { toast.error(t.common.lineItemsNeedName); return false }
+    if (lines.some(l => !l.category_id)) { toast.error(s.category + ' *'); return false }
     return true
   }
 
@@ -408,6 +355,7 @@ export default function POFormPage() {
     const linePayload = lines.map(l => ({
       position: l.position,
       item_id: l.item_id || null,
+      category_id: l.category_id || null,
       name: l.name,
       long_description: l.long_description || null,
       quantity: parseNum(l.quantity) || 1,
@@ -556,16 +504,6 @@ export default function POFormPage() {
             disabled={isReadOnly}
             placeholder={t.common.search + '…'}
           />
-          <SearchCombobox
-            items={categories.map(c => ({ id: c.id, name: c.name }))}
-            value={header.category_id}
-            onChange={v => setHeader(h => ({ ...h, category_id: v }))}
-            label={s.category}
-            required
-            disabled={isReadOnly}
-            placeholder={t.common.search + '…'}
-            emptyText={s.noResults}
-          />
           <Select id="location" label={s.location} required hint={locationHint} value={header.location_id} onChange={v => setHeader(h => ({ ...h, location_id: v }))}>
             {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
           </Select>
@@ -671,6 +609,7 @@ export default function POFormPage() {
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">{s.catalog}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">{s.code}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">{t.po.itemName}</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-40">{s.category} *</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">{t.po.qty}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-20">{t.po.unit}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-28">{t.po.unitPrice}</th>
@@ -703,6 +642,13 @@ export default function POFormPage() {
                       placeholder={s.descPlaceholder}
                       className="w-full text-xs border-0 bg-transparent outline-none text-gray-400 placeholder:text-placeholder focus:ring-0 mt-0.5"
                     />
+                  </td>
+                  <td className="px-4 py-2.5 pt-3">
+                    <select value={line.category_id} onChange={e => setLine(idx, { category_id: e.target.value })} disabled={isReadOnly}
+                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-ink">
+                      <option value="">{t.common.select}</option>
+                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
                   </td>
                   <td className="px-4 py-2.5 pt-3">
                     <input
@@ -743,7 +689,7 @@ export default function POFormPage() {
               ))}
               {!isReadOnly && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-2 border-t border-gray-100 text-right">
+                  <td colSpan={9} className="px-4 py-2 border-t border-gray-100 text-right">
                     <button type="button" onClick={addLine} className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover font-medium">
                       <Plus className="w-4 h-4" />{s.addLine}
                     </button>
@@ -755,7 +701,7 @@ export default function POFormPage() {
               {/* Subtotal */}
               {discountAmount > 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 pt-3 pb-1 text-right text-sm text-gray-500">
+                  <td colSpan={7} className="px-4 pt-3 pb-1 text-right text-sm text-gray-500">
                     {s.subtotal}
                   </td>
                   <td className="px-4 pt-3 pb-1 text-right text-sm text-gray-700">
@@ -766,7 +712,7 @@ export default function POFormPage() {
               )}
               {/* Discount row */}
               <tr>
-                <td colSpan={6} className="px-4 py-2 text-right text-sm text-gray-500">
+                <td colSpan={7} className="px-4 py-2 text-right text-sm text-gray-500">
                   {s.discount} (€)
                 </td>
                 <td className="px-4 py-2 text-right">
@@ -786,7 +732,7 @@ export default function POFormPage() {
               </tr>
               {/* Grand total */}
               <tr className="border-t-2 border-field">
-                <td colSpan={6} className="px-4 py-3 text-right text-sm font-bold text-gray-900">
+                <td colSpan={7} className="px-4 py-3 text-right text-sm font-bold text-gray-900">
                   {s.totalExVat}
                 </td>
                 <td className="px-4 py-3 text-right text-base font-bold text-accent-hover">

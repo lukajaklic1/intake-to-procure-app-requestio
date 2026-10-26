@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, Pencil, Trash2, Package } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, Package, Tag } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { toast } from '../components/ui/Toast'
@@ -13,7 +13,7 @@ import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Item, Category } from '../types/database'
 import { useLanguage } from '../hooks/useLanguage'
 import { poLineLocSl, poLineCountEn } from '../utils/pluralize'
-import { countByKey } from '../lib/usageCounts'
+import { countByKey, mergeUsage } from '../lib/usageCounts'
 
 interface ItemWithCategory extends Item {
   categories: { name: string } | null
@@ -21,12 +21,17 @@ interface ItemWithCategory extends Item {
 
 const EMPTY: Partial<Item> = { name: '', long_description: '', category_id: undefined, default_unit: '', default_unit_price: null, status: 'active' }
 
-export default function ItemsPage() {
+export default function CatalogPage() {
   const { company } = useCompany()
   const { t, lang } = useLanguage()
   const s = t.items
   const [items, setItems] = useState<ItemWithCategory[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
+  const [allCategories, setAllCategories] = useState<Category[]>([])
+  const [catUsage, setCatUsage] = useState<Map<string, number>>(new Map())
+  const [catModalOpen, setCatModalOpen] = useState(false)
+  const [catEditing, setCatEditing] = useState<{ id?: string; name: string; status: 'active' | 'inactive' }>({ name: '', status: 'active' })
+  const [catSaving, setCatSaving] = useState(false)
+  const [confirmDeleteCat, setConfirmDeleteCat] = useState<Category | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
@@ -57,8 +62,40 @@ export default function ItemsPage() {
 
   async function loadCategories() {
     if (!company) return
-    const { data } = await supabase.from('categories').select('*').eq('company_id', company.id).eq('status', 'active').order('name')
-    setCategories(data ?? [])
+    const [{ data }, { data: poLines }, { data: reqLines }] = await Promise.all([
+      supabase.from('categories').select('*').eq('company_id', company.id).order('name'),
+      supabase.from('po_line_items').select('category_id, purchase_orders!inner(company_id)').eq('purchase_orders.company_id', company.id),
+      supabase.from('request_line_items').select('category_id, requests!inner(company_id)').eq('requests.company_id', company.id),
+    ])
+    setAllCategories(data ?? [])
+    setCatUsage(mergeUsage(countByKey(poLines, 'category_id'), countByKey(reqLines, 'category_id')))
+  }
+
+  function openNewCategory() { setCatEditing({ name: '', status: 'active' }); setCatModalOpen(true) }
+  function openEditCategory(c: Category) { setCatEditing({ id: c.id, name: c.name, status: c.status }); setCatModalOpen(true) }
+  function closeCategoryModal() { setCatModalOpen(false); setCatEditing({ name: '', status: 'active' }) }
+
+  async function saveCategory() {
+    if (!company || !catEditing.name.trim()) { toast.error(t.common.nameRequired); return }
+    setCatSaving(true)
+    const { error } = catEditing.id
+      ? await supabase.from('categories').update({ name: catEditing.name, status: catEditing.status, updated_at: new Date().toISOString() }).eq('id', catEditing.id)
+      : await supabase.from('categories').insert({ name: catEditing.name, company_id: company.id, status: 'active' })
+    setCatSaving(false)
+    if (error) { toast.error(error.message); return }
+    toast.success(t.common.saved); closeCategoryModal(); loadCategories()
+  }
+
+  // A category is in use if any item or any request/PO line references it.
+  function categoryInUse(id: string) { return (catUsage.get(id) ?? 0) > 0 || items.some(i => i.category_id === id) }
+
+  async function handleDeleteCategory(c: Category) {
+    setActionLoading(true)
+    const { error } = await supabase.from('categories').delete().eq('id', c.id)
+    setActionLoading(false); setConfirmDeleteCat(null)
+    if (error) { toast.error(error.message); return }
+    if (categoryFilter === c.id) setCategoryFilter('all')
+    toast.success(t.common.deleted); closeCategoryModal(); loadCategories()
   }
 
   async function nextItemNumber(): Promise<string> {
@@ -73,12 +110,13 @@ export default function ItemsPage() {
     return String(isNaN(last) ? 100001 : last + 1)
   }
 
-  function openNew() { setEditing({ ...EMPTY }); setPriceStr(''); setModalOpen(true) }
+  function openNew() { setEditing({ ...EMPTY, category_id: categoryFilter !== 'all' ? categoryFilter : undefined }); setPriceStr(''); setModalOpen(true) }
   function openEdit(i: ItemWithCategory) { setEditing({ ...i }); setPriceStr(i.default_unit_price != null ? String(i.default_unit_price).replace('.', ',') : ''); setModalOpen(true) }
   function closeModal() { setModalOpen(false); setEditing(EMPTY); setPriceStr('') }
 
   async function save() {
     if (!company || !editing.name?.trim()) { toast.error(t.common.nameRequired); return }
+    if (!editing.category_id) { toast.error(t.po.category + ' *'); return }
     setSaving(true)
 
     if (editing.id) {
@@ -146,20 +184,12 @@ export default function ItemsPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar actions={<Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button>}>
+      <PageToolbar actions={<><Button variant="secondary" onClick={openNewCategory} className="gap-2"><Tag className="w-4 h-4" />{t.categories.new}</Button><Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
             className="w-full pl-9 pr-4 py-1.5 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:ring-2 focus:ring-accent bg-white text-ink placeholder:text-placeholder" />
         </div>
-        <select
-          value={categoryFilter}
-          onChange={e => setCategoryFilter(e.target.value)}
-          className="px-3 py-2 text-sm border border-field rounded-lg hover:border-field-hover bg-white focus:outline-none focus:ring-2 focus:ring-accent text-ink"
-        >
-          <option value="all">{t.filters.allCategories}</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
         {(['all', 'active', 'inactive'] as const).map(v => (
           <button key={v} onClick={() => setStatusFilter(v)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${statusFilter === v ? 'bg-ink text-white' : 'bg-white border border-field text-gray-600 hover:bg-surface'}`}>
@@ -168,8 +198,27 @@ export default function ItemsPage() {
         ))}
       </PageToolbar>
 
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
+      {/* Categories panel */}
+      <div className="w-full lg:w-60 shrink-0 bg-white rounded-lg border border-field p-2">
+        <p className="px-2.5 pt-1.5 pb-1 text-xs font-medium text-muted">{t.categories.title}</p>
+        {[{ id: 'all', name: t.filters.allCategories, count: items.length, status: 'active' as const }, ...allCategories.map(c => ({ id: c.id, name: c.name, count: items.filter(i => i.category_id === c.id).length, status: c.status }))].map(c => (
+          <div key={c.id} className={`group flex items-center rounded-lg transition-colors ${categoryFilter === c.id ? 'bg-selected' : 'hover:bg-hover'}`}>
+            <button onClick={() => setCategoryFilter(c.id)} className="flex-1 min-w-0 flex items-center gap-2 px-2.5 py-1.5 text-left">
+              <span className={`flex-1 truncate text-sm ${c.status === 'active' ? 'text-ink' : 'text-muted'}`}>{c.name}</span>
+              <span className="text-xs text-gray-400 tabular-nums">{c.count}</span>
+            </button>
+            {c.id !== 'all' && (
+              <button onClick={() => openEditCategory(allCategories.find(x => x.id === c.id)!)} className="p-1.5 mr-1 text-gray-400 hover:text-ink opacity-0 group-hover:opacity-100 transition-opacity">
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
       {/* Table */}
-      <div className="bg-white rounded-lg border border-field overflow-hidden">
+      <div className="flex-1 min-w-0 w-full bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
@@ -221,6 +270,7 @@ export default function ItemsPage() {
         )}
         <Pagination total={filtered.length} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={handlePageSizeChange} />
       </div>
+      </div>
 
       <Modal open={modalOpen} onClose={closeModal} title={editing.id ? t.common.editEntity : s.new} size="md">
         <div className="flex flex-col gap-4">
@@ -252,14 +302,14 @@ export default function ItemsPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
-              <label htmlFor="i-cat" className="text-sm font-medium text-gray-700">{t.po.category}</label>
+              <label htmlFor="i-cat" className="text-sm font-medium text-gray-700">{t.po.category} *</label>
               <select id="i-cat"
                 value={editing.category_id ?? ''}
                 onChange={e => setEditing(f => ({ ...f, category_id: e.target.value || undefined }))}
                 className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               >
-                <option value="">{s.allCategories}</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <option value="">{t.common.select}</option>
+                {allCategories.filter(c => c.status === 'active' || c.id === editing.category_id).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <Input id="i-unit" label={s.defaultUnit}
@@ -307,6 +357,42 @@ export default function ItemsPage() {
           <Button loading={saving} onClick={save}>{editing.id ? t.common.saveChanges : s.new}</Button>
         </div>
       </Modal>
+
+      <Modal open={catModalOpen} onClose={closeCategoryModal} title={catEditing.id ? t.common.editEntity : t.categories.new} size="sm">
+        <Input id="cat-name" label={t.categories.categoryName + ' *'} value={catEditing.name} onChange={e => setCatEditing(f => ({ ...f, name: e.target.value }))} />
+        {catEditing.id && (
+          <div className="flex items-center justify-between p-3 mt-4 bg-gray-50 rounded-lg border border-field">
+            <div>
+              <p className="text-sm font-medium text-gray-700">{catEditing.status === 'active' ? t.common.statusActiveF : t.common.statusInactiveF}</p>
+              <p className="text-xs text-gray-400">{t.categories.statusHelp}</p>
+            </div>
+            <button type="button" onClick={() => setCatEditing(f => ({ ...f, status: f.status === 'active' ? 'inactive' : 'active' }))}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${catEditing.status === 'active' ? 'bg-accent' : 'bg-gray-300'}`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${catEditing.status === 'active' ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+        )}
+        <div className="flex items-center gap-3 mt-5">
+          {catEditing.id && (
+            <button disabled={categoryInUse(catEditing.id)}
+              onClick={() => { const c = allCategories.find(x => x.id === catEditing.id); if (c) setConfirmDeleteCat(c) }}
+              title={categoryInUse(catEditing.id) ? `${t.common.cannotDelete} ${t.common.deactivateInstead}` : undefined}
+              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:bg-transparent">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+          <div className="flex gap-3 ml-auto">
+            <Button variant="secondary" onClick={closeCategoryModal}>{t.common.cancel}</Button>
+            <Button loading={catSaving} onClick={saveCategory}>{catEditing.id ? t.common.saveChanges : t.common.create}</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <ConfirmDialog open={!!confirmDeleteCat} onClose={() => setConfirmDeleteCat(null)}
+        onConfirm={() => confirmDeleteCat && handleDeleteCategory(confirmDeleteCat)}
+        title={t.common.deleteEntity} danger loading={actionLoading}
+        message={`${t.common.deleteEntity} "${confirmDeleteCat?.name}"? ${t.common.cannotUndo}`}
+        confirmLabel={t.common.deleteEntity} />
 
       <ConfirmDialog
         open={!!confirmDelete} onClose={() => setConfirmDelete(null)}

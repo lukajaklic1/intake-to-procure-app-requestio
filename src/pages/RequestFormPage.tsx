@@ -96,6 +96,7 @@ function Select({ id, label, value, onChange, children, placeholder, required, h
 interface Line {
   id?: string
   item_id?: string | null
+  category_id: string
   position: number
   name: string
   long_description: string
@@ -107,15 +108,14 @@ interface Line {
 interface Header {
   supplier_id: string
   supplier_name: string
-  category_id: string
   location_id: string
   department_id: string
   needed_by_date: string
   note: string
 }
 
-const EMPTY: Header = { supplier_id: '', supplier_name: '', category_id: '', location_id: '', department_id: '', needed_by_date: '', note: '' }
-function newLine(position: number): Line { return { position, item_id: null, name: '', long_description: '', quantity: '1', unit: 'kos', est_unit_price: '0' } }
+const EMPTY: Header = { supplier_id: '', supplier_name: '', location_id: '', department_id: '', needed_by_date: '', note: '' }
+function newLine(position: number): Line { return { position, item_id: null, category_id: '', name: '', long_description: '', quantity: '1', unit: 'kos', est_unit_price: '0' } }
 
 export default function RequestFormPage() {
   const { id } = useParams()
@@ -173,14 +173,14 @@ export default function RequestFormPage() {
     setReqStatus(req.status)
     setHeader({
       supplier_id: req.supplier_id ?? '', supplier_name: req.supplier_name ?? '',
-      category_id: req.category_id ?? '', location_id: req.location_id ?? '', department_id: req.department_id ?? '',
+      location_id: req.location_id ?? '', department_id: req.department_id ?? '',
       needed_by_date: req.needed_by_date ?? '', note: req.note ?? '',
     })
     setDiscount(String(req.discount_amount ?? 0))
     const { data: atts } = await supabase.from('request_attachments').select('id, file_name, file_path').eq('request_id', id!)
     setAttachments(atts ?? [])
     const { data: ls } = await supabase.from('request_line_items').select('*').eq('request_id', id!).order('position')
-    setLines((ls ?? []).map(l => ({ id: l.id, item_id: l.item_id, position: l.position, name: l.name, long_description: l.long_description ?? '', quantity: String(l.quantity), unit: l.unit, est_unit_price: String(l.est_unit_price) })))
+    setLines((ls ?? []).map(l => ({ id: l.id, item_id: l.item_id, category_id: l.category_id ?? '', position: l.position, name: l.name, long_description: l.long_description ?? '', quantity: String(l.quantity), unit: l.unit, est_unit_price: String(l.est_unit_price) })))
     setLoading(false)
   }
 
@@ -189,7 +189,7 @@ export default function RequestFormPage() {
   function removeLine(idx: number) { setLines(ls => ls.filter((_, i) => i !== idx)) }
   function applyItem(idx: number, item: Item) {
     setLine(idx, {
-      item_id: item.id, name: item.name, long_description: item.long_description ?? '',
+      item_id: item.id, category_id: item.category_id ?? '', name: item.name, long_description: item.long_description ?? '',
       unit: item.default_unit ?? lines[idx].unit,
       est_unit_price: item.default_unit_price != null ? String(item.default_unit_price).replace('.', ',') : lines[idx].est_unit_price,
     })
@@ -241,16 +241,16 @@ export default function RequestFormPage() {
     if (!company || !profile) return null
     if (!header.location_id) { toast.error(s.location + ' *'); return null }
     if (lines.length === 0 || lines.some(l => !l.name.trim())) { toast.error(s.lineItems); return null }
+    if (lines.some(l => !l.category_id)) { toast.error(s.category + ' *'); return null }
 
     const linePayload = lines.map((l, i) => ({
-      position: (i + 1) * 10, item_id: l.item_id || null, name: l.name.trim(),
+      position: (i + 1) * 10, item_id: l.item_id || null, category_id: l.category_id || null, name: l.name.trim(),
       long_description: l.long_description.trim() || null,
       quantity: parseNum(l.quantity) || 1, unit: l.unit || 'kos', est_unit_price: parseNum(l.est_unit_price),
     }))
     const reqFields = {
       supplier_id: header.supplier_id || null,
       supplier_name: header.supplier_name.trim() || null,
-      category_id: header.category_id || null,
       location_id: header.location_id || null,
       department_id: header.department_id || null,
       needed_by_date: header.needed_by_date || null,
@@ -319,7 +319,6 @@ export default function RequestFormPage() {
         <h2 className="text-sm font-semibold text-gray-700 mb-4">{t.po.orderDetails}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <SearchCombobox items={suppliers} value={header.supplier_id} onChange={v => setHeader(h => ({ ...h, supplier_id: v }))} label={s.supplier} placeholder={s.noSupplier} emptyText={s.noMatch} />
-          <SearchCombobox items={categories} value={header.category_id} onChange={v => setHeader(h => ({ ...h, category_id: v }))} label={s.category} placeholder={t.common.select} emptyText={s.noMatch} />
           <Select id="r-location" label={s.location} required hint={locationHint} value={header.location_id} onChange={v => setHeader(h => ({ ...h, location_id: v }))} placeholder={t.common.select}>
             {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
           </Select>
@@ -378,6 +377,7 @@ export default function RequestFormPage() {
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">{s.catalog}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">{s.code}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">{s.itemName}</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-40">{s.category} *</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">{s.quantity}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-20">{s.unit}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-28">{s.estUnitPrice}</th>
@@ -397,6 +397,13 @@ export default function RequestFormPage() {
                     <input value={line.long_description} onChange={e => setLine(idx, { long_description: e.target.value })} placeholder={s.descPlaceholder}
                       className="w-full text-xs border-0 bg-transparent outline-none text-gray-400 placeholder:text-placeholder focus:ring-0 mt-0.5" />
                   </td>
+                  <td className="px-4 py-2.5 pt-3">
+                    <select value={line.category_id} onChange={e => setLine(idx, { category_id: e.target.value })}
+                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-ink">
+                      <option value="">{t.common.select}</option>
+                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </td>
                   <td className="px-4 py-2.5 pt-3"><input type="text" inputMode="decimal" {...numInput(line.quantity, v => setLine(idx, { quantity: v }))} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent text-right" /></td>
                   <td className="px-4 py-2.5 pt-3"><input value={line.unit} onChange={e => setLine(idx, { unit: e.target.value })} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent" /></td>
                   <td className="px-4 py-2.5 pt-3"><input type="text" inputMode="decimal" {...numInput(line.est_unit_price, v => setLine(idx, { est_unit_price: v }))} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent text-right" /></td>
@@ -405,7 +412,7 @@ export default function RequestFormPage() {
                 </tr>
               ))}
               <tr>
-                <td colSpan={9} className="px-4 py-2 border-t border-gray-100 text-right">
+                <td colSpan={10} className="px-4 py-2 border-t border-gray-100 text-right">
                   <button type="button" onClick={addLine} className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover font-medium"><Plus className="w-4 h-4" />{s.addItem}</button>
                 </td>
               </tr>

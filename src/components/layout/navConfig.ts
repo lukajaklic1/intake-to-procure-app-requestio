@@ -1,11 +1,11 @@
 import {
   LayoutDashboard, FileText, Building2, Package,
-  Tag, MapPin, Users, UserCog, Settings,
+  MapPin, Users, UserCog, Settings,
   ClipboardList, CheckCircle2, PackageCheck,
 } from 'lucide-react'
 
 export type NavKey = 'dashboard' | 'myRequests' | 'approvals' | 'purchaseOrders' | 'receipts'
-  | 'suppliers' | 'items' | 'categories' | 'locations' | 'departments' | 'users' | 'settings'
+  | 'suppliers' | 'catalog' | 'locations' | 'departments' | 'users' | 'settings'
 
 export type SectionKey = 'sectionWorkflow' | 'sectionCatalog' | 'sectionOrganization' | 'sectionAdmin'
 
@@ -33,8 +33,7 @@ export const NAV_GROUPS: { section?: SectionKey; items: NavItem[] }[] = [
     section: 'sectionCatalog',
     items: [
       { to: '/suppliers', icon: Building2, key: 'suppliers' },
-      { to: '/items', icon: Package, key: 'items' },
-      { to: '/categories', icon: Tag, key: 'categories' },
+      { to: '/catalog', icon: Package, key: 'catalog' },
     ],
   },
   {

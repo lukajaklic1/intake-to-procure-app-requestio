@@ -10,10 +10,9 @@ import RegisterPage from './pages/RegisterPage'
 import OnboardingPage from './pages/OnboardingPage'
 import DashboardPage from './pages/DashboardPage'
 import SuppliersPage from './pages/SuppliersPage'
-import CategoriesPage from './pages/CategoriesPage'
+import CatalogPage from './pages/CatalogPage'
 import LocationsPage from './pages/LocationsPage'
 import DepartmentsPage from './pages/DepartmentsPage'
-import ItemsPage from './pages/ItemsPage'
 import PurchaseOrdersPage from './pages/PurchaseOrdersPage'
 import POFormPage from './pages/POFormPage'
 import PODetailPage from './pages/PODetailPage'
@@ -64,8 +63,7 @@ export default function Root() {
             <Route path="/purchase-orders/:id"    element={<App><PODetailPage /></App>} />
             <Route path="/purchase-orders/:id/edit" element={<App><POFormPage /></App>} />
             <Route path="/suppliers"              element={<App><SuppliersPage /></App>} />
-            <Route path="/items"                  element={<App><ItemsPage /></App>} />
-            <Route path="/categories"             element={<App><CategoriesPage /></App>} />
+            <Route path="/catalog"                element={<App><CatalogPage /></App>} />
             <Route path="/locations"              element={<App><LocationsPage /></App>} />
             <Route path="/departments"            element={<App><DepartmentsPage /></App>} />
             <Route path="/requests"               element={<App><RequestsPage /></App>} />

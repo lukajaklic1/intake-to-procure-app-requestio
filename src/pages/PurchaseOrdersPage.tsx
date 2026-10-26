@@ -12,6 +12,13 @@ import PageToolbar from '../components/layout/PageToolbar'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import { format, subMonths, startOfMonth } from 'date-fns'
 
+// Distinct line categories of a document: "Food", or "Food +2" when mixed.
+function catLabel(lines: { categories: { name: string } | null }[] | null | undefined) {
+  const names = [...new Set((lines ?? []).map(l => l.categories?.name).filter(Boolean) as string[])]
+  if (names.length === 0) return '—'
+  return names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`
+}
+
 interface PO {
   id: string
   po_number: string
@@ -22,11 +29,10 @@ interface PO {
   created_by: string
   expected_delivery_date: string | null
   supplier_id: string
-  category_id: string
   department_id: string | null
   request_id: string | null
   suppliers: { name: string } | null
-  categories: { name: string } | null
+  po_line_items: { category_id: string | null; categories: { name: string } | null }[]
   locations: { name: string } | null
 }
 
@@ -101,7 +107,7 @@ export default function PurchaseOrdersPage() {
     setLoading(true)
     const { data } = await supabase
       .from('purchase_orders')
-      .select('id, po_number, status, received_status, total_amount, created_at, created_by, expected_delivery_date, supplier_id, category_id, department_id, request_id, suppliers(name), categories(name), locations(name)')
+      .select('id, po_number, status, received_status, total_amount, created_at, created_by, expected_delivery_date, supplier_id, department_id, request_id, suppliers(name), po_line_items(category_id, categories(name)), locations(name)')
       .eq('company_id', company.id)
       .order('created_at', { ascending: false })
     const list = (data as unknown as PO[]) ?? []
@@ -143,7 +149,7 @@ export default function PurchaseOrdersPage() {
     if (status !== 'all' && po.status !== status) return false
     if (dateFrom && po.created_at < dateFrom) return false
     if (supplierId && po.supplier_id !== supplierId) return false
-    if (categoryId && po.category_id !== categoryId) return false
+    if (categoryId && !po.po_line_items?.some(l => l.category_id === categoryId)) return false
     if (departmentId && po.department_id !== departmentId) return false
     if (creatorId && po.created_by !== creatorId) return false
     return true
@@ -240,7 +246,7 @@ export default function PurchaseOrdersPage() {
                   </td>
                   <td className="px-4 py-3 font-medium text-ink">{po.suppliers?.name ?? '—'}</td>
                   <td className="px-4 py-3 text-ink2">{po.locations?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{po.categories?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{catLabel(po.po_line_items)}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
                     {po.expected_delivery_date ? format(new Date(po.expected_delivery_date), 'dd.MM.yyyy') : '—'}
                   </td>
