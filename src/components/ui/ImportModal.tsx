@@ -31,11 +31,16 @@ interface ImportModalProps {
   onImport: (rows: ImportRow[]) => Promise<void>
 }
 
+interface PreviewRow { line: number; data: ImportRow; status: 'new' | 'exists' | 'error'; message?: string }
+
 interface Parsed {
   valid: ImportRow[]
   duplicates: number
   errors: { line: number; message: string }[]
+  preview: PreviewRow[]   // every data row of the file, with what will happen to it
 }
+
+const EMPTY: Parsed = { valid: [], duplicates: 0, errors: [], preview: [] }
 
 const cell = (v: unknown) => (v == null ? '' : String(v).trim())
 
@@ -61,32 +66,33 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
     setFileName(file.name)
     try {
       const rows = await readSheet(file)
-      if (rows.length < 2) { setParsed({ valid: [], duplicates: 0, errors: [{ line: 0, message: s.noRows }] }); return }
+      if (rows.length < 2) { setParsed({ ...EMPTY, errors: [{ line: 0, message: s.noRows }] }); return }
       const norm = (v: unknown) => cell(v).replace(/\*/g, '').trim().toLowerCase()
       const headers = rows[0].map(norm)
       const idx = columns.map(c => headers.findIndex(h => h === c.label.toLowerCase() || h === c.key.toLowerCase()))
       const missing = columns.filter((c, i) => c.required && idx[i] < 0)
-      if (missing.length) { setParsed({ valid: [], duplicates: 0, errors: [{ line: 1, message: `${s.missingColumn}: ${missing.map(c => c.label).join(', ')}` }] }); return }
+      if (missing.length) { setParsed({ ...EMPTY, errors: [{ line: 1, message: `${s.missingColumn}: ${missing.map(c => c.label).join(', ')}` }] }); return }
 
       const seen = new Set(existing)
-      const out: Parsed = { valid: [], duplicates: 0, errors: [] }
+      const out: Parsed = { valid: [], duplicates: 0, errors: [], preview: [] }
       rows.slice(1).forEach((r, i) => {
         const line = i + 2
         if (r.every(v => cell(v) === '')) return
         const row: ImportRow = {}
         columns.forEach((c, ci) => { row[c.key] = idx[ci] >= 0 ? cell(r[idx[ci]]) : '' })
         const empty = columns.find(c => c.required && !row[c.key])
-        if (empty) { out.errors.push({ line, message: `${s.missingValue}: ${empty.label}` }); return }
+        if (empty) { const message = `${s.missingValue}: ${empty.label}`; out.errors.push({ line, message }); out.preview.push({ line, data: row, status: 'error', message }); return }
         const err = validate?.(row)
-        if (err) { out.errors.push({ line, message: err }); return }
+        if (err) { out.errors.push({ line, message: err }); out.preview.push({ line, data: row, status: 'error', message: err }); return }
         const key = keyOf(row)
-        if (seen.has(key)) { out.duplicates++; return }
+        if (seen.has(key)) { out.duplicates++; out.preview.push({ line, data: row, status: 'exists' }); return }
         seen.add(key)
         out.valid.push(row)
+        out.preview.push({ line, data: row, status: 'new' })
       })
       setParsed(out)
     } catch {
-      setParsed({ valid: [], duplicates: 0, errors: [{ line: 0, message: s.badFile }] })
+      setParsed({ ...EMPTY, errors: [{ line: 0, message: s.badFile }] })
     }
   }
 
@@ -126,10 +132,36 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
             {parsed.duplicates > 0 && <span className="badge badge-neutral">{s.skipped}: {parsed.duplicates}</span>}
             {parsed.errors.length > 0 && <span className="badge badge-danger">{s.errors}: {parsed.errors.length}</span>}
           </div>
-          {parsed.errors.slice(0, 6).map((e, i) => (
+          {parsed.preview.length === 0 && parsed.errors.map((e, i) => (
             <p key={i} className="text-xs text-danger">{e.line > 0 ? `${s.row} ${e.line}: ` : ''}{e.message}</p>
           ))}
-          {parsed.errors.length > 6 && <p className="text-xs text-gray-400">… +{parsed.errors.length - 6}</p>}
+        </div>
+      )}
+
+      {parsed && parsed.preview.length > 0 && (
+        <div className="rounded-lg border border-field mb-4 overflow-auto max-h-72">
+          <table className="w-full text-sm">
+            <thead className="bg-surface border-b border-field sticky top-0">
+              <tr>
+                <th className="text-left px-3 py-2 text-xs font-medium text-ink2 w-10">#</th>
+                {columns.map(c => <th key={c.key} className="text-left px-3 py-2 text-xs font-medium text-ink2 whitespace-nowrap">{c.label}</th>)}
+                <th className="text-left px-3 py-2 text-xs font-medium text-ink2 whitespace-nowrap"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-field">
+              {parsed.preview.map(p => (
+                <tr key={p.line} className={p.status === 'new' ? '' : 'bg-surface'}>
+                  <td className="px-3 py-2 text-xs text-gray-400 tabular-nums">{p.line}</td>
+                  {columns.map(c => <td key={c.key} className={`px-3 py-2 max-w-[180px] truncate ${p.status === 'new' ? 'text-ink' : 'text-muted'}`} title={p.data[c.key]}>{p.data[c.key] || '—'}</td>)}
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {p.status === 'new' && <span className="badge badge-success">{s.statusNew}</span>}
+                    {p.status === 'exists' && <span className="badge badge-neutral">{s.statusExists}</span>}
+                    {p.status === 'error' && <span className="badge badge-danger" title={p.message}>{p.message ?? s.statusError}</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
