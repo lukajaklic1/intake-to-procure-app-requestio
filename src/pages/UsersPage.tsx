@@ -4,6 +4,7 @@ import { Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
+import { useRequired } from '../lib/useRequired'
 import { toast } from '../components/ui/Toast'
 import Modal from '../components/ui/Modal'
 import Button from '../components/ui/Button'
@@ -82,6 +83,8 @@ export default function UsersPage() {
   // Invite modal
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inv, setInv] = useState({ first_name: '', last_name: '', email: '', department_id: '', job_title: '' })
+  const invReq = useRequired(t.common.fieldRequired)
+  const editReq = useRequired(t.common.fieldRequired)
   const [inviteAsAdmin, setInviteAsAdmin] = useState(false)
   const [invitePerms, setInvitePerms] = useState<PermMap>(emptyPerms())
   const [sentTo, setSentTo] = useState<string | null>(null)
@@ -124,6 +127,7 @@ export default function UsersPage() {
 
   // ── Invite ──
   function openInvite() {
+    invReq.reset()
     setInv({ first_name: '', last_name: '', email: '', department_id: '', job_title: '' })
     setInviteAsAdmin(false); setInvitePerms(emptyPerms()); setSentTo(null); setInviteOpen(true)
   }
@@ -133,7 +137,9 @@ export default function UsersPage() {
   }
 
   async function sendInvite() {
-    if (!company || !inv.email.trim() || !inv.first_name.trim() || !inv.last_name.trim()) return
+    if (!company) return
+    if (!invReq.check(inv, ['first_name', 'last_name', 'email'], { first_name: 'inv-first', last_name: 'inv-last', email: 'inv-email' })) return
+    if (!/^\S+@\S+\.\S+$/.test(inv.email.trim())) { invReq.setError('email', t.common.import.invalidEmail, 'inv-email'); return }
     setInviting(true)
     const email = inv.email.trim()
     const permissions = MODULES.map(module => ({ module, ...invitePerms[module] }))
@@ -167,6 +173,7 @@ export default function UsersPage() {
 
   // ── Edit user ──
   function openEdit(u: AppUser) {
+    editReq.reset()
     const base = emptyPerms()
     for (const m of MODULES) {
       const p = permsByUser[u.id]?.[m]
@@ -186,7 +193,7 @@ export default function UsersPage() {
 
   async function saveUser() {
     if (!editUser) return
-    if (!editForm.first_name.trim() || !editForm.last_name.trim()) return
+    if (!editReq.check(editForm, ['first_name', 'last_name'], { first_name: 'edit-first', last_name: 'edit-last' })) return
     setSavingPerms(true)
     const { error: uErr } = await supabase.from('users').update({
       first_name: editForm.first_name.trim(),
@@ -302,10 +309,10 @@ export default function UsersPage() {
         ) : (
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input id="inv-first" label={s.firstName} value={inv.first_name} onChange={e => setInv(v => ({ ...v, first_name: e.target.value }))} />
-              <Input id="inv-last" label={s.lastName} value={inv.last_name} onChange={e => setInv(v => ({ ...v, last_name: e.target.value }))} />
+              <Input id="inv-first" label={s.firstName + ' *'} value={inv.first_name} error={invReq.errors.first_name} onChange={e => { invReq.clear('first_name'); setInv(v => ({ ...v, first_name: e.target.value })) }} />
+              <Input id="inv-last" label={s.lastName + ' *'} value={inv.last_name} error={invReq.errors.last_name} onChange={e => { invReq.clear('last_name'); setInv(v => ({ ...v, last_name: e.target.value })) }} />
               <div className="col-span-1 sm:col-span-2">
-                <Input id="inv-email" label={s.inviteEmail} type="email" value={inv.email} onChange={e => setInv(v => ({ ...v, email: e.target.value }))} />
+                <Input id="inv-email" label={s.inviteEmail + ' *'} type="email" value={inv.email} error={invReq.errors.email} onChange={e => { invReq.clear('email'); setInv(v => ({ ...v, email: e.target.value })) }} />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-gray-700">{s.department}</label>
@@ -346,8 +353,8 @@ export default function UsersPage() {
       <Modal open={!!editUser} onClose={() => setEditUser(null)} title={`${s.permissionsFor} ${editUser?.first_name ?? ''} ${editUser?.last_name ?? ''}`} size="lg">
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input id="edit-first" label={s.firstName} value={editForm.first_name} onChange={e => setEditForm(v => ({ ...v, first_name: e.target.value }))} />
-            <Input id="edit-last" label={s.lastName} value={editForm.last_name} onChange={e => setEditForm(v => ({ ...v, last_name: e.target.value }))} />
+            <Input id="edit-first" label={s.firstName + ' *'} value={editForm.first_name} error={editReq.errors.first_name} onChange={e => { editReq.clear('first_name'); setEditForm(v => ({ ...v, first_name: e.target.value })) }} />
+            <Input id="edit-last" label={s.lastName + ' *'} value={editForm.last_name} error={editReq.errors.last_name} onChange={e => { editReq.clear('last_name'); setEditForm(v => ({ ...v, last_name: e.target.value })) }} />
             <div className="col-span-1 sm:col-span-2 flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700">{t.common.email}</label>
               <input value={editUser?.email ?? ''} disabled

@@ -29,5 +29,11 @@ export function useRequired(message: string) {
 
   function reset() { setErrors({}) }
 
-  return { errors, check, clear, reset }
+  /** Mark a single field invalid with a custom message (e.g. bad email format). */
+  function setError(key: string, msg: string, id?: string) {
+    setErrors(e => ({ ...e, [key]: msg }))
+    setTimeout(() => document.getElementById(id ?? key)?.focus(), 0)
+  }
+
+  return { errors, check, clear, reset, setError }
 }
