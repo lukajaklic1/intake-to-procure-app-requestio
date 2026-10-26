@@ -26,7 +26,7 @@ export default function Pagination({ total, page, pageSize, onChange, onPageSize
   const to = Math.min(safePage * pageSize, total)
 
   return (
-    <div ref={rootRef} className="flex items-center px-4 py-2 border-t border-field bg-surface">
+    <div ref={rootRef} data-pagination className="flex items-center px-4 py-2 border-t border-field bg-surface">
       <div className="flex items-center gap-2 text-sm text-ink2">
         <span>{t.common.show}</span>
         {onPageSizeChange ? (

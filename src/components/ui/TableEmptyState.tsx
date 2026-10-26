@@ -11,7 +11,7 @@ export default function TableEmptyState({ icon: Icon, colSpan, subtitle, action 
   const { t } = useLanguage()
   return (
     <tr>
-      <td colSpan={colSpan} className="py-16">
+      <td colSpan={colSpan} data-empty className="py-16">
         <div className="flex flex-col items-center justify-center text-center gap-3">
           <div className="w-9 h-9 rounded-lg border border-field flex items-center justify-center shrink-0">
             <Icon className="w-4 h-4 text-gray-400" />

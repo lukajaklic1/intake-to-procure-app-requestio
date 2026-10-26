@@ -223,7 +223,7 @@ export default function UsersPage() {
     <div className="p-4 lg:p-6">
       <PageToolbar actions={<Button onClick={openInvite} className="gap-2"><Plus className="w-4 h-4" />{s.addUser}</Button>} />
 
-      <div className="bg-white rounded-lg border border-field overflow-hidden">
+      <div className="data-card bg-white rounded-lg border border-field overflow-hidden">
         {dataLoading ? (
           <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (

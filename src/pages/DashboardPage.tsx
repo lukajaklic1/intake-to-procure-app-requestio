@@ -133,7 +133,7 @@ function BreakdownTable({ rows, currency }: { rows: BreakdownRow[]; currency: st
   ]
 
   return (
-    <div className="-mx-5 -mb-5 border-t border-field">
+    <div className="data-flat -mx-5 -mb-5 border-t border-field">
       <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
         <thead className="bg-surface border-b border-field">
           <tr>

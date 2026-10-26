@@ -218,7 +218,7 @@ export default function CatalogPage() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 min-w-0 w-full bg-white rounded-lg border border-field overflow-hidden">
+      <div className="flex-1 min-w-0 w-full data-card bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (

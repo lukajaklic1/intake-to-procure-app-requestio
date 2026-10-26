@@ -136,7 +136,7 @@ export default function ReceiptsPage() {
       {loading ? (
         <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
       ) : tab === 'queue' ? (
-        <div className="bg-white rounded-lg border border-field overflow-hidden">
+        <div className="data-card bg-white rounded-lg border border-field overflow-hidden">
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
               <thead className="bg-surface border-b border-field"><tr>
                 {[t.po.poNumber, t.po.supplier, t.po.total, t.common.status, ''].map((h, i) => (
@@ -163,7 +163,7 @@ export default function ReceiptsPage() {
         </div>
       ) : (
         <div>
-          <div className="bg-white rounded-lg border border-field overflow-hidden">
+          <div className="data-card bg-white rounded-lg border border-field overflow-hidden">
             <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
                 <thead className="bg-surface border-b border-field"><tr>
                   {[s.receiptNumber, t.po.title, t.po.supplier, s.receivedDate, s.receivedBy, ''].map((h, i) => (

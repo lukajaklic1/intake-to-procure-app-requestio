@@ -9,3 +9,22 @@ body {
   font-family: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Minimal empty state: when a table card has no rows, drop the card chrome
+   (border, header, footer) and show just the message with a line below it. */
+.data-card:has([data-empty]),
+.data-flat:has([data-empty]) {
+  background: transparent;
+  border-radius: 0;
+  border-width: 0;
+}
+.data-card:has([data-empty]) {
+  border-bottom-width: 1px;
+  border-color: var(--color-line);
+}
+.data-card:has([data-empty]) thead,
+.data-card:has([data-empty]) [data-pagination],
+.data-flat:has([data-empty]) thead,
+.data-flat:has([data-empty]) [data-pagination] {
+  display: none;
+}
