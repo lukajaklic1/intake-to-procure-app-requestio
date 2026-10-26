@@ -13,12 +13,12 @@ import { format } from 'date-fns'
 import type { Request, RequestLineItem, RequestStatus, Approval, ActivityLog } from '../types/database'
 
 const STATUS_BADGE: Record<string, string> = {
-  draft: 'bg-selected text-ink2',
-  pending: 'bg-warn-light text-warn',
-  approved: 'bg-success-light text-success',
-  rejected: 'bg-danger-light text-danger',
-  cancelled: 'bg-selected text-muted',
-  completed: 'bg-accent-light text-accent-hover',
+  draft: 'badge-neutral',
+  pending: 'badge-warn',
+  approved: 'badge-success',
+  rejected: 'badge-danger',
+  cancelled: 'badge-neutral',
+  completed: 'badge-info',
 }
 
 type ReqFull = Request & {
@@ -184,7 +184,7 @@ export default function RequestDetailPage() {
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-900 ">{req.request_number}</h1>
-          <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[st]}`}>{s.st[st]}</span>
+          <span className={`badge ${STATUS_BADGE[st]}`}>{s.st[st]}</span>
         </div>
         <div className="flex items-center gap-2">
           {st === 'approved' && !req.po_id && (hasPerm('purchase_orders', 'create') || isAdmin) && (

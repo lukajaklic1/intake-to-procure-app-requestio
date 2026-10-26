@@ -133,7 +133,7 @@ export default function LocationsPage() {
                   <td className="px-4 py-3 text-ink2">{l.address_city ?? '—'}</td>
                   <td className="px-4 py-3 text-ink2">{l.address_country ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${l.status === 'active' ? 'bg-success-light text-success' : 'bg-selected text-muted'}`}>{l.status === 'active' ? t.common.activeF : t.common.inactiveF}</span>
+                    <span className={`badge ${l.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>{l.status === 'active' ? t.common.activeF : t.common.inactiveF}</span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">

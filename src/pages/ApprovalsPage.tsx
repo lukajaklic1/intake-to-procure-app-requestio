@@ -155,7 +155,7 @@ export default function ApprovalsPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end">
                       <Link to={`/requests/${r.id}`} onClick={e => e.stopPropagation()}
-                        className="text-xs font-medium text-warn bg-warn-light hover:brightness-95 rounded-full px-2 py-0.5 transition-all whitespace-nowrap">
+                        className="badge badge-warn hover:brightness-95 transition-all whitespace-nowrap">
                         {a.review}
                       </Link>
                     </div>

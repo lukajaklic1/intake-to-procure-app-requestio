@@ -35,11 +35,11 @@ interface POFull {
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  draft: 'bg-selected text-ink2',
-  issued: 'bg-warn-light text-warn',
-  sent: 'bg-accent-light text-accent-hover',
-  closed: 'bg-success-light text-success',
-  cancelled: 'bg-danger-light text-danger',
+  draft: 'badge-neutral',
+  issued: 'badge-warn',
+  sent: 'badge-info',
+  closed: 'badge-success',
+  cancelled: 'badge-danger',
 }
 
 function Field({ label, value }: { label: string; value?: string | null }) {
@@ -205,10 +205,10 @@ export default function PODetailPage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-2xl font-bold text-gray-900 ">{po.po_number}</h1>
                 {po.status === 'sent' && po.received_status === 'partial'
-                  ? <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-warn-light text-warn">{t.receipts.rsPartial}</span>
+                  ? <span className="badge badge-warn">{t.receipts.rsPartial}</span>
                   : po.status === 'closed' && po.received_status !== 'full'
-                  ? <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-accent-light text-accent-hover">{t.po.statusFinalized}</span>
-                  : <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${STATUS_BADGE[po.status]}`}>{t.status[po.status as keyof typeof t.status] ?? po.status}</span>}
+                  ? <span className="badge badge-info">{t.po.statusFinalized}</span>
+                  : <span className={`badge capitalize ${STATUS_BADGE[po.status]}`}>{t.status[po.status as keyof typeof t.status] ?? po.status}</span>}
               </div>
               <p className="text-xs text-gray-400 mt-0.5">{t.common.created}: {format(new Date(po.created_at), 'dd.MM.yyyy')}</p>
             </div>

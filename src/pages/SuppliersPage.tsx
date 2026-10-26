@@ -145,7 +145,7 @@ export default function SuppliersPage() {
                   <td className="px-4 py-3 text-ink2">{s.phone ?? '—'}</td>
                   <td className="px-4 py-3 text-ink2">{s.payment_terms ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.status === 'active' ? 'bg-success-light text-success' : 'bg-selected text-muted'}`}>{s.status === 'active' ? t.common.active : t.common.inactive}
+                    <span className={`badge ${s.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>{s.status === 'active' ? t.common.active : t.common.inactive}
                     </span>
                   </td>
                   <td className="px-4 py-3">

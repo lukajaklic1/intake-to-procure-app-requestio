@@ -118,7 +118,7 @@ export default function DepartmentsPage() {
                 <tr key={d.id} className="hover:bg-surface transition-colors">
                   <td className="px-4 py-3 font-medium text-ink">{d.name}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${d.status === 'active' ? 'bg-success-light text-success' : 'bg-selected text-muted'}`}>{d.status === 'active' ? t.common.active : t.common.inactive}</span>
+                    <span className={`badge ${d.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>{d.status === 'active' ? t.common.active : t.common.inactive}</span>
                   </td>
                   <td className="px-4 py-3 text-gray-400 text-xs">{new Date(d.created_at).toLocaleDateString('de-DE')}</td>
                   <td className="px-4 py-3">

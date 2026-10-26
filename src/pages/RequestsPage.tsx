@@ -12,12 +12,12 @@ import { format, subMonths, startOfMonth } from 'date-fns'
 import type { RequestStatus } from '../types/database'
 
 const STATUS_BADGE: Record<string, string> = {
-  draft: 'bg-selected text-ink2',
-  pending: 'bg-warn-light text-warn',
-  approved: 'bg-success-light text-success',
-  rejected: 'bg-danger-light text-danger',
-  cancelled: 'bg-selected text-muted',
-  completed: 'bg-accent-light text-accent-hover',
+  draft: 'badge-neutral',
+  pending: 'badge-warn',
+  approved: 'badge-success',
+  rejected: 'badge-danger',
+  cancelled: 'badge-neutral',
+  completed: 'badge-info',
 }
 
 const STATUSES: RequestStatus[] = ['draft', 'pending', 'approved', 'rejected', 'cancelled', 'completed']
@@ -231,7 +231,7 @@ export default function RequestsPage() {
                   <td className="px-4 py-3 text-ink2">{names[r.created_by] ?? '—'}</td>
                   <td className="px-4 py-3 font-medium text-ink whitespace-nowrap">{fmt(r.total_estimate ?? 0, company?.currency)}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[r.status]}`}>{s.st[r.status]}</span>
+                    <span className={`badge ${STATUS_BADGE[r.status]}`}>{s.st[r.status]}</span>
                     {r.status === 'pending' && r.approver_id && names[r.approver_id] && (
                       <p className="text-xs text-gray-400 mt-1">{names[r.approver_id]}</p>
                     )}
@@ -249,11 +249,11 @@ export default function RequestsPage() {
                           </>)
                       : r.status === 'approved' && (hasPerm('purchase_orders', 'create') || isAdmin)
                         ? <button onClick={e => { e.stopPropagation(); navigate(`/requests/${r.id}`) }}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-warn bg-warn-light hover:brightness-95 rounded-full px-2 py-0.5 transition-all whitespace-nowrap">
+                            className="inline-flex items-center gap-1 badge badge-warn hover:brightness-95 transition-all whitespace-nowrap">
                             <Plus className="w-3 h-3" />{t.requests.createPO}
                           </button>
                         : r.status === 'approved'
-                          ? <span className="text-xs font-medium text-ink2 bg-selected rounded-full px-2 py-0.5 whitespace-nowrap">{t.requests.pendingPO}</span>
+                          ? <span className="badge badge-neutral">{t.requests.pendingPO}</span>
                           : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3">

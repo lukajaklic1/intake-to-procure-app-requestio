@@ -11,9 +11,9 @@ import TableEmptyState from '../components/ui/TableEmptyState'
 import { format, subMonths, startOfMonth } from 'date-fns'
 
 const RS_BADGE: Record<string, string> = {
-  none: 'bg-selected text-ink2',
-  partial: 'bg-warn-light text-warn',
-  full: 'bg-success-light text-success',
+  none: 'badge-neutral',
+  partial: 'badge-warn',
+  full: 'badge-success',
 }
 
 interface QueueRow {
@@ -151,7 +151,7 @@ export default function ReceiptsPage() {
                     <td className="px-4 py-3"><Link to={`/purchase-orders/${po.id}`} className=" text-sm font-medium text-gray-400 hover:text-gray-600">{po.po_number}</Link></td>
                     <td className="px-4 py-3 text-ink2">{po.suppliers?.name ?? '—'}</td>
                     <td className="px-4 py-3 font-medium text-ink">{fmt(po.total_amount ?? 0, company?.currency)}</td>
-                    <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${RS_BADGE[po.received_status]}`}>{po.received_status === 'partial' ? s.rsPartial : s.rsNone}</span></td>
+                    <td className="px-4 py-3"><span className={`badge ${RS_BADGE[po.received_status]}`}>{po.received_status === 'partial' ? s.rsPartial : s.rsNone}</span></td>
                     <td className="px-4 py-3 text-right">
                       <Button onClick={() => navigate(`/receive/${po.id}`)} className="gap-1.5"><PackageCheck className="w-3.5 h-3.5" />{s.receive}</Button>
                     </td>

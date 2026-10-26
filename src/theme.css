@@ -47,6 +47,13 @@
 
   /* User avatar (sidebar, bottom) */
   --color-user: #f26a1b;
+  /* Badges (colors from Carboniqdesk): background, border, text */
+  --badge-success-bg: #e0fced;  --badge-success-border: #d4f8e6;  --badge-success-text: #098259;
+  --badge-warn-bg:    #fff3bf;  --badge-warn-border:    #ffe066;  --badge-warn-text:    #e67700;
+  --badge-neutral-bg: #f1f3f5;  --badge-neutral-border: #e9ecef;  --badge-neutral-text: #868e96;
+  --badge-info-bg:    #e5eeff;  --badge-info-border:    #d6e5ff;  --badge-info-text:    #215bcf;
+  --badge-danger-bg:  #ffe3e3;  --badge-danger-border:  #ffc9c9;  --badge-danger-text:  #e03131;
+  --badge-purple-bg:  #f3e8ff;  --badge-purple-border:  #e9d5ff;  --badge-purple-text:  #7c3aed;
 
   /* Company avatar */
   --color-company: #7c3aed;

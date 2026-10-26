@@ -249,7 +249,7 @@ export default function CatalogPage() {
                   <td className="px-4 py-3 text-ink2">{item.default_unit ?? '—'}</td>
                   <td className="px-4 py-3 text-ink2">{item.default_unit_price != null ? `${item.default_unit_price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '—'}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.status === 'active' ? 'bg-success-light text-success' : 'bg-selected text-muted'}`}>{item.status === 'active' ? t.common.active : t.common.inactive}
+                    <span className={`badge ${item.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>{item.status === 'active' ? t.common.active : t.common.inactive}
                     </span>
                   </td>
                   <td className="px-4 py-3">

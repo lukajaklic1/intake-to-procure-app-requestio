@@ -37,11 +37,11 @@ interface PO {
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  draft:     'bg-selected text-ink2',
-  issued:    'bg-warn-light text-warn',
-  sent:      'bg-accent-light text-accent-hover',
-  closed:    'bg-success-light text-success',
-  cancelled: 'bg-danger-light text-danger',
+  draft:     'badge-neutral',
+  issued:    'badge-warn',
+  sent:      'badge-info',
+  closed:    'badge-success',
+  cancelled: 'badge-danger',
 }
 
 // Date options are rendered inline with t.filters.*
@@ -253,10 +253,10 @@ export default function PurchaseOrdersPage() {
                   <td className="px-4 py-3 font-medium text-ink">{fmt(po.total_amount ?? 0, company?.currency)}</td>
                   <td className="px-4 py-3">
                     {po.status === 'sent' && po.received_status === 'partial'
-                      ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-warn-light text-warn">{t.receipts.rsPartial}</span>
+                      ? <span className="badge badge-warn">{t.receipts.rsPartial}</span>
                       : po.status === 'closed' && po.received_status !== 'full'
-                      ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-accent-light text-accent-hover">{t.po.statusFinalized}</span>
-                      : <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_BADGE[po.status] ?? 'bg-selected text-ink2'}`}>
+                      ? <span className="badge badge-info">{t.po.statusFinalized}</span>
+                      : <span className={`badge capitalize ${STATUS_BADGE[po.status] ?? 'badge-neutral'}`}>
                           {t.status[po.status as keyof typeof t.status] ?? po.status}
                         </span>}
                   </td>

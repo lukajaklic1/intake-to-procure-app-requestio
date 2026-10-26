@@ -246,12 +246,12 @@ export default function UsersPage() {
                   <td className="px-4 py-3 text-ink2">{deptName(u.department_id)}</td>
                   <td className="px-4 py-3 text-ink2">{u.job_title ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.is_admin ? 'bg-accent-light text-accent-hover' : 'bg-selected text-ink2'}`}>
+                    <span className={`badge ${u.is_admin ? 'badge-info' : 'badge-neutral'}`}>
                       {u.is_admin ? s.admin : s.member}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-success-light text-success">{t.common.active}</span>
+                    <span className="badge badge-success">{t.common.active}</span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">
@@ -268,12 +268,12 @@ export default function UsersPage() {
                   <td className="px-4 py-3 text-ink2">{deptName(invite.department_id)}</td>
                   <td className="px-4 py-3 text-ink2">{invite.job_title ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${invite.is_admin ? 'bg-accent-light text-accent-hover' : 'bg-selected text-ink2'}`}>
+                    <span className={`badge ${invite.is_admin ? 'badge-info' : 'badge-neutral'}`}>
                       {invite.is_admin ? s.admin : s.member}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-warn-light text-warn">{s.invited}</span>
+                    <span className="badge badge-warn">{s.invited}</span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">
