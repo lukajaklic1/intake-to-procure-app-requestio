@@ -224,7 +224,7 @@ export default function CatalogPage() {
     setCollapsed(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
   }
 
-  useHeaderCounts(loading ? [] : [{ label: t.categories.title, value: allCategories.length }, { label: t.nav.items, value: filteredItems.length }])
+  useHeaderCounts(loading ? [] : [{ label: t.categories.title, value: allCategories.filter(c => !c.parent_id).length }, { label: t.categories.subcategories, value: allCategories.filter(c => c.parent_id).length }, { label: t.nav.items, value: filteredItems.length }])
 
   return (
     <div className="p-4 lg:p-6">

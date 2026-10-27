@@ -409,6 +409,7 @@ export const translations = {
       addSub: 'Add subcategory',
       addItem: 'Add item',
       subcategory: 'Subcategory',
+      subcategories: 'Subcategories',
     },
 
     // Projects
@@ -1165,6 +1166,7 @@ export const translations = {
       addSub: 'Dodaj podkategorijo',
       addItem: 'Dodaj artikel',
       subcategory: 'Podkategorija',
+      subcategories: 'Podkategorije',
     },
 
     // Projects
