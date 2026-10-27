@@ -45,21 +45,21 @@ export default function RegisterPage() {
               <label className="text-sm font-medium text-gray-700">{a.email}</label>
               <input type="email" required autoComplete="email"
                 value={email} onChange={e => setEmail(e.target.value)}
-                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus"
                 placeholder="you@company.com" />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700">{a.password}</label>
               <input type="password" required autoComplete="new-password"
                 value={password} onChange={e => setPassword(e.target.value)}
-                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus"
                 placeholder={lang === 'sl' ? 'Vsaj 8 znakov' : 'Min. 8 characters'} />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700">{a.confirmPassword}</label>
               <input type="password" required autoComplete="new-password"
                 value={confirm} onChange={e => setConfirm(e.target.value)}
-                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus"
                 placeholder="••••••••" />
             </div>
 

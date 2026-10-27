@@ -65,7 +65,7 @@ export default function OnboardingPage() {
                 <div className="flex flex-col gap-1 mb-6">
                   <label className="text-sm font-medium text-gray-700">{o.companyName}</label>
                   <input type="text" required value={companyName} onChange={e => setCompanyName(e.target.value)}
-                    className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus"
                     placeholder="Acme d.o.o." />
                 </div>
                 <button type="button" disabled={!companyName.trim()} onClick={() => setStep('profile')}
@@ -88,13 +88,13 @@ export default function OnboardingPage() {
                   <div className="flex flex-col gap-1">
                     <label className="text-sm font-medium text-gray-700">{o.firstName}</label>
                     <input type="text" required value={firstName} onChange={e => setFirstName(e.target.value)}
-                      className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                      className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus"
                       placeholder="Janez" />
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-sm font-medium text-gray-700">{o.lastName}</label>
                     <input type="text" required value={lastName} onChange={e => setLastName(e.target.value)}
-                      className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                      className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus"
                       placeholder="Novak" />
                   </div>
                 </div>

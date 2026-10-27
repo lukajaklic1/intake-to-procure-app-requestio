@@ -45,7 +45,7 @@ export default function SearchSelect({ id, label, required, error, value, onChan
             if (e.key === 'Escape') setOpen(false)
           }}
           autoComplete="off"
-          className={`w-full rounded-lg border px-3 py-2 pr-8 text-sm text-ink placeholder:text-placeholder focus:outline-none focus:ring-2 bg-white ${error ? 'border-red-400 focus:ring-red-400' : 'border-field hover:border-field-hover focus:ring-accent'}`} />
+          className={`w-full rounded-lg border px-3 py-2 pr-8 text-sm text-ink placeholder:text-placeholder focus:outline-none bg-white ${error ? 'border-red-400' : 'border-field hover:border-field-hover focus:border-field-focus'}`} />
         <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         {open && (
           <div className="absolute z-30 left-0 mt-1 w-full bg-white border border-field rounded-lg shadow-lg overflow-y-auto max-h-56">

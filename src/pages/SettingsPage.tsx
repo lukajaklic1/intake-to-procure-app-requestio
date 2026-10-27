@@ -139,7 +139,7 @@ export default function SettingsPage() {
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-ink2">{s.currency}</label>
               <select value={form.currency ?? 'EUR'} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}
-                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent">
+                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus">
                 {CURRENCIES.map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
@@ -170,7 +170,7 @@ export default function SettingsPage() {
                 <label className="text-sm font-medium text-ink2">{s.secondApprover}</label>
                 <select value={form.second_approver_id ?? ''}
                   onChange={e => setForm(f => ({ ...f, second_approver_id: e.target.value || null }))}
-                  className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent bg-white">
+                  className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus bg-white">
                   <option value="">{s.selectApprover}</option>
                   {members.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
                 </select>

@@ -39,7 +39,7 @@ export default function Pagination({ total, page, pageSize, onChange, onPageSize
             <span className="hidden sm:inline">{t.common.show}</span>
             <span className="relative">
               <select value={pageSize} onChange={e => onPageSizeChange(Number(e.target.value))}
-                className="appearance-none h-7 rounded-md border border-field bg-white pl-2.5 pr-7 text-sm text-ink hover:border-field-hover focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer">
+                className="appearance-none h-7 rounded-md border border-field bg-white pl-2.5 pr-7 text-sm text-ink hover:border-field-hover focus:outline-none focus:border-field-focus cursor-pointer">
                 {pageSizeOptions.map(n => <option key={n} value={n}>{n}</option>)}
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />

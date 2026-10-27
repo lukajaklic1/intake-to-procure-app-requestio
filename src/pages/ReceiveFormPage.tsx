@@ -115,7 +115,7 @@ export default function ReceiveFormPage() {
         <div className="mt-4 flex flex-col gap-1">
           <label className="text-sm font-medium text-gray-700">{s.note}</label>
           <textarea rows={2} value={note} onChange={e => setNote(e.target.value)}
-            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none" />
+            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none" />
         </div>
 
         {/* Attachment */}
@@ -162,7 +162,7 @@ export default function ReceiveFormPage() {
                   <td className="px-4 py-2.5 text-right font-medium text-gray-800">{rem}</td>
                   <td className="px-4 py-2.5">
                     <input value={l.receiveNow} onChange={e => setReceiveNow(idx, e.target.value)} inputMode="decimal"
-                      className="w-full text-right rounded-lg border border-field hover:border-field-hover px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+                      className="w-full text-right rounded-lg border border-field hover:border-field-hover px-2 py-1.5 text-sm focus:outline-none focus:border-field-focus" />
                   </td>
                   <td className="px-4 py-2.5">
                     <input value={l.rejectNow} onChange={e => setRejectNow(idx, e.target.value)} inputMode="decimal" placeholder="0"

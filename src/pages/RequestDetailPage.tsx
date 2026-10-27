@@ -353,7 +353,7 @@ export default function RequestDetailPage() {
         <div className="flex flex-col gap-1 mb-4">
           <label className="text-sm font-medium text-gray-700">{t.approvals.noteOptional}</label>
           <textarea value={note} onChange={e => setNote(e.target.value)} rows={3}
-            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus" />
         </div>
         <div className="flex gap-3 justify-end">
           <Button variant="secondary" onClick={() => setDecision(null)}>{t.common.cancel}</Button>

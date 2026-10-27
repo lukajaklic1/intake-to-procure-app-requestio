@@ -19,7 +19,7 @@ function ItemSearch({ items, onSelect, placeholder }: { items: Item[]; onSelect:
     : items
   return (
     <div className="relative">
-      <div className="flex items-center gap-1 border border-field rounded-lg hover:border-field-hover bg-white px-2 py-1.5 focus-within:ring-2 focus-within:ring-accent focus-within:border-transparent">
+      <div className="flex items-center gap-1 border border-field rounded-lg hover:border-field-hover bg-white px-2 py-1.5 focus-within:border-field-focus">
         <Search className="w-3 h-3 text-gray-400 shrink-0" />
         <input value={query} onChange={e => { setQuery(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
@@ -60,7 +60,7 @@ function SearchCombobox({ items, value, onChange, label, required, placeholder, 
           onFocus={() => { setQuery(''); setOpen(true) }}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder={placeholder}
-          className="w-full rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-ink placeholder:text-placeholder focus:outline-none focus:ring-2 focus:ring-accent bg-white" />
+          className="w-full rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-ink placeholder:text-placeholder focus:outline-none focus:border-field-focus bg-white" />
         {open && (
           <div className="absolute z-30 left-0 mt-1 w-full bg-white border border-field rounded-lg shadow-lg overflow-y-auto max-h-56">
             {filtered.length > 0 ? filtered.map(item => (
@@ -84,7 +84,7 @@ function Select({ id, label, value, onChange, children, placeholder, required, h
     <div className="flex flex-col gap-1">
       <label htmlFor={id} className="text-sm font-medium text-gray-700">{label}{required && ' *'}</label>
       <select id={id} value={value} onChange={e => onChange(e.target.value)}
-        className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent bg-white">
+        className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-ink focus:outline-none focus:border-field-focus bg-white">
         <option value="">{placeholder}</option>
         {children}
       </select>
@@ -335,7 +335,7 @@ export default function RequestFormPage() {
         <div className="mt-4 flex flex-col gap-1">
           <label className="text-sm font-medium text-gray-700">{s.note}</label>
           <textarea rows={3} value={header.note} onChange={e => setHeader(h => ({ ...h, note: e.target.value }))}
-            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none" />
+            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none" />
         </div>
 
         {/* Attachments */}
@@ -399,14 +399,14 @@ export default function RequestFormPage() {
                   </td>
                   <td className="px-4 py-2.5 pt-3">
                     <select value={line.category_id} onChange={e => setLine(idx, { category_id: e.target.value })}
-                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-ink">
+                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus bg-white text-ink">
                       <option value="">{t.common.select}</option>
                       {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </td>
-                  <td className="px-4 py-2.5 pt-3"><input type="text" inputMode="decimal" {...numInput(line.quantity, v => setLine(idx, { quantity: v }))} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent text-right" /></td>
-                  <td className="px-4 py-2.5 pt-3"><input value={line.unit} onChange={e => setLine(idx, { unit: e.target.value })} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent" /></td>
-                  <td className="px-4 py-2.5 pt-3"><input type="text" inputMode="decimal" {...numInput(line.est_unit_price, v => setLine(idx, { est_unit_price: v }))} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent text-right" /></td>
+                  <td className="px-4 py-2.5 pt-3"><input type="text" inputMode="decimal" {...numInput(line.quantity, v => setLine(idx, { quantity: v }))} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right" /></td>
+                  <td className="px-4 py-2.5 pt-3"><input value={line.unit} onChange={e => setLine(idx, { unit: e.target.value })} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus" /></td>
+                  <td className="px-4 py-2.5 pt-3"><input type="text" inputMode="decimal" {...numInput(line.est_unit_price, v => setLine(idx, { est_unit_price: v }))} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right" /></td>
                   <td className="px-4 py-2.5 pt-3 text-right font-medium text-gray-800">{fmt(lineTotal(line))}</td>
                   <td className="px-2 py-2.5 pt-3"><button type="button" onClick={() => removeLine(idx)} className="p-1 text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button></td>
                 </tr>
@@ -427,7 +427,7 @@ export default function RequestFormPage() {
               )}
               <tr>
                 <td colSpan={7} className="px-4 py-2 text-right text-sm text-gray-500">{s.discount} (€)</td>
-                <td className="px-4 py-2 text-right"><input type="text" inputMode="decimal" {...numInput(discount, setDiscount)} className="w-28 text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent text-right ml-auto block" /></td>
+                <td className="px-4 py-2 text-right"><input type="text" inputMode="decimal" {...numInput(discount, setDiscount)} className="w-28 text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right ml-auto block" /></td>
                 <td />
               </tr>
               <tr className="border-t-2 border-field">
@@ -450,7 +450,7 @@ export default function RequestFormPage() {
         <div className="flex flex-col gap-1 mb-4">
           <label className="text-sm font-medium text-gray-700">{s.submitComment}</label>
           <textarea value={submitNote} onChange={e => setSubmitNote(e.target.value)} rows={3}
-            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none" />
+            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none" />
         </div>
         <div className="flex gap-3 justify-end">
           <Button variant="secondary" onClick={() => setSubmitOpen(false)}>{t.common.cancel}</Button>

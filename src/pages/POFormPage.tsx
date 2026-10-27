@@ -57,7 +57,7 @@ function ItemSearch({ items, onSelect, placeholder }: { items: Item[]; onSelect:
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-1 border border-field rounded-lg hover:border-field-hover bg-white px-2 py-1.5 focus-within:ring-2 focus-within:ring-accent focus-within:border-transparent">
+      <div className="flex items-center gap-1 border border-field rounded-lg hover:border-field-hover bg-white px-2 py-1.5 focus-within:border-field-focus">
         <Search className="w-3 h-3 text-gray-400 shrink-0" />
         <input
           value={query}
@@ -115,7 +115,7 @@ function SupplierSearch({ suppliers, value, onChange, label, disabled, placehold
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           readOnly={disabled}
           placeholder={placeholder}
-          className="w-full rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-accent bg-white disabled:bg-gray-50"
+          className="w-full rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-gray-900 focus:outline-none focus:border-field-focus bg-white disabled:bg-gray-50"
         />
         {open && !disabled && filtered.length > 0 && (
           <div className="absolute z-30 left-0 mt-1 w-full bg-white border border-field rounded-lg shadow-lg overflow-y-auto max-h-56">
@@ -145,7 +145,7 @@ function Select({ id, label, value, onChange, required, hint, children }: {
     <div className="flex flex-col gap-1">
       <label htmlFor={id} className="text-sm font-medium text-gray-700">{label}{required && ' *'}</label>
       <select id={id} value={value} onChange={e => onChange(e.target.value)}
-        className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent bg-white">
+        className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-ink focus:outline-none focus:border-field-focus bg-white">
         <option value="">{t.common.select}</option>
         {children}
       </select>
@@ -540,7 +540,7 @@ export default function POFormPage() {
               onChange={e => setHeader(h => ({ ...h, notes: e.target.value }))}
               readOnly={isReadOnly}
               placeholder={s.notesPlaceholder}
-              className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+              className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none"
             />
           </div>
         </div>
@@ -645,7 +645,7 @@ export default function POFormPage() {
                   </td>
                   <td className="px-4 py-2.5 pt-3">
                     <select value={line.category_id} onChange={e => setLine(idx, { category_id: e.target.value })} disabled={isReadOnly}
-                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent bg-white text-ink">
+                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus bg-white text-ink">
                       <option value="">{t.common.select}</option>
                       {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
@@ -655,7 +655,7 @@ export default function POFormPage() {
                       type="text" inputMode="decimal"
                       {...numericInput(line.quantity, v => setLine(idx, { quantity: v }))}
                       readOnly={isReadOnly}
-                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent text-right"
+                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right"
                     />
                   </td>
                   <td className="px-4 py-2.5 pt-3">
@@ -663,7 +663,7 @@ export default function POFormPage() {
                       value={line.unit}
                       onChange={e => setLine(idx, { unit: e.target.value })}
                       readOnly={isReadOnly}
-                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent"
+                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus"
                     />
                   </td>
                   <td className="px-4 py-2.5 pt-3">
@@ -671,7 +671,7 @@ export default function POFormPage() {
                       type="text" inputMode="decimal"
                       {...numericInput(line.unit_price, v => setLine(idx, { unit_price: v }))}
                       readOnly={isReadOnly}
-                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent text-right"
+                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right"
                     />
                   </td>
                   <td className="px-4 py-2.5 pt-3 text-right font-medium text-gray-800">
@@ -724,7 +724,7 @@ export default function POFormPage() {
                     <input
                       type="text" inputMode="decimal"
                       {...numericInput(discount, setDiscount)}
-                      className="w-28 text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent text-right ml-auto block"
+                      className="w-28 text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right ml-auto block"
                     />
                   )}
                 </td>

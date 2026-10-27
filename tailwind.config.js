@@ -86,6 +86,7 @@ export default {
 
         field: v('field'),
         'field-hover': v('field-hover'),
+        'field-focus': v('field-focus'),
       },
     },
   },

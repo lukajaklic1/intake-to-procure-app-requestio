@@ -201,7 +201,7 @@ export default function CatalogPage() {
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
-            className="w-full pl-9 pr-4 h-8 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:ring-2 focus:ring-accent bg-white text-ink placeholder:text-filter-label" />
+            className="w-full pl-9 pr-4 h-8 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-focus bg-white text-ink placeholder:text-filter-label" />
         </div>
         <FilterSelect label={t.filters.labels.category} value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
           <option value="all">{t.filters.allF}</option>
@@ -372,7 +372,7 @@ export default function CatalogPage() {
               rows={3}
               value={editing.long_description ?? ''}
               onChange={e => setEditing(f => ({ ...f, long_description: e.target.value }))}
-              className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+              className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none"
             />
           </div>
 
@@ -382,7 +382,7 @@ export default function CatalogPage() {
               <select id="i-cat"
                 value={editing.category_id ?? ''}
                 onChange={e => { req.clear('category_id'); setEditing(f => ({ ...f, category_id: e.target.value || undefined })) }}
-                className={`rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${req.errors.category_id ? 'border-red-400 focus:ring-red-400' : 'border-field hover:border-field-hover focus:ring-accent'}`}
+                className={`rounded-lg border px-3 py-2 text-sm focus:outline-none ${req.errors.category_id ? 'border-red-400' : 'border-field hover:border-field-hover focus:border-field-focus'}`}
               >
                 <option value="">{t.common.select}</option>
                 {allCategories.filter(c => c.status === 'active' || c.id === editing.category_id).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
