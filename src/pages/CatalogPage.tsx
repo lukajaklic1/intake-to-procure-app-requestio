@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Upload, Plus, Search, Pencil, Trash2, Package, Tag } from 'lucide-react'
+import { Fragment, useEffect, useState } from 'react'
+import { Upload, Plus, Search, Pencil, Trash2, Package, Tag, ChevronDown, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { toast } from '../components/ui/Toast'
@@ -7,7 +7,6 @@ import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
-import Pagination from '../components/ui/Pagination'
 import ImportModal from '../components/ui/ImportModal'
 import PageToolbar from '../components/layout/PageToolbar'
 import FilterSelect from '../components/ui/FilterSelect'
@@ -40,7 +39,7 @@ export default function CatalogPage() {
   const req = useRequired(t.common.fieldRequired)
   const catReq = useRequired(t.common.fieldRequired)
   const [importOpen, setImportOpen] = useState(false)
-  const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Partial<Item>>(EMPTY)
@@ -48,8 +47,6 @@ export default function CatalogPage() {
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<ItemWithCategory | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
   const [usage, setUsage] = useState<Map<string, number>>(new Map())
 
   useEffect(() => { if (company) { load(); loadCategories() } }, [company])
@@ -100,7 +97,6 @@ export default function CatalogPage() {
     const { error } = await supabase.from('categories').delete().eq('id', c.id)
     setActionLoading(false); setConfirmDeleteCat(null)
     if (error) { toast.error(error.message); return }
-    if (categoryFilter === c.id) setCategoryFilter('all')
     toast.success(t.common.deleted); closeCategoryModal(); loadCategories()
   }
 
@@ -116,7 +112,7 @@ export default function CatalogPage() {
     return String(isNaN(last) ? 100001 : last + 1)
   }
 
-  function openNew() { req.reset(); setEditing({ ...EMPTY, category_id: categoryFilter !== 'all' ? categoryFilter : undefined }); setPriceStr(''); setModalOpen(true) }
+  function openNew(categoryId?: string) { req.reset(); setEditing({ ...EMPTY, category_id: categoryId }); setPriceStr(''); setModalOpen(true) }
   function openEdit(i: ItemWithCategory) { req.reset(); setEditing({ ...i }); setPriceStr(i.default_unit_price != null ? String(i.default_unit_price).replace('.', ',') : ''); setModalOpen(true) }
   function closeModal() { setModalOpen(false); setEditing(EMPTY); setPriceStr('') }
 
@@ -175,21 +171,24 @@ export default function CatalogPage() {
     toast.success(t.common.deleted); load()
   }
 
-  const filtered = items.filter(i => {
-    const q = search.toLowerCase()
-    const matchSearch = i.name.toLowerCase().includes(q) || i.item_number.includes(q)
-    const matchCat = categoryFilter === 'all' || i.category_id === categoryFilter
-    const matchStatus = statusFilter === 'all' || i.status === statusFilter
-    return matchSearch && matchCat && matchStatus
-  })
+  const q = search.toLowerCase()
+  const filtering = q !== '' || statusFilter !== 'all'
+  const filteredItems = items.filter(i =>
+    (i.name.toLowerCase().includes(q) || i.item_number.includes(q)) && (statusFilter === 'all' || i.status === statusFilter))
 
-  useEffect(() => { setPage(1) }, [search, categoryFilter, statusFilter])
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
-  function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
+  // One group per category (plus legacy items without one). While filtering, groups with no match are hidden.
+  const groups = [
+    ...allCategories.map(c => ({ id: c.id, name: c.name, category: c as Category | null, inactive: c.status === 'inactive', rows: filteredItems.filter(i => i.category_id === c.id) })),
+    { id: 'none', name: t.dashboard.noCategory, category: null, inactive: false, rows: filteredItems.filter(i => !i.category_id) },
+  ].filter(g => (g.category || g.rows.length > 0) && (!filtering || g.rows.length > 0))
+
+  function toggleGroup(id: string) {
+    setCollapsed(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  }
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar actions={<><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}</Button><Button variant="secondary" onClick={openNewCategory} className="gap-2"><Tag className="w-4 h-4" />{t.categories.new}</Button><Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
+      <PageToolbar attached actions={<><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}</Button><Button onClick={openNewCategory} className="gap-2"><Tag className="w-4 h-4" />{t.categories.new}</Button></>}>
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
@@ -200,78 +199,91 @@ export default function CatalogPage() {
         </FilterSelect>
       </PageToolbar>
 
-      <div className="flex flex-col lg:flex-row gap-4 items-start mt-0">
-      {/* Categories panel */}
-      <div className="w-full lg:w-60 shrink-0 bg-white rounded-lg border border-field p-2">
-        <p className="px-2.5 pt-1.5 pb-1 text-xs font-medium text-muted">{t.categories.title}</p>
-        {[{ id: 'all', name: t.filters.allCategories, count: items.length, status: 'active' as const }, ...allCategories.map(c => ({ id: c.id, name: c.name, count: items.filter(i => i.category_id === c.id).length, status: c.status }))].map(c => (
-          <div key={c.id} className={`group flex items-center rounded-lg transition-colors ${categoryFilter === c.id ? 'bg-selected' : 'hover:bg-hover'}`}>
-            <button onClick={() => setCategoryFilter(c.id)} className="flex-1 min-w-0 flex items-center gap-2 px-2.5 py-1.5 text-left">
-              <span className={`flex-1 truncate text-sm ${c.status === 'active' ? 'text-ink' : 'text-muted'}`}>{c.name}</span>
-              <span className="text-xs text-gray-400 tabular-nums">{c.count}</span>
-            </button>
-            {c.id !== 'all' && (
-              <button onClick={() => openEditCategory(allCategories.find(x => x.id === c.id)!)} className="p-1.5 mr-1 text-gray-400 hover:text-ink opacity-0 group-hover:opacity-100 transition-opacity">
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Table */}
-      <div className="flex-1 min-w-0 w-full data-card table-clean bg-white rounded-lg border border-field overflow-hidden">
+      <div className="data-card table-bleed bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]">
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
             <thead className="bg-surface border-b border-field">
               <tr>
-                {[s.itemNumber, t.common.name, t.categories.title, s.defaultUnit, s.defaultUnitPrice, t.common.status, ''].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-sm font-medium text-ink2">{h}</th>
+                {[s.itemNumber, t.common.name, s.defaultUnit, s.defaultUnitPrice, t.common.status, ''].map((h, i) => (
+                  <th key={i} className="text-left px-4 py-3 text-sm font-medium text-ink2">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-field">
-              {filtered.length === 0 ? (
-                <TableEmptyState icon={Package} colSpan={7} title={(search || categoryFilter !== 'all') ? t.common.empty.noResults.title : t.common.empty.items.title} subtitle={(search || categoryFilter !== 'all') ? t.common.empty.noResults.text : t.common.empty.items.text} />
-              ) : paginated.map(item => {
-                const count = usage.get(item.id) ?? 0
-                const inUse = count > 0
+              {groups.length === 0 ? (
+                <TableEmptyState icon={filtering ? Package : Tag} colSpan={6}
+                  title={filtering ? t.common.empty.noResults.title : t.common.empty.categories.title}
+                  subtitle={filtering ? t.common.empty.noResults.text : t.common.empty.categories.text}
+                  action={filtering ? undefined : <Button onClick={openNewCategory} className="gap-2 mt-2"><Plus className="w-4 h-4" />{t.categories.new}</Button>} />
+              ) : groups.map(g => {
+                const open = filtering || !collapsed.has(g.id)
                 return (
-                <tr key={item.id} className="hover:bg-surface transition-colors">
-                  <td className="px-4 py-3 text-xs text-gray-500 font-medium">{item.item_number}</td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-gray-900">{item.name}</p>
-                    {item.long_description && (
-                      <p className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{item.long_description}</p>
+                  <Fragment key={g.id}>
+                    {/* Category header row */}
+                    <tr className="bg-surface hover:bg-hover cursor-pointer select-none group" onClick={() => toggleGroup(g.id)}>
+                      <td colSpan={6} className="!py-2.5">
+                        <div className="flex items-center gap-2">
+                          {open ? <ChevronDown className="w-4 h-4 text-icon shrink-0" /> : <ChevronRight className="w-4 h-4 text-icon shrink-0" />}
+                          <span className={`font-medium ${g.inactive ? 'text-muted' : 'text-ink'}`}>{g.name}</span>
+                          <span className="text-xs text-gray-400 tabular-nums">{g.rows.length}</span>
+                          {g.inactive && <span className="badge badge-neutral">{t.common.inactiveF}</span>}
+                          {g.category && (
+                            <button onClick={e => { e.stopPropagation(); openEditCategory(g.category!) }}
+                              className="ml-1 p-1 text-gray-400 hover:text-ink rounded-md opacity-0 group-hover:opacity-100 transition-opacity" title={t.common.editEntity}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {open && g.rows.map(item => {
+                      const count = usage.get(item.id) ?? 0
+                      const inUse = count > 0
+                      return (
+                        <tr key={item.id} className="hover:bg-surface transition-colors">
+                          <td className="px-4 py-3 text-xs text-gray-500 font-medium">{item.item_number}</td>
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-gray-900">{item.name}</p>
+                            {item.long_description && <p className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{item.long_description}</p>}
+                          </td>
+                          <td className="px-4 py-3 text-ink2">{item.default_unit ?? '—'}</td>
+                          <td className="px-4 py-3 text-ink2">{item.default_unit_price != null ? `${item.default_unit_price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '—'}</td>
+                          <td className="px-4 py-3">
+                            <span className={`badge ${item.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>{item.status === 'active' ? t.common.active : t.common.inactive}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1 justify-end">
+                              <button onClick={() => openEdit(item)} className="p-1.5 text-gray-400 hover:text-accent hover:bg-accent-light rounded-lg transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                              <button disabled={inUse} onClick={() => !inUse && setConfirmDelete(item)}
+                                title={inUse ? (lang === 'sl' ? `${t.common.cannotDelete} ${t.common.usedOn} ${poLineLocSl(count)}. ${t.common.setInactiveInstead}` : `${t.common.cannotDelete} ${t.common.usedOn} ${poLineCountEn(count)}. ${t.common.setInactiveInstead}`) : undefined}
+                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:bg-transparent">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+
+                    {/* Add an item inside this category */}
+                    {open && !filtering && g.category && (
+                      <tr>
+                        <td colSpan={6} className="!py-2">
+                          <button onClick={() => openNew(g.id)} className="inline-flex items-center gap-1.5 text-sm text-ink2 hover:text-ink transition-colors">
+                            <Plus className="w-4 h-4" />{g.rows.length === 0 ? t.common.empty.categoryEmpty + ' ' : ''}{s.new}
+                          </button>
+                        </td>
+                      </tr>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-ink2">{item.categories?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-ink2">{item.default_unit ?? '—'}</td>
-                  <td className="px-4 py-3 text-ink2">{item.default_unit_price != null ? `${item.default_unit_price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`badge ${item.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>{item.status === 'active' ? t.common.active : t.common.inactive}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 justify-end">
-                      <button onClick={() => openEdit(item)} className="p-1.5 text-gray-400 hover:text-accent hover:bg-accent-light rounded-lg transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-                      <button disabled={inUse} onClick={() => !inUse && setConfirmDelete(item)}
-                        title={inUse ? (lang === 'sl' ? `${t.common.cannotDelete} ${t.common.usedOn} ${poLineLocSl(count)}. ${t.common.setInactiveInstead}` : `${t.common.cannotDelete} ${t.common.usedOn} ${poLineCountEn(count)}. ${t.common.setInactiveInstead}`) : undefined}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:bg-transparent">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                  </Fragment>
                 )
               })}
             </tbody>
           </table></div>
         )}
-        <Pagination total={filtered.length} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={handlePageSizeChange} />
-      </div>
       </div>
 
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} title={t.common.import.title}
