@@ -33,8 +33,8 @@ export default function PageHeader({ sidebarCollapsed, onShowSidebar }: PageHead
         <div className="flex items-center gap-1.5 ml-3">
           {tabs.map(tab => (
             <button key={tab.id} onClick={() => select(tab.id)}
-              className={`inline-flex items-center gap-2 h-8 px-3 rounded-lg border text-sm transition-colors ${tab.active ? 'border-field bg-surface text-ink' : 'border-transparent text-ink2 hover:bg-hover'}`}>
-              {tab.icon && <tab.icon className="block w-4 h-4 shrink-0 text-icon" strokeWidth={1.75} />}
+              className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border text-sm transition-colors ${tab.active ? 'border-field bg-surface text-ink' : 'border-transparent text-ink2 hover:bg-hover'}`}>
+              {tab.icon && <tab.icon className="block w-3.5 h-3.5 shrink-0 text-icon" strokeWidth={1.75} />}
               {tab.label}
               {tab.count != null && <CountBadge value={tab.count} />}
             </button>
