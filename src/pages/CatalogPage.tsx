@@ -497,17 +497,10 @@ export default function CatalogPage() {
         </div>
       </Modal>
 
-      <Modal open={catModalOpen} onClose={closeCategoryModal} title={catEditing.id ? t.common.editEntity : t.categories.new} size="sm">
-        <Input id="cat-name" label={t.categories.categoryName + ' *'} value={catEditing.name} error={catReq.errors.name} onChange={e => { catReq.clear('name'); setCatEditing(f => ({ ...f, name: e.target.value })) }} />
-        {!(catEditing.id && allCategories.some(c => c.parent_id === catEditing.id)) && (
-          <div className="flex flex-col gap-1 mt-4">
-            <label htmlFor="cat-parent" className="text-sm font-medium text-gray-700">{t.categories.parent}</label>
-            <select id="cat-parent" value={catEditing.parent_id} onChange={e => setCatEditing(f => ({ ...f, parent_id: e.target.value }))}
-              className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus bg-white">
-              <option value="">{t.categories.noParent}</option>
-              {tree.filter(n => n.category.id !== catEditing.id).map(n => <option key={n.category.id} value={n.category.id}>{n.category.name}</option>)}
-            </select>
-          </div>
+      <Modal open={catModalOpen} onClose={closeCategoryModal} title={catEditing.id ? t.common.editEntity : catEditing.parent_id ? t.categories.newSub : t.categories.new} size="sm">
+        <Input id="cat-name" label={(catEditing.parent_id ? t.categories.subcategory : t.categories.categoryName) + ' *'} value={catEditing.name} error={catReq.errors.name} onChange={e => { catReq.clear('name'); setCatEditing(f => ({ ...f, name: e.target.value })) }} />
+        {catEditing.parent_id && (
+          <p className="text-sm text-ink2 mt-3">{t.categories.parent}: <span className="text-ink font-medium">{allCategories.find(c => c.id === catEditing.parent_id)?.name}</span></p>
         )}
         {catEditing.id && (
           <div className="flex items-center justify-between p-3 mt-4 bg-gray-50 rounded-lg border border-field">
