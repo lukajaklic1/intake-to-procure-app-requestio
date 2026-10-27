@@ -401,6 +401,8 @@ export const translations = {
       parent: 'Parent category',
       noParent: 'None (main category)',
       newSub: 'New subcategory',
+      addSub: 'Add subcategory',
+      addItem: 'Add item',
       subcategory: 'Subcategory',
     },
 
@@ -1150,6 +1152,8 @@ export const translations = {
       parent: 'Nadrejena kategorija',
       noParent: 'Brez (glavna kategorija)',
       newSub: 'Nova podkategorija',
+      addSub: 'Dodaj podkategorijo',
+      addItem: 'Dodaj artikel',
       subcategory: 'Podkategorija',
     },
 

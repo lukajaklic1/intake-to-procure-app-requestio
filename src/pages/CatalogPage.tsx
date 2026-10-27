@@ -317,12 +317,12 @@ export default function CatalogPage() {
                           <div className={`flex items-center gap-4 ${g.level === 1 ? 'ml-6' : ''}`}>
                             {g.level === 1 && (
                               <button onClick={() => openNew(g.id)} className="inline-flex items-center gap-1.5 text-sm text-ink2 hover:text-ink transition-colors">
-                                <Plus className="w-4 h-4" />{g.rows.length === 0 ? t.common.empty.categoryEmpty + ' ' : ''}{s.new}
+                                <Plus className="w-4 h-4" />{t.categories.addItem}
                               </button>
                             )}
                             {g.level === 0 && (
                               <button onClick={() => openNewCategory(g.id)} className="inline-flex items-center gap-1.5 text-sm text-ink2 hover:text-ink transition-colors">
-                                <Plus className="w-4 h-4" />{g.leaf ? t.common.empty.categoryNoSubs + ' ' : ''}{t.categories.newSub}
+                                <Plus className="w-4 h-4" />{t.categories.addSub}
                               </button>
                             )}
                           </div>
