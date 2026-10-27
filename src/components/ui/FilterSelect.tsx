@@ -1,4 +1,4 @@
-import { Children, isValidElement, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { Children, Fragment, isValidElement, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { Check, ChevronDown, Search } from 'lucide-react'
 
 interface FilterSelectProps {
@@ -37,7 +37,7 @@ export default function FilterSelect({ label, value, onChange, children }: Filte
 
   // keep the highlighted row in view while moving with the keyboard
   useEffect(() => {
-    if (open) (listRef.current?.children[active] as HTMLElement | undefined)?.scrollIntoView({ block: 'nearest' })
+    if (open) (listRef.current?.querySelectorAll('[role="option"]')[active] as HTMLElement | undefined)?.scrollIntoView({ block: 'nearest' })
   }, [active, open])
 
   function close() { setOpen(false); setQuery('') }
@@ -68,23 +68,29 @@ export default function FilterSelect({ label, value, onChange, children }: Filte
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-40 min-w-[200px] w-max max-w-[320px] bg-white border border-line rounded-lg shadow-lg p-1">
+        <div className="absolute left-0 top-full mt-1.5 z-40 min-w-[220px] w-max max-w-[340px] bg-white border border-line rounded-xl shadow-[0_8px_30px_rgba(16,17,18,0.12)] p-1.5">
           {searchable && (
-            <div className="relative mb-1">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-filter-label" />
+            <div className="relative mb-1.5">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-filter-label" />
               <input autoFocus value={query} onChange={e => { setQuery(e.target.value); setActive(0) }}
-                className="w-full h-8 pl-8 pr-2 text-sm bg-transparent text-ink outline-none border-b border-line" />
+                className="w-full h-9 pl-9 pr-3 text-sm bg-surface rounded-lg text-ink outline-none placeholder:text-filter-label" />
             </div>
           )}
-          <div ref={listRef} role="listbox" className="max-h-64 overflow-y-auto">
-            {shown.length === 0 && <p className="px-2.5 py-1.5 text-sm text-gray-400">—</p>}
+          <div ref={listRef} role="listbox" className="max-h-72 overflow-y-auto flex flex-col gap-0.5">
+            {shown.length === 0 && <p className="px-3 py-2 text-sm text-gray-400">—</p>}
             {shown.map((o, i) => (
-              <button key={o.value + i} type="button" role="option" aria-selected={o.value === selected?.value}
-                onMouseEnter={() => setActive(i)} onClick={() => pick(o.value)}
-                className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-sm text-left text-ink outline-none ${i === active ? 'bg-selected' : ''}`}>
-                <span className="flex-1 truncate">{o.text}</span>
-                {o.value === selected?.value && <Check className="w-3.5 h-3.5 text-ink shrink-0" />}
-              </button>
+              <Fragment key={o.value + i}>
+                <button type="button" role="option" aria-selected={o.value === selected?.value}
+                  onMouseEnter={() => setActive(i)} onClick={() => pick(o.value)}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[14px] text-left text-ink outline-none transition-colors ${i === active ? 'bg-selected' : ''}`}>
+                  <span className="flex-1 truncate">{o.text}</span>
+                  {o.value === selected?.value && (
+                    <span className="w-4 h-4 rounded-full bg-primary flex items-center justify-center shrink-0"><Check className="w-2.5 h-2.5 text-white" strokeWidth={3.5} /></span>
+                  )}
+                </button>
+                {/* The first option ("All") is set apart from the rest by a thin line */}
+                {!q && i === 0 && shown.length > 1 && <div className="h-px bg-line mx-1 my-0.5" />}
+              </Fragment>
             ))}
           </div>
         </div>
