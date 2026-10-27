@@ -27,6 +27,7 @@ interface LineItem {
 
 interface POHeader {
   supplier_id: string
+  contract_id: string
   location_id: string
   department_id: string
   payment_terms: string
@@ -37,7 +38,7 @@ interface POHeader {
 }
 
 const EMPTY_HEADER: POHeader = {
-  supplier_id: '', location_id: '', department_id: '',
+  supplier_id: '', contract_id: '', location_id: '', department_id: '',
   payment_terms: '', expected_delivery_date: '', incoterm: '', supplier_quote_ref: '',
   notes: '',
 }
@@ -185,6 +186,7 @@ export default function POFormPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
+  const [contracts, setContracts] = useState<{ id: string; title: string; contract_number: string; supplier_id: string; status: string; end_date: string | null }[]>([])
   const [items, setItems] = useState<Item[]>([])
 
   useEffect(() => {
@@ -208,6 +210,8 @@ export default function POFormPage() {
     if (isNew && loc.data?.length === 1) setHeader(h => ({ ...h, location_id: h.location_id || loc.data![0].id }))
     setDepartments(dept.data ?? [])
     setItems(itm.data ?? [])
+    const { data: ctr } = await supabase.from('contracts').select('id, title, contract_number, supplier_id, status, end_date').eq('company_id', cid)
+    setContracts(ctr ?? [])
   }
 
   async function loadPO() {
@@ -220,6 +224,7 @@ export default function POFormPage() {
     setPoNumber(po.po_number)
     setHeader({
       supplier_id: po.supplier_id ?? '',
+      contract_id: po.contract_id ?? '',
       location_id: po.location_id ?? '',
       department_id: po.department_id ?? '',
       payment_terms: po.payment_terms ?? '',
@@ -376,6 +381,7 @@ export default function POFormPage() {
         status: targetStatus,
         total_amount: grandTotal,
         ...header,
+        contract_id: header.contract_id || null,
         department_id: header.department_id || null,
         incoterm: header.incoterm || null,
         supplier_quote_ref: header.supplier_quote_ref || null,
@@ -406,6 +412,7 @@ export default function POFormPage() {
         total_amount: grandTotal,
         updated_at: new Date().toISOString(),
         ...header,
+        contract_id: header.contract_id || null,
         department_id: header.department_id || null,
         incoterm: header.incoterm || null,
         supplier_quote_ref: header.supplier_quote_ref || null,
@@ -497,6 +504,7 @@ export default function POFormPage() {
               setHeader(h => ({
                 ...h,
                 supplier_id: v,
+                contract_id: contracts.find(c => c.id === h.contract_id)?.supplier_id === v ? h.contract_id : '',
                 payment_terms: h.payment_terms || sup?.payment_terms || '',
                 incoterm: h.incoterm || sup?.incoterm || '',
               }))
@@ -505,6 +513,11 @@ export default function POFormPage() {
             disabled={isReadOnly}
             placeholder={t.common.search + '…'}
           />
+          <Select id="contract" label={t.contracts.linkedContract} value={header.contract_id} onChange={v => setHeader(h => ({ ...h, contract_id: v }))}>
+            {contracts
+              .filter(c => c.supplier_id === header.supplier_id && (c.id === header.contract_id || (c.status === 'active' && !(c.end_date && c.end_date < new Date().toISOString().slice(0, 10)))))
+              .map(c => <option key={c.id} value={c.id}>{c.contract_number} · {c.title}</option>)}
+          </Select>
           <Select id="location" label={s.location} required hint={locationHint} value={header.location_id} onChange={v => setHeader(h => ({ ...h, location_id: v }))}>
             {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
           </Select>

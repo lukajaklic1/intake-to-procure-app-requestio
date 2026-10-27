@@ -81,7 +81,7 @@ export default function PODetailPage() {
     setLoading(true)
     const { data } = await supabase
       .from('purchase_orders')
-      .select('*, suppliers(name,email,address_street,address_city,address_postal_code,address_country,vat_number), locations(name,address_street,address_city,address_postal_code), departments(name)')
+      .select('*, contracts(id, title, contract_number), suppliers(name,email,address_street,address_city,address_postal_code,address_country,vat_number), locations(name,address_street,address_city,address_postal_code), departments(name)')
       .eq('id', id!)
       .single()
     setPo(data as unknown as POFull)
@@ -271,6 +271,7 @@ export default function PODetailPage() {
             {po.departments && <Field label={s.department} value={po.departments.name} />}
             <Field label={t.po.paymentTermsLabel} value={po.payment_terms} />
             {po.incoterm && <Field label={t.po.incoterm} value={po.incoterm} />}
+            {(po as unknown as { contracts?: { title: string; contract_number: string } | null }).contracts && <Field label={t.contracts.linkedContract} value={`${(po as unknown as { contracts: { contract_number: string } }).contracts.contract_number} · ${(po as unknown as { contracts: { title: string } }).contracts.title}`} />}
             {po.supplier_quote_ref && <Field label={t.po.quoteRef} value={po.supplier_quote_ref} />}
           </div>
         </div>

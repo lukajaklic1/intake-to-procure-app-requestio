@@ -334,6 +334,32 @@ export interface Approval {
   created_at: string
 }
 
+export type ContractStatus = 'draft' | 'active' | 'terminated'
+
+export interface Contract {
+  id: string
+  company_id: string
+  contract_number: string
+  title: string
+  supplier_id: string
+  status: ContractStatus
+  start_date: string
+  end_date: string | null
+  auto_renew: boolean
+  renewal_months: number | null
+  notice_days: number | null
+  total_value: number | null
+  payment_terms: string | null
+  owner_id: string | null
+  description: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ContractItem { id: string; contract_id: string; company_id: string; item_id: string; agreed_price: number; created_at: string }
+export interface ContractAttachment { id: string; contract_id: string; company_id: string; file_path: string; file_name: string; file_size: number | null; created_at: string }
+
 export interface Database {
   public: {
     Tables: {
@@ -358,6 +384,9 @@ export interface Database {
       po_activity_log: { Row: PoActivityLog; Insert: Omit<PoActivityLog, 'id' | 'created_at'>; Update: Partial<Omit<PoActivityLog, 'id'>> }
       receipts: { Row: Receipt; Insert: Omit<Receipt, 'id' | 'created_at'>; Update: Partial<Omit<Receipt, 'id'>> }
       receipt_line_items: { Row: ReceiptLineItem; Insert: Omit<ReceiptLineItem, 'id' | 'created_at'>; Update: Partial<Omit<ReceiptLineItem, 'id'>> }
+      contracts: { Row: Contract; Insert: Omit<Contract, 'id' | 'created_at' | 'updated_at' | 'contract_number'>; Update: Partial<Omit<Contract, 'id'>> }
+      contract_items: { Row: ContractItem; Insert: Omit<ContractItem, 'id' | 'created_at'>; Update: Partial<Omit<ContractItem, 'id'>> }
+      contract_attachments: { Row: ContractAttachment; Insert: Omit<ContractAttachment, 'id' | 'created_at'>; Update: Partial<Omit<ContractAttachment, 'id'>> }
       receipt_attachments: { Row: ReceiptAttachment; Insert: Omit<ReceiptAttachment, 'id' | 'created_at'>; Update: Partial<Omit<ReceiptAttachment, 'id'>> }
     }
   }

@@ -9,6 +9,7 @@ import { useLanguage } from '../../hooks/useLanguage'
 import { cn } from '../../lib/cn'
 import AppLogo from '../ui/AppLogo'
 import { NAV_GROUPS } from './navConfig'
+import { needsAttention } from '../../lib/contracts'
 
 interface SidebarProps {
   onClose?: () => void
@@ -25,6 +26,7 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
   const [pendingApprovals, setPendingApprovals] = useState(0)
   const [readyForPO, setReadyForPO] = useState(0)
   const [openReceipts, setOpenReceipts] = useState(0)
+  const [expiringContracts, setExpiringContracts] = useState(0)
 
   useEffect(() => {
     if (!company || !profile) return
@@ -32,16 +34,18 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
       let approvalsQuery = supabase.from('requests').select('*', { count: 'exact', head: true })
         .eq('company_id', company!.id).eq('status', 'pending')
       if (!isAdmin) approvalsQuery = approvalsQuery.eq('approver_id', profile!.id)
-      const [{ count: pending }, { count: noPo }, { count: receiptsOpen }] = await Promise.all([
+      const [{ count: pending }, { count: noPo }, { count: receiptsOpen }, { data: ctr }] = await Promise.all([
         approvalsQuery,
         supabase.from('requests').select('*', { count: 'exact', head: true })
           .eq('company_id', company!.id).eq('status', 'approved').is('po_id', null),
         supabase.from('purchase_orders').select('*', { count: 'exact', head: true })
           .eq('company_id', company!.id).eq('status', 'sent').neq('received_status', 'full'),
+        supabase.from('contracts').select('status, end_date, notice_days').eq('company_id', company!.id).eq('status', 'active'),
       ])
       setPendingApprovals(pending ?? 0)
       setReadyForPO(noPo ?? 0)
       setOpenReceipts(receiptsOpen ?? 0)
+      setExpiringContracts((ctr ?? []).filter(c => needsAttention(c as { status: 'active'; end_date: string | null; notice_days: number | null }, 60)).length)
     }
     loadCounts()
     return onRefreshCounts(loadCounts)
@@ -101,7 +105,7 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
                 </p>
               )}
               {items.map(({ to, icon: Icon, key }) => {
-                const badge = key === 'approvals' ? pendingApprovals : key === 'myRequests' ? readyForPO : key === 'receipts' ? openReceipts : 0
+                const badge = key === 'approvals' ? pendingApprovals : key === 'myRequests' ? readyForPO : key === 'receipts' ? openReceipts : key === 'contracts' ? expiringContracts : 0
                 return (
                   <NavLink key={to} to={to} onClick={handleNavClick} className={navLinkCls}>
                     {({ isActive }) => (
