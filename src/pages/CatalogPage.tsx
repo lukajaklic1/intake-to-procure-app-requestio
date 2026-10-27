@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { Upload, Plus, Search, Pencil, Trash2, Package, Tag, ChevronDown, ChevronRight, ListChevronsDownUp, ListChevronsUpDown } from 'lucide-react'
+import { Upload, Plus, Search, Pencil, Trash2, Package, Tag, ChevronDown, ChevronRight, ListChevronsDownUp, ListChevronsUpDown, ListTree, List } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { toast } from '../components/ui/Toast'
@@ -9,7 +9,7 @@ import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import ImportModal from '../components/ui/ImportModal'
 import PageToolbar from '../components/layout/PageToolbar'
-import { useHeaderCounts } from '../components/layout/HeaderCounts'
+import { useHeaderTabs } from '../components/layout/HeaderCounts'
 import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import Pagination from '../components/ui/Pagination'
@@ -264,7 +264,10 @@ export default function CatalogPage() {
     setCollapsed(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
   }
 
-  useHeaderCounts(loading ? [] : [{ label: t.categories.title, value: allCategories.filter(c => !c.parent_id).length }, { label: t.categories.subcategories, value: allCategories.filter(c => c.parent_id).length }, { label: t.nav.items, value: filteredItems.length }])
+  useHeaderTabs(loading ? [] : [
+    { id: 'tree', label: t.categories.viewTree, count: allCategories.filter(c => !c.parent_id).length, active: view === 'tree', icon: ListTree },
+    { id: 'all', label: t.categories.viewAll, count: filteredItems.length, active: view === 'all', icon: List },
+  ], id => setView(id === 'all' ? 'all' : 'tree'))
 
   return (
     <div className="p-4 lg:p-6">
@@ -279,14 +282,6 @@ export default function CatalogPage() {
             </div>
           )}
         </div><Button variant="secondary" onClick={() => openNewCategory()} className="gap-2"><Plus className="w-4 h-4" />{t.categories.new}</Button><Button onClick={() => openNew(preselectSub)} disabled={!hasSubcategories} title={hasSubcategories ? undefined : t.categories.needSubFirst} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
-        <div className="flex items-center gap-2 mr-1">
-          {(['tree', 'all'] as const).map(v => (
-            <button key={v} onClick={() => setView(v)}
-              className={`h-8 px-3 rounded-lg border border-field text-sm transition-colors ${view === v ? 'bg-surface text-ink' : 'bg-white text-ink2 hover:bg-hover'}`}>
-              {v === 'tree' ? t.categories.viewTree : t.categories.viewAll}
-            </button>
-          ))}
-        </div>
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
