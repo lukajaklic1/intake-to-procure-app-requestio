@@ -386,15 +386,6 @@ export default function CatalogPage() {
                   </Fragment>
                 )
               })}
-              {sections.length > 0 && !filtering && categoryFilter === 'all' && (
-                <tr>
-                  <td colSpan={6} data-nobottom className="!py-2">
-                    <button onClick={() => openNewCategory()} className="inline-flex items-center gap-1.5 text-sm text-ink2 hover:text-ink transition-colors">
-                      <Plus className="w-4 h-4" />{t.categories.addCategory}
-                    </button>
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table></div>
         )}
