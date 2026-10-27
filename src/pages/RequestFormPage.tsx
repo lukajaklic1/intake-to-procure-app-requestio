@@ -4,6 +4,7 @@ import { Plus, Trash2, ChevronLeft, Search, X, Paperclip, FileText, UploadCloud 
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
+import { useRequired } from '../lib/useRequired'
 import { toast } from '../components/ui/Toast'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
@@ -107,6 +108,7 @@ interface Line {
 }
 
 interface Header {
+  title: string
   supplier_id: string
   supplier_name: string
   location_id: string
@@ -115,7 +117,7 @@ interface Header {
   note: string
 }
 
-const EMPTY: Header = { supplier_id: '', supplier_name: '', location_id: '', department_id: '', needed_by_date: '', note: '' }
+const EMPTY: Header = { title: '', supplier_id: '', supplier_name: '', location_id: '', department_id: '', needed_by_date: '', note: '' }
 function newLine(position: number): Line { return { position, item_id: null, category_id: '', name: '', long_description: '', quantity: '1', unit: 'kos', est_unit_price: '0' } }
 
 export default function RequestFormPage() {
@@ -140,6 +142,7 @@ export default function RequestFormPage() {
 
   const [members, setMembers] = useState<{ id: string; first_name: string; last_name: string }[]>([])
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
+  const titleReq = useRequired(t.common.fieldRequired)
   const [categories, setCategories] = useState<{ id: string; name: string; parent_id: string | null; status: 'active' | 'inactive' }[]>([])
   const [locations, setLocations] = useState<{ id: string; name: string; address_street: string | null; address_city: string | null; address_postal_code: string | null }[]>([])
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
@@ -175,7 +178,7 @@ export default function RequestFormPage() {
     setHeader({
       supplier_id: req.supplier_id ?? '', supplier_name: req.supplier_name ?? '',
       location_id: req.location_id ?? '', department_id: req.department_id ?? '',
-      needed_by_date: req.needed_by_date ?? '', note: req.note ?? '',
+      title: req.title ?? '', needed_by_date: req.needed_by_date ?? '', note: req.note ?? '',
     })
     setDiscount(String(req.discount_amount ?? 0))
     const { data: atts } = await supabase.from('request_attachments').select('id, file_name, file_path').eq('request_id', id!)
@@ -240,6 +243,7 @@ export default function RequestFormPage() {
 
   async function persist(): Promise<string | null> {
     if (!company || !profile) return null
+    if (!titleReq.check(header as unknown as Record<string, unknown>, ['title'], { title: 'r-title' })) return null
     if (!header.location_id) { toast.error(s.location + ' *'); return null }
     if (lines.length === 0 || lines.some(l => !l.name.trim())) { toast.error(s.lineItems); return null }
     if (lines.some(l => !l.category_id)) { toast.error(s.category + ' *'); return null }
@@ -250,6 +254,7 @@ export default function RequestFormPage() {
       quantity: parseNum(l.quantity) || 1, unit: l.unit || 'kos', est_unit_price: parseNum(l.est_unit_price),
     }))
     const reqFields = {
+      title: header.title.trim() || null,
       supplier_id: header.supplier_id || null,
       supplier_name: header.supplier_name.trim() || null,
       location_id: header.location_id || null,
@@ -319,6 +324,10 @@ export default function RequestFormPage() {
       <div className="bg-white rounded-lg border border-field p-6 mb-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">{t.po.orderDetails}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="sm:col-span-2 lg:col-span-3">
+            <Input id="r-title" label={s.requestTitle + ' *'} placeholder={s.requestTitlePlaceholder} value={header.title} error={titleReq.errors.title}
+              onChange={e => { titleReq.clear('title'); setHeader(h => ({ ...h, title: e.target.value })) }} />
+          </div>
           <SearchCombobox items={suppliers} value={header.supplier_id} onChange={v => setHeader(h => ({ ...h, supplier_id: v }))} label={s.supplier} placeholder={s.noSupplier} emptyText={s.noMatch} />
           <Select id="r-location" label={s.location} required hint={locationHint} value={header.location_id} onChange={v => setHeader(h => ({ ...h, location_id: v }))} placeholder={t.common.select}>
             {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}

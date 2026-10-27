@@ -35,6 +35,7 @@ function catLabel(lines: { categories: { name: string } | null }[] | null | unde
 interface Row {
   id: string
   request_number: string
+  title: string | null
   status: RequestStatus
   total_estimate: number
   created_at: string
@@ -108,7 +109,7 @@ export default function RequestsPage() {
     setLoading(true)
     let query = supabase
       .from('requests')
-      .select('id, request_number, status, total_estimate, created_at, created_by, approver_id, po_id, needed_by_date, supplier_id, supplier_name, department_id, request_line_items(category_id, categories(name)), suppliers(name), locations(name)')
+      .select('id, request_number, title, status, total_estimate, created_at, created_by, approver_id, po_id, needed_by_date, supplier_id, supplier_name, department_id, request_line_items(category_id, categories(name)), suppliers(name), locations(name)')
       .eq('company_id', company.id)
       .order('created_at', { ascending: false })
     if (!canViewAll) query = query.eq('created_by', profile.id)
@@ -143,7 +144,7 @@ export default function RequestsPage() {
 
   const filtered = rows.filter(r => {
     const q = search.toLowerCase()
-    if (search && !r.request_number.toLowerCase().includes(q) && !(r.suppliers?.name ?? r.supplier_name ?? '').toLowerCase().includes(q)) return false
+    if (search && !r.request_number.toLowerCase().includes(q) && !(r.title ?? '').toLowerCase().includes(q) && !(r.suppliers?.name ?? r.supplier_name ?? '').toLowerCase().includes(q)) return false
     if (status !== 'all' && r.status !== status) return false
     if (dateFrom && r.created_at < dateFrom) return false
     if (supplierId && r.supplier_id !== supplierId) return false
@@ -222,9 +223,12 @@ export default function RequestsPage() {
                 <TableEmptyState icon={FileText} colSpan={10} title={hasActiveFilters ? t.common.empty.noResults.title : t.common.empty.requests.title} subtitle={hasActiveFilters ? t.common.empty.noResults.text : t.common.empty.requests.text} />
               ) : paginated.map(r => (
                 <tr key={r.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/requests/${r.id}`)}>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <Link to={`/requests/${r.id}`} className=" text-sm font-medium text-gray-400 hover:text-gray-600" onClick={e => e.stopPropagation()}>{r.request_number}</Link>
-                    <p className="text-xs text-gray-400 mt-0.5">{format(new Date(r.created_at), 'dd.MM.yyyy')}</p>
+                  <td className="px-4 py-3 max-w-[300px]">
+                    {r.title && <p className="text-sm font-medium text-ink truncate" title={r.title}>{r.title}</p>}
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <Link to={`/requests/${r.id}`} className={`font-medium hover:text-ink ${r.title ? 'text-xs text-gray-400' : 'text-sm text-gray-400'}`} onClick={e => e.stopPropagation()}>{r.request_number}</Link>
+                      <span className="text-xs text-gray-400">{format(new Date(r.created_at), 'dd.MM.yyyy')}</span>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-ink2">{catLabel(r.request_line_items)}</td>
                   <td className="px-4 py-3 text-ink2 max-w-[200px] truncate" title={r.suppliers?.name ?? r.supplier_name ?? undefined}>{r.suppliers?.name ?? r.supplier_name ?? '—'}</td>

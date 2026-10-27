@@ -263,6 +263,7 @@ export interface Request {
   id: string
   company_id: string
   request_number: string
+  title: string | null
   created_by: string
   project_id: string
   supplier_id: string | null

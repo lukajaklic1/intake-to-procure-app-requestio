@@ -183,7 +183,10 @@ export default function RequestDetailPage() {
 
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-gray-900 ">{req.request_number}</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 ">{req.request_number}</h1>
+            {req.title && <p className="text-sm text-ink2 mt-0.5">{req.title}</p>}
+          </div>
           <span className={`badge ${STATUS_BADGE[st]}`}>{s.st[st]}</span>
         </div>
         <div className="flex items-center gap-2">
