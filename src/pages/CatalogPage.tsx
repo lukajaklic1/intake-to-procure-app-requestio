@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import { Upload, Plus, Search, Pencil, Trash2, Package, Tag, ChevronDown, ChevronRight } from 'lucide-react'
+import { Upload, Plus, Search, Pencil, Trash2, Package, Tag, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { toast } from '../components/ui/Toast'
@@ -185,13 +185,16 @@ export default function CatalogPage() {
     { id: 'none', name: t.dashboard.noCategory, category: null, inactive: false, rows: filteredItems.filter(i => !i.category_id) },
   ].filter(g => (g.category || g.rows.length > 0) && (!filtering || g.rows.length > 0) && (categoryFilter === 'all' || g.id === categoryFilter))
 
+  const allCollapsed = groups.length > 0 && groups.every(g => collapsed.has(g.id))
+  function toggleAll() { setCollapsed(allCollapsed ? new Set() : new Set(groups.map(g => g.id))) }
+
   function toggleGroup(id: string) {
     setCollapsed(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
   }
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<><Button variant="secondary" onClick={() => setImportCatOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.categoriesButton}</Button><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.itemsButton}</Button><Button onClick={openNewCategory} className="gap-2"><Tag className="w-4 h-4" />{t.categories.new}</Button></>}>
+      <PageToolbar attached actions={<><Button variant="secondary" onClick={toggleAll} className="gap-2" disabled={groups.length === 0}>{allCollapsed ? <ChevronsUpDown className="w-4 h-4" /> : <ChevronsDownUp className="w-4 h-4" />}{allCollapsed ? t.common.expandAll : t.common.collapseAll}</Button><Button variant="secondary" onClick={() => setImportCatOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.categoriesButton}</Button><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.itemsButton}</Button><Button onClick={openNewCategory} className="gap-2"><Tag className="w-4 h-4" />{t.categories.new}</Button></>}>
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
