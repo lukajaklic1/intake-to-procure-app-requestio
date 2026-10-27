@@ -17,6 +17,7 @@ import { useLanguage } from '../hooks/useLanguage'
 import { useRequired } from '../lib/useRequired'
 import { poLineLocSl, poLineCountEn } from '../utils/pluralize'
 import { countByKey, mergeUsage } from '../lib/usageCounts'
+import { buildCategoryTree, categoryOptions } from '../lib/categories'
 
 interface ItemWithCategory extends Item {
   categories: { name: string } | null
@@ -32,7 +33,7 @@ export default function CatalogPage() {
   const [allCategories, setAllCategories] = useState<Category[]>([])
   const [catUsage, setCatUsage] = useState<Map<string, number>>(new Map())
   const [catModalOpen, setCatModalOpen] = useState(false)
-  const [catEditing, setCatEditing] = useState<{ id?: string; name: string; status: 'active' | 'inactive' }>({ name: '', status: 'active' })
+  const [catEditing, setCatEditing] = useState<{ id?: string; name: string; status: 'active' | 'inactive'; parent_id: string }>({ name: '', status: 'active', parent_id: '' })
   const [catSaving, setCatSaving] = useState(false)
   const [confirmDeleteCat, setConfirmDeleteCat] = useState<Category | null>(null)
   const [loading, setLoading] = useState(true)
@@ -77,23 +78,24 @@ export default function CatalogPage() {
     setCatUsage(mergeUsage(countByKey(poLines, 'category_id'), countByKey(reqLines, 'category_id')))
   }
 
-  function openNewCategory() { catReq.reset(); setCatEditing({ name: '', status: 'active' }); setCatModalOpen(true) }
-  function openEditCategory(c: Category) { catReq.reset(); setCatEditing({ id: c.id, name: c.name, status: c.status }); setCatModalOpen(true) }
-  function closeCategoryModal() { setCatModalOpen(false); setCatEditing({ name: '', status: 'active' }) }
+  function openNewCategory(parentId = '') { catReq.reset(); setCatEditing({ name: '', status: 'active', parent_id: parentId }); setCatModalOpen(true) }
+  function openEditCategory(c: Category) { catReq.reset(); setCatEditing({ id: c.id, name: c.name, status: c.status, parent_id: c.parent_id ?? '' }); setCatModalOpen(true) }
+  function closeCategoryModal() { setCatModalOpen(false); setCatEditing({ name: '', status: 'active', parent_id: '' }) }
 
   async function saveCategory() {
     if (!company || !catReq.check(catEditing, ['name'], { name: 'cat-name' })) return
     setCatSaving(true)
+    const parent_id = catEditing.parent_id || null
     const { error } = catEditing.id
-      ? await supabase.from('categories').update({ name: catEditing.name, status: catEditing.status, updated_at: new Date().toISOString() }).eq('id', catEditing.id)
-      : await supabase.from('categories').insert({ name: catEditing.name, company_id: company.id, status: 'active' })
+      ? await supabase.from('categories').update({ name: catEditing.name, status: catEditing.status, parent_id, updated_at: new Date().toISOString() }).eq('id', catEditing.id)
+      : await supabase.from('categories').insert({ name: catEditing.name, company_id: company.id, status: 'active', parent_id })
     setCatSaving(false)
     if (error) { toast.error(error.message); return }
     toast.success(t.common.saved); closeCategoryModal(); loadCategories()
   }
 
   // A category is in use if any item or any request/PO line references it.
-  function categoryInUse(id: string) { return (catUsage.get(id) ?? 0) > 0 || items.some(i => i.category_id === id) }
+  function categoryInUse(id: string) { return (catUsage.get(id) ?? 0) > 0 || items.some(i => i.category_id === id) || allCategories.some(c => c.parent_id === id) }
 
   async function handleDeleteCategory(c: Category) {
     setActionLoading(true)
@@ -180,15 +182,32 @@ export default function CatalogPage() {
   const filteredItems = items.filter(i =>
     (i.name.toLowerCase().includes(q) || i.item_number.includes(q)) && (statusFilter === 'all' || i.status === statusFilter))
 
-  // One group per category (plus legacy items without one). While filtering, groups with no match are hidden.
-  const groups = [
-    ...allCategories.map(c => ({ id: c.id, name: c.name, category: c as Category | null, inactive: c.status === 'inactive', rows: filteredItems.filter(i => i.category_id === c.id) })),
-    { id: 'none', name: t.dashboard.noCategory, category: null, inactive: false, rows: filteredItems.filter(i => !i.category_id) },
-  ].filter(g => (g.category || g.rows.length > 0) && (!filtering || g.rows.length > 0) && (categoryFilter === 'all' || g.id === categoryFilter))
+  // Sections: a header per category and per subcategory, each followed by its own items.
+  // While filtering, sections with no matching item are hidden.
+  interface Section { id: string; name: string; level: 0 | 1; category: Category | null; inactive: boolean; rows: ItemWithCategory[]; total: number; parentId: string | null; leaf: boolean }
+  const tree = buildCategoryTree(allCategories)
+  const sections: Section[] = []
+  for (const { category, children } of tree) {
+    const own = filteredItems.filter(i => i.category_id === category.id)
+    const subs = children.map(c => ({ c, rows: filteredItems.filter(i => i.category_id === c.id) }))
+    const total = own.length + subs.reduce((n, x) => n + x.rows.length, 0)
+    if (filtering && total === 0) continue
+    if (categoryFilter !== 'all' && categoryFilter !== category.id && !children.some(c => c.id === categoryFilter)) continue
+    sections.push({ id: category.id, name: category.name, level: 0, category, inactive: category.status === 'inactive', rows: own, total, parentId: null, leaf: children.length === 0 })
+    for (const { c, rows } of subs) {
+      if (filtering && rows.length === 0) continue
+      if (categoryFilter !== 'all' && categoryFilter !== category.id && categoryFilter !== c.id) continue
+      sections.push({ id: c.id, name: c.name, level: 1, category: c, inactive: c.status === 'inactive', rows, total: rows.length, parentId: category.id, leaf: true })
+    }
+  }
+  const legacy = filteredItems.filter(i => !i.category_id)
+  if (legacy.length > 0 && categoryFilter === 'all') sections.push({ id: 'none', name: t.dashboard.noCategory, level: 0, category: null, inactive: false, rows: legacy, total: legacy.length, parentId: null, leaf: true })
 
-  const allCollapsed = groups.length > 0 && groups.every(g => collapsed.has(g.id))
-  function toggleAll() { setCollapsed(allCollapsed ? new Set() : new Set(groups.map(g => g.id))) }
-
+  // A subcategory is hidden when its category (or itself) is collapsed.
+  const isOpen = (sec: Section) => filtering || !(collapsed.has(sec.id) || (sec.parentId && collapsed.has(sec.parentId)))
+  const headerOpen = (sec: Section) => filtering || !collapsed.has(sec.id)
+  const allCollapsed = sections.length > 0 && sections.every(g => collapsed.has(g.id))
+  function toggleAll() { setCollapsed(allCollapsed ? new Set() : new Set(sections.map(g => g.id))) }
   function toggleGroup(id: string) {
     setCollapsed(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
   }
@@ -197,7 +216,7 @@ export default function CatalogPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<><Button variant="secondary" onClick={toggleAll} disabled={groups.length === 0} className="!px-0 w-8 h-8" title={allCollapsed ? t.common.expandAll : t.common.collapseAll} aria-label={allCollapsed ? t.common.expandAll : t.common.collapseAll}>{allCollapsed ? <ListChevronsUpDown className="w-4 h-4 text-icon" /> : <ListChevronsDownUp className="w-4 h-4 text-icon" />}</Button><Button variant="secondary" onClick={() => setImportCatOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.categoriesButton}</Button><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.itemsButton}</Button><Button onClick={openNewCategory} className="gap-2"><Tag className="w-4 h-4" />{t.categories.new}</Button></>}>
+      <PageToolbar attached actions={<><Button variant="secondary" onClick={toggleAll} disabled={sections.length === 0} className="!px-0 w-8 h-8" title={allCollapsed ? t.common.expandAll : t.common.collapseAll} aria-label={allCollapsed ? t.common.expandAll : t.common.collapseAll}>{allCollapsed ? <ListChevronsUpDown className="w-4 h-4 text-icon" /> : <ListChevronsDownUp className="w-4 h-4 text-icon" />}</Button><Button variant="secondary" onClick={() => setImportCatOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.categoriesButton}</Button><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.itemsButton}</Button><Button onClick={() => openNewCategory()} className="gap-2"><Tag className="w-4 h-4" />{t.categories.new}</Button></>}>
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
@@ -205,7 +224,7 @@ export default function CatalogPage() {
         </div>
         <FilterSelect label={t.filters.labels.category} value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
           <option value="all">{t.filters.allF}</option>
-          {allCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {categoryOptions(allCategories, false).map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
         </FilterSelect>
         <FilterSelect label={t.filters.labels.status} value={statusFilter} onChange={e => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}>
           {(['all', 'active', 'inactive'] as const).map(v => <option key={v} value={v}>{v === 'all' ? t.common.allM : v === 'active' ? t.common.activeM : t.common.inactiveM}</option>)}
@@ -225,22 +244,24 @@ export default function CatalogPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-field">
-              {groups.length === 0 ? (
+              {sections.length === 0 ? (
                 <TableEmptyState icon={filtering ? Package : Tag} colSpan={6}
                   title={filtering ? t.common.empty.noResults.title : t.common.empty.categories.title}
                   subtitle={filtering ? t.common.empty.noResults.text : t.common.empty.categories.text}
-                  action={filtering ? undefined : <Button onClick={openNewCategory} className="gap-2 mt-2"><Plus className="w-4 h-4" />{t.categories.new}</Button>} />
-              ) : groups.map(g => {
-                const open = filtering || !collapsed.has(g.id)
+                  action={filtering ? undefined : <Button onClick={() => openNewCategory()} className="gap-2 mt-2"><Plus className="w-4 h-4" />{t.categories.new}</Button>} />
+              ) : sections.map(g => {
+                const showItems = isOpen(g)
+                // a subcategory row is only shown when its category is open
+                if (g.level === 1 && !(filtering || !(g.parentId && collapsed.has(g.parentId)))) return null
                 return (
                   <Fragment key={g.id}>
-                    {/* Category header row */}
-                    <tr className="bg-surface hover:bg-hover cursor-pointer select-none group" onClick={() => toggleGroup(g.id)}>
+                    {/* Category / subcategory header row */}
+                    <tr className={`${g.level === 0 ? 'bg-surface hover:bg-hover' : 'hover:bg-surface'} cursor-pointer select-none group`} onClick={() => toggleGroup(g.id)}>
                       <td colSpan={6} className="!py-2.5">
-                        <div className="flex items-center gap-2">
-                          {open ? <ChevronDown className="w-4 h-4 text-icon shrink-0" /> : <ChevronRight className="w-4 h-4 text-icon shrink-0" />}
-                          <span className={`font-medium ${g.inactive ? 'text-muted' : 'text-ink'}`}>{g.name}</span>
-                          <span className="text-xs text-gray-400 tabular-nums">{g.rows.length}</span>
+                        <div className={`flex items-center gap-2 ${g.level === 1 ? 'ml-6' : ''}`}>
+                          {headerOpen(g) ? <ChevronDown className="w-4 h-4 text-icon shrink-0" /> : <ChevronRight className="w-4 h-4 text-icon shrink-0" />}
+                          <span className={`${g.level === 0 ? 'font-medium' : ''} ${g.inactive ? 'text-muted' : 'text-ink'}`}>{g.name}</span>
+                          <span className="text-xs text-gray-400 tabular-nums">{g.total}</span>
                           {g.inactive && <span className="badge badge-neutral">{t.common.inactiveF}</span>}
                           {g.category && (
                             <button onClick={e => { e.stopPropagation(); openEditCategory(g.category!) }}
@@ -252,12 +273,12 @@ export default function CatalogPage() {
                       </td>
                     </tr>
 
-                    {open && g.rows.map(item => {
+                    {showItems && g.rows.map(item => {
                       const count = usage.get(item.id) ?? 0
                       const inUse = count > 0
                       return (
                         <tr key={item.id} className="hover:bg-surface transition-colors">
-                          <td className="px-4 py-3 text-xs text-gray-500 font-medium">{item.item_number}</td>
+                          <td className="px-4 py-3 text-xs text-gray-500 font-medium" style={g.level === 1 ? { paddingLeft: 'calc(var(--page-px) + 1.5rem)' } : undefined}>{item.item_number}</td>
                           <td className="px-4 py-3">
                             <p className="font-medium text-gray-900">{item.name}</p>
                             {item.long_description && <p className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{item.long_description}</p>}
@@ -281,13 +302,22 @@ export default function CatalogPage() {
                       )
                     })}
 
-                    {/* Add an item inside this category */}
-                    {open && !filtering && g.category && (
+                    {/* Add rows: a subcategory, or an item where the items live */}
+                    {showItems && !filtering && g.category && (
                       <tr>
                         <td colSpan={6} className="!py-2">
-                          <button onClick={() => openNew(g.id)} className="inline-flex items-center gap-1.5 text-sm text-ink2 hover:text-ink transition-colors">
-                            <Plus className="w-4 h-4" />{g.rows.length === 0 ? t.common.empty.categoryEmpty + ' ' : ''}{s.new}
-                          </button>
+                          <div className={`flex items-center gap-4 ${g.level === 1 ? 'ml-6' : ''}`}>
+                            {(g.level === 1 || g.leaf) && (
+                              <button onClick={() => openNew(g.id)} className="inline-flex items-center gap-1.5 text-sm text-ink2 hover:text-ink transition-colors">
+                                <Plus className="w-4 h-4" />{g.rows.length === 0 ? t.common.empty.categoryEmpty + ' ' : ''}{s.new}
+                              </button>
+                            )}
+                            {g.level === 0 && (
+                              <button onClick={() => openNewCategory(g.id)} className="inline-flex items-center gap-1.5 text-sm text-ink2 hover:text-ink transition-colors">
+                                <Plus className="w-4 h-4" />{t.categories.newSub}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )}
@@ -301,12 +331,27 @@ export default function CatalogPage() {
 
       <ImportModal open={importCatOpen} onClose={() => setImportCatOpen(false)} title={t.common.import.categoriesTitle}
         templateName="categories"
-        columns={[{ key: 'name', label: t.common.import.cols.name, required: true, example: 'Hrana' }]}
-        existing={new Set(allCategories.map(c => c.name.toLowerCase()))}
-        keyOf={row => row.name.toLowerCase()}
+        columns={[
+          { key: 'name', label: t.common.import.cols.name, required: true, example: 'Hrana' },
+          { key: 'parent', label: t.common.import.cols.parent, example: '' },
+        ]}
+        existing={new Set(allCategories.map(c => `${(allCategories.find(p => p.id === c.parent_id)?.name ?? '').toLowerCase()}›${c.name.toLowerCase()}`))}
+        keyOf={row => `${row.parent.toLowerCase()}›${row.name.toLowerCase()}`}
         onImport={async rows => {
-          const { error } = await supabase.from('categories').insert(rows.map(r => ({ company_id: company!.id, name: r.name, status: 'active' })))
-          if (error) throw error
+          // Parents named in the file that don't exist yet are created first, then the subcategories.
+          const topByName = new Map(allCategories.filter(c => !c.parent_id).map(c => [c.name.toLowerCase(), c.id]))
+          const missingParents = [...new Set(rows.map(r => r.parent).filter(n => n && !topByName.has(n.toLowerCase())))]
+          const newTop = [...missingParents, ...rows.filter(r => !r.parent).map(r => r.name)].filter((n, i, a) => !topByName.has(n.toLowerCase()) && a.indexOf(n) === i)
+          if (newTop.length) {
+            const { data, error } = await supabase.from('categories').insert(newTop.map(name => ({ company_id: company!.id, name, status: 'active' }))).select('id, name')
+            if (error) throw error
+            for (const c of data ?? []) topByName.set(c.name.toLowerCase(), c.id)
+          }
+          const subs = rows.filter(r => r.parent).map(r => ({ company_id: company!.id, name: r.name, status: 'active', parent_id: topByName.get(r.parent.toLowerCase()) }))
+          if (subs.length) {
+            const { error } = await supabase.from('categories').insert(subs)
+            if (error) throw error
+          }
           loadCategories()
         }} />
 
@@ -315,6 +360,7 @@ export default function CatalogPage() {
         columns={[
           { key: 'name', label: t.common.import.cols.name, required: true, example: 'Olivno olje 1 L' },
           { key: 'category', label: t.common.import.cols.category, required: true, example: 'Hrana' },
+          { key: 'subcategory', label: t.common.import.cols.subcategory, example: 'Olja in omake' },
           { key: 'unit', label: t.common.import.cols.unit, example: 'kos' },
           { key: 'price', label: t.common.import.cols.price, example: '5,90' },
           { key: 'description', label: t.common.import.cols.description, example: 'Ekstra deviško' },
@@ -323,20 +369,28 @@ export default function CatalogPage() {
         keyOf={row => row.name.toLowerCase()}
         validate={row => (row.price && Number.isNaN(Number(row.price.replace(',', '.')))) ? t.common.import.invalidNumber + ': ' + row.price : null}
         onImport={async rows => {
-          // Categories named in the file that don't exist yet are created first.
-          const byName = new Map(allCategories.map(c => [c.name.toLowerCase(), c.id]))
-          const missing = [...new Set(rows.map(r => r.category).filter(n => !byName.has(n.toLowerCase())))]
-          if (missing.length) {
-            const { data, error } = await supabase.from('categories')
-              .insert(missing.map(name => ({ company_id: company!.id, name, status: 'active' }))).select('id, name')
+          // Categories / subcategories named in the file that don't exist yet are created first.
+          const top = new Map(allCategories.filter(c => !c.parent_id).map(c => [c.name.toLowerCase(), c.id]))
+          const missingTop = [...new Set(rows.map(r => r.category).filter(n => !top.has(n.toLowerCase())))]
+          if (missingTop.length) {
+            const { data, error } = await supabase.from('categories').insert(missingTop.map(name => ({ company_id: company!.id, name, status: 'active' }))).select('id, name')
             if (error) throw error
-            for (const c of data ?? []) byName.set(c.name.toLowerCase(), c.id)
+            for (const c of data ?? []) top.set(c.name.toLowerCase(), c.id)
+          }
+          const subKey = (cat: string, sub: string) => `${top.get(cat.toLowerCase())}|${sub.toLowerCase()}`
+          const sub = new Map(allCategories.filter(c => c.parent_id).map(c => [`${c.parent_id}|${c.name.toLowerCase()}`, c.id]))
+          const wanted = [...new Map(rows.filter(r => r.subcategory).map(r => [subKey(r.category, r.subcategory), r])).values()].filter(r => !sub.has(subKey(r.category, r.subcategory)))
+          if (wanted.length) {
+            const { data, error } = await supabase.from('categories').insert(wanted.map(r => ({ company_id: company!.id, name: r.subcategory, status: 'active', parent_id: top.get(r.category.toLowerCase()) }))).select('id, name, parent_id')
+            if (error) throw error
+            for (const c of data ?? []) sub.set(`${c.parent_id}|${c.name.toLowerCase()}`, c.id)
           }
           // Item numbers continue after the highest existing one.
           const last = items.reduce((m, i) => Math.max(m, parseInt(i.item_number, 10) || 0), 100000)
           const payload = rows.map((r, i) => ({
             company_id: company!.id, item_number: String(last + 1 + i), name: r.name,
-            long_description: r.description || null, category_id: byName.get(r.category.toLowerCase()),
+            long_description: r.description || null,
+            category_id: r.subcategory ? sub.get(subKey(r.category, r.subcategory)) : top.get(r.category.toLowerCase()),
             default_unit: r.unit || null,
             default_unit_price: r.price ? Number(r.price.replace(',', '.')) : null,
             status: 'active',
@@ -385,7 +439,17 @@ export default function CatalogPage() {
                 className={`rounded-lg border px-3 py-2 text-sm focus:outline-none ${req.errors.category_id ? 'border-red-400' : 'border-field hover:border-field-hover focus:border-field-focus'}`}
               >
                 <option value="">{t.common.select}</option>
-                {allCategories.filter(c => c.status === 'active' || c.id === editing.category_id).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {tree.map(({ category, children }) => {
+                  const subs = children.filter(c => c.status === 'active' || c.id === editing.category_id)
+                  const topOk = category.status === 'active' || category.id === editing.category_id
+                  if (children.length === 0) return topOk ? <option key={category.id} value={category.id}>{category.name}</option> : null
+                  return (
+                    <optgroup key={category.id} label={category.name}>
+                      {category.id === editing.category_id && <option value={category.id}>{category.name}</option>}
+                      {subs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </optgroup>
+                  )
+                })}
               </select>
               {req.errors.category_id && <p className="text-xs text-red-600">{req.errors.category_id}</p>}
             </div>
@@ -437,6 +501,16 @@ export default function CatalogPage() {
 
       <Modal open={catModalOpen} onClose={closeCategoryModal} title={catEditing.id ? t.common.editEntity : t.categories.new} size="sm">
         <Input id="cat-name" label={t.categories.categoryName + ' *'} value={catEditing.name} error={catReq.errors.name} onChange={e => { catReq.clear('name'); setCatEditing(f => ({ ...f, name: e.target.value })) }} />
+        {!(catEditing.id && allCategories.some(c => c.parent_id === catEditing.id)) && (
+          <div className="flex flex-col gap-1 mt-4">
+            <label htmlFor="cat-parent" className="text-sm font-medium text-gray-700">{t.categories.parent}</label>
+            <select id="cat-parent" value={catEditing.parent_id} onChange={e => setCatEditing(f => ({ ...f, parent_id: e.target.value }))}
+              className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus bg-white">
+              <option value="">{t.categories.noParent}</option>
+              {tree.filter(n => n.category.id !== catEditing.id).map(n => <option key={n.category.id} value={n.category.id}>{n.category.name}</option>)}
+            </select>
+          </div>
+        )}
         {catEditing.id && (
           <div className="flex items-center justify-between p-3 mt-4 bg-gray-50 rounded-lg border border-field">
             <div>

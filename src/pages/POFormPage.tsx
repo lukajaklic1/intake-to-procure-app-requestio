@@ -8,6 +8,7 @@ import { useLanguage } from '../hooks/useLanguage'
 import { toast } from '../components/ui/Toast'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import CategoryOptions from '../components/ui/CategoryOptions'
 import type { Supplier, Category, Location, Department, Item } from '../types/database'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -195,7 +196,7 @@ export default function POFormPage() {
     const cid = company.id
     const [s, cat, loc, dept, itm] = await Promise.all([
       supabase.from('suppliers').select('*').eq('company_id', cid).eq('status', 'active').order('name'),
-      supabase.from('categories').select('*').eq('company_id', cid).eq('status', 'active').order('name'),
+      supabase.from('categories').select('*').eq('company_id', cid).order('name'),
       supabase.from('locations').select('*').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('departments').select('*').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('items').select('*').eq('company_id', cid).eq('status', 'active').order('name'),
@@ -647,7 +648,7 @@ export default function POFormPage() {
                     <select value={line.category_id} onChange={e => setLine(idx, { category_id: e.target.value })} disabled={isReadOnly}
                       className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus bg-white text-ink">
                       <option value="">{t.common.select}</option>
-                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      <CategoryOptions categories={categories} selectedId={line.category_id} />
                     </select>
                   </td>
                   <td className="px-4 py-2.5 pt-3">

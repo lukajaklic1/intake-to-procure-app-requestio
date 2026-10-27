@@ -138,7 +138,7 @@ export const translations = {
           name: 'Name', street: 'Street', postalCode: 'Postal code', city: 'City', country: 'Country',
           vat: 'VAT number', contact: 'Contact person', email: 'Email', phone: 'Phone',
           paymentTerms: 'Payment terms', incoterm: 'Incoterm',
-          category: 'Category', unit: 'Unit', price: 'Price', description: 'Description',
+          category: 'Category', subcategory: 'Subcategory', parent: 'Parent category', unit: 'Unit', price: 'Price', description: 'Description',
         },
       },
       empty: {
@@ -184,6 +184,7 @@ export const translations = {
       avgPoValue: 'Avg PO value',
       spendOverTime: 'Spend over time',
       spendByCategory: 'Spend by category',
+      spendBySubcategory: 'Spend by subcategory',
       spendBySupplier: 'Spend by supplier',
       spendByProject: 'Spend by project',
       spendByDepartment: 'Spend by department',
@@ -396,6 +397,9 @@ export const translations = {
       createFirst: 'Add your first category →',
       categoryName: 'Category name',
       statusHelp: 'Inactive categories are hidden from PO and item dropdowns.',
+      parent: 'Parent category',
+      noParent: 'None (main category)',
+      newSub: 'New subcategory',
     },
 
     // Projects
@@ -881,7 +885,7 @@ export const translations = {
           name: 'Ime', street: 'Ulica', postalCode: 'Poštna številka', city: 'Mesto', country: 'Država',
           vat: 'Davčna številka', contact: 'Kontaktna oseba', email: 'E-pošta', phone: 'Telefon',
           paymentTerms: 'Plačilni pogoji', incoterm: 'Incoterm',
-          category: 'Kategorija', unit: 'Enota', price: 'Cena', description: 'Opis',
+          category: 'Kategorija', subcategory: 'Podkategorija', parent: 'Nadrejena kategorija', unit: 'Enota', price: 'Cena', description: 'Opis',
         },
       },
       empty: {
@@ -927,6 +931,7 @@ export const translations = {
       avgPoValue: 'Povpr. vrednost naročila',
       spendOverTime: 'Stroški skozi čas',
       spendByCategory: 'Stroški po kategorijah',
+      spendBySubcategory: 'Stroški po podkategorijah',
       spendBySupplier: 'Stroški po dobaviteljih',
       spendByProject: 'Stroški po projektih',
       spendByDepartment: 'Stroški po oddelkih',
@@ -1139,6 +1144,9 @@ export const translations = {
       createFirst: 'Dodajte prvo kategorijo →',
       categoryName: 'Ime kategorije',
       statusHelp: 'Neaktivne kategorije niso prikazane v naročilih in artiklih.',
+      parent: 'Nadrejena kategorija',
+      noParent: 'Brez (glavna kategorija)',
+      newSub: 'Nova podkategorija',
     },
 
     // Projects

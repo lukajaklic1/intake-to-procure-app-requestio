@@ -14,6 +14,7 @@ import Pagination from '../components/ui/Pagination'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import EmptyState from '../components/ui/EmptyState'
 import PageToolbar from '../components/layout/PageToolbar'
+import { categoryOptions } from '../lib/categories'
 import FilterSelect from '../components/ui/FilterSelect'
 
 const SANS = '"Inter Variable", ui-sans-serif, system-ui, sans-serif'
@@ -186,13 +187,14 @@ export default function DashboardPage() {
 
   // Reference data for dropdowns
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
+  const [categories, setCategories] = useState<{ id: string; name: string; parent_id: string | null; status: 'active' | 'inactive' }[]>([])
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
 
   // Chart data
   const [spendByMonth, setSpendByMonth] = useState<{ month: string; amount: number }[]>([])
   const [spendBySupplier, setSpendBySupplier] = useState<BreakdownRow[]>([])
   const [spendByCategory, setSpendByCategory] = useState<BreakdownRow[]>([])
+  const [spendBySubcategory, setSpendBySubcategory] = useState<BreakdownRow[]>([])
   const [spendByDepartment, setSpendByDepartment] = useState<BreakdownRow[]>([])
   const [spendByMaterial, setSpendByMaterial] = useState<BreakdownRow[]>([])
 
@@ -220,7 +222,7 @@ export default function DashboardPage() {
     const cid = company!.id
     const [s, c, d] = await Promise.all([
       supabase.from('suppliers').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
-      supabase.from('categories').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
+      supabase.from('categories').select('id, name, parent_id, status').eq('company_id', cid).order('name'),
       supabase.from('departments').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
     ])
     setSuppliers(s.data ?? [])
@@ -305,6 +307,7 @@ export default function DashboardPage() {
       }))
     setSpendBySupplier(toBreakdown(d.spend_by_supplier, t.dashboard.unknown))
     setSpendByCategory(toBreakdown(d.spend_by_category, t.dashboard.noCategory))
+    setSpendBySubcategory(toBreakdown(d.spend_by_subcategory, t.dashboard.noCategory))
     setSpendByDepartment(toBreakdown(d.spend_by_department, t.dashboard.noDepartment))
     setSpendByMaterial(toBreakdown(d.spend_by_material, t.dashboard.unknown))
   }
@@ -356,7 +359,7 @@ export default function DashboardPage() {
 
           <FilterSelect label={t.filters.labels.category} value={filters.categoryId} onChange={e => setFilter('categoryId', e.target.value)}>
             <option value="">{t.filters.allF}</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {categoryOptions(categories).map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
           </FilterSelect>
 
           <FilterSelect label={t.filters.labels.department} value={filters.departmentId} onChange={e => setFilter('departmentId', e.target.value)}>
@@ -433,6 +436,12 @@ export default function DashboardPage() {
         <ChartCard title={t.dashboard.spendByCategory}>
           <BreakdownTable rows={spendByCategory} currency={currency} />
         </ChartCard>
+
+        {spendBySubcategory.length > 0 && (
+          <ChartCard title={t.dashboard.spendBySubcategory}>
+            <BreakdownTable rows={spendBySubcategory} currency={currency} />
+          </ChartCard>
+        )}
 
         <ChartCard title={t.dashboard.spendBySupplier}>
           <BreakdownTable rows={spendBySupplier} currency={currency} />

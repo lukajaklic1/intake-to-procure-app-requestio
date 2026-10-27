@@ -11,6 +11,7 @@ import Pagination from '../components/ui/Pagination'
 import PageToolbar from '../components/layout/PageToolbar'
 import { useHeaderCounts } from '../components/layout/HeaderCounts'
 import FilterSelect from '../components/ui/FilterSelect'
+import { categoryOptions, categoryAndChildren } from '../lib/categories'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import { format, subMonths, startOfMonth } from 'date-fns'
 
@@ -78,7 +79,7 @@ export default function PurchaseOrdersPage() {
 
   // Reference data for dropdowns
   const [suppliers, setSuppliers]     = useState<{ id: string; name: string }[]>([])
-  const [categories, setCategories]   = useState<{ id: string; name: string }[]>([])
+  const [categories, setCategories]   = useState<{ id: string; name: string; parent_id: string | null; status: 'active' | 'inactive' }[]>([])
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
   const [members, setMembers]         = useState<{ id: string; first_name: string; last_name: string }[]>([])
 
@@ -94,7 +95,7 @@ export default function PurchaseOrdersPage() {
     const cid = company.id
     const [s, c, d, u] = await Promise.all([
       supabase.from('suppliers').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
-      supabase.from('categories').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
+      supabase.from('categories').select('id, name, parent_id, status').eq('company_id', cid).order('name'),
       supabase.from('departments').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('users').select('id, first_name, last_name').eq('company_id', cid).order('first_name'),
     ])
@@ -151,7 +152,7 @@ export default function PurchaseOrdersPage() {
     if (status !== 'all' && po.status !== status) return false
     if (dateFrom && po.created_at < dateFrom) return false
     if (supplierId && po.supplier_id !== supplierId) return false
-    if (categoryId && !po.po_line_items?.some(l => l.category_id === categoryId)) return false
+    if (categoryId) { const ids = categoryAndChildren(categoryId, categories); if (!po.po_line_items?.some(l => ids.has(l.category_id ?? ''))) return false }
     if (departmentId && po.department_id !== departmentId) return false
     if (creatorId && po.created_by !== creatorId) return false
     return true
@@ -200,7 +201,7 @@ export default function PurchaseOrdersPage() {
           {/* Category */}
           <FilterSelect label={t.filters.labels.category} value={categoryId} onChange={e => setCategoryId(e.target.value)}>
             <option value="">{t.filters.allF}</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {categoryOptions(categories).map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
           </FilterSelect>
 
           {/* Department */}

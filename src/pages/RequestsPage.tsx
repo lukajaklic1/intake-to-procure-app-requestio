@@ -9,6 +9,7 @@ import Pagination from '../components/ui/Pagination'
 import PageToolbar from '../components/layout/PageToolbar'
 import { useHeaderCounts } from '../components/layout/HeaderCounts'
 import FilterSelect from '../components/ui/FilterSelect'
+import { categoryOptions, categoryAndChildren } from '../lib/categories'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import { format, subMonths, startOfMonth } from 'date-fns'
 import type { RequestStatus } from '../types/database'
@@ -82,7 +83,7 @@ export default function RequestsPage() {
   const [creatorId, setCreatorId] = useState('')
 
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
+  const [categories, setCategories] = useState<{ id: string; name: string; parent_id: string | null; status: 'active' | 'inactive' }[]>([])
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
   const [members, setMembers] = useState<{ id: string; first_name: string; last_name: string }[]>([])
 
@@ -95,7 +96,7 @@ export default function RequestsPage() {
     const cid = company.id
     const [sp, c, d, u] = await Promise.all([
       supabase.from('suppliers').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
-      supabase.from('categories').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
+      supabase.from('categories').select('id, name, parent_id, status').eq('company_id', cid).order('name'),
       supabase.from('departments').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('users').select('id, first_name, last_name').eq('company_id', cid).order('first_name'),
     ])
@@ -146,7 +147,7 @@ export default function RequestsPage() {
     if (status !== 'all' && r.status !== status) return false
     if (dateFrom && r.created_at < dateFrom) return false
     if (supplierId && r.supplier_id !== supplierId) return false
-    if (categoryId && !r.request_line_items?.some(l => l.category_id === categoryId)) return false
+    if (categoryId) { const ids = categoryAndChildren(categoryId, categories); if (!r.request_line_items?.some(l => ids.has(l.category_id ?? ''))) return false }
     if (departmentId && r.department_id !== departmentId) return false
     if (poFilter === 'ordered' && !r.po_id) return false
     if (poFilter === 'not' && r.po_id) return false
@@ -184,7 +185,7 @@ export default function RequestsPage() {
           </FilterSelect>
           <FilterSelect label={t.filters.labels.category} value={categoryId} onChange={e => setCategoryId(e.target.value)}>
             <option value="">{t.filters.allF}</option>
-            {categories.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+            {categoryOptions(categories).map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
           </FilterSelect>
           <FilterSelect label={t.filters.labels.department} value={departmentId} onChange={e => setDepartmentId(e.target.value)}>
             <option value="">{t.filters.allM}</option>

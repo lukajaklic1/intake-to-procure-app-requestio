@@ -7,6 +7,7 @@ import { useLanguage } from '../hooks/useLanguage'
 import { toast } from '../components/ui/Toast'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import CategoryOptions from '../components/ui/CategoryOptions'
 import Modal from '../components/ui/Modal'
 import type { Item } from '../types/database'
 
@@ -139,7 +140,7 @@ export default function RequestFormPage() {
 
   const [members, setMembers] = useState<{ id: string; first_name: string; last_name: string }[]>([])
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
+  const [categories, setCategories] = useState<{ id: string; name: string; parent_id: string | null; status: 'active' | 'inactive' }[]>([])
   const [locations, setLocations] = useState<{ id: string; name: string; address_street: string | null; address_city: string | null; address_postal_code: string | null }[]>([])
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
   const [items, setItems] = useState<Item[]>([])
@@ -152,7 +153,7 @@ export default function RequestFormPage() {
     const cid = company.id
     const [sup, c, l, d, itm] = await Promise.all([
       supabase.from('suppliers').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
-      supabase.from('categories').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
+      supabase.from('categories').select('id, name, parent_id, status').eq('company_id', cid).order('name'),
       supabase.from('locations').select('id, name, address_street, address_city, address_postal_code').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('departments').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('items').select('*').eq('company_id', cid).eq('status', 'active').order('name'),
@@ -401,7 +402,7 @@ export default function RequestFormPage() {
                     <select value={line.category_id} onChange={e => setLine(idx, { category_id: e.target.value })}
                       className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus bg-white text-ink">
                       <option value="">{t.common.select}</option>
-                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      <CategoryOptions categories={categories} selectedId={line.category_id} />
                     </select>
                   </td>
                   <td className="px-4 py-2.5 pt-3"><input type="text" inputMode="decimal" {...numInput(line.quantity, v => setLine(idx, { quantity: v }))} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right" /></td>

@@ -64,6 +64,7 @@ export interface Category {
   id: string
   company_id: string
   name: string
+  parent_id?: string | null
   status: 'active' | 'inactive'
   created_at: string
   updated_at: string
