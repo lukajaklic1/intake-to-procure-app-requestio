@@ -6,6 +6,7 @@ import Modal from './Modal'
 import Button from './Button'
 import { toast } from './Toast'
 import { useLanguage } from '../../hooks/useLanguage'
+import { dbError } from '../../lib/dbError'
 
 export type ImportRow = Record<string, string>
 
@@ -104,7 +105,7 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
       toast.success(`${s.imported}: ${parsed.valid.length}`)
       close()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e))
+      toast.error(dbError(e, t))
     } finally {
       setBusy(false)
     }

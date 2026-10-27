@@ -17,6 +17,7 @@ import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Supplier } from '../types/database'
 import { useLanguage } from '../hooks/useLanguage'
 import { useRequired } from '../lib/useRequired'
+import { dbError } from '../lib/dbError'
 import { poLocSl, poCountEn } from '../utils/pluralize'
 import { countByKey } from '../lib/usageCounts'
 
@@ -74,11 +75,11 @@ export default function SuppliersPage() {
     setSaving(true)
     if (editing.id) {
       const { error } = await supabase.from('suppliers').update({ ...editing, updated_at: new Date().toISOString() }).eq('id', editing.id)
-      if (error) { toast.error(error.message); setSaving(false); return }
+      if (error) { toast.error(dbError(error, t)); setSaving(false); return }
       toast.success(t.common.saved)
     } else {
       const { error } = await supabase.from('suppliers').insert({ ...editing, company_id: company.id, status: 'active' })
-      if (error) { toast.error(error.message); setSaving(false); return }
+      if (error) { toast.error(dbError(error, t)); setSaving(false); return }
       toast.success(t.common.saved)
     }
     setSaving(false); closeModal(); load()
@@ -96,7 +97,7 @@ export default function SuppliersPage() {
     }
     const { error } = await supabase.from('suppliers').delete().eq('id', s.id)
     setActionLoading(false); setConfirmDelete(null)
-    if (error) { toast.error(error.message); return }
+    if (error) { toast.error(dbError(error, t)); return }
     toast.success(t.common.deleted); load()
   }
 

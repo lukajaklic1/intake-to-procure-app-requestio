@@ -15,6 +15,7 @@ import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Item, Category } from '../types/database'
 import { useLanguage } from '../hooks/useLanguage'
 import { useRequired } from '../lib/useRequired'
+import { dbError } from '../lib/dbError'
 import { poLineLocSl, poLineCountEn } from '../utils/pluralize'
 import { countByKey, mergeUsage } from '../lib/usageCounts'
 import { buildCategoryTree, categoryOptions } from '../lib/categories'
@@ -101,7 +102,7 @@ export default function CatalogPage() {
       ? await supabase.from('categories').update({ name: catEditing.name, status: catEditing.status, parent_id, updated_at: new Date().toISOString() }).eq('id', catEditing.id)
       : await supabase.from('categories').insert({ name: catEditing.name, company_id: company.id, status: 'active', parent_id })
     setCatSaving(false)
-    if (error) { toast.error(error.message); return }
+    if (error) { toast.error(dbError(error, t)); return }
     toast.success(t.common.saved); closeCategoryModal(); loadCategories()
   }
 
@@ -112,7 +113,7 @@ export default function CatalogPage() {
     setActionLoading(true)
     const { error } = await supabase.from('categories').delete().eq('id', c.id)
     setActionLoading(false); setConfirmDeleteCat(null)
-    if (error) { toast.error(error.message); return }
+    if (error) { toast.error(dbError(error, t)); return }
     if (categoryFilter === c.id) setCategoryFilter('all')
     toast.success(t.common.deleted); closeCategoryModal(); loadCategories()
   }
@@ -147,7 +148,7 @@ export default function CatalogPage() {
         status: editing.status,
         updated_at: new Date().toISOString(),
       }).eq('id', editing.id)
-      if (error) { toast.error(error.message); setSaving(false); return }
+      if (error) { toast.error(dbError(error, t)); setSaving(false); return }
       toast.success(t.common.saved)
     } else {
       const itemNumber = await nextItemNumber()
@@ -161,7 +162,7 @@ export default function CatalogPage() {
         default_unit_price: editing.default_unit_price ?? null,
         status: 'active',
       })
-      if (error) { toast.error(error.message); setSaving(false); return }
+      if (error) { toast.error(dbError(error, t)); setSaving(false); return }
       toast.success(t.common.saved)
     }
 
@@ -184,7 +185,7 @@ export default function CatalogPage() {
     }
     const { error } = await supabase.from('items').delete().eq('id', item.id)
     setActionLoading(false); setConfirmDelete(null)
-    if (error) { toast.error(error.message); return }
+    if (error) { toast.error(dbError(error, t)); return }
     toast.success(t.common.deleted); load()
   }
 
