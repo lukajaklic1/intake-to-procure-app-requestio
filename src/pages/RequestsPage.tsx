@@ -165,7 +165,7 @@ export default function RequestsPage() {
           <div className="relative min-w-40 flex-1 max-w-[220px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder={s.requestNumber + ' / ' + s.supplier}
-              className="w-full pl-9 pr-3 h-8 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-focus bg-white text-ink placeholder:text-filter-label" />
+              className="w-full pl-9 pr-3 h-8 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
           </div>
           <FilterSelect label={t.filters.labels.status} value={status} onChange={e => setStatus(e.target.value)}>
             <option value="all">{t.filters.allM}</option>
