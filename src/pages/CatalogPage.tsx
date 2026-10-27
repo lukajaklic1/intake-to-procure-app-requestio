@@ -279,10 +279,10 @@ export default function CatalogPage() {
             </div>
           )}
         </div><Button variant="secondary" onClick={() => openNewCategory()} className="gap-2"><Plus className="w-4 h-4" />{t.categories.new}</Button><Button onClick={() => openNew(preselectSub)} disabled={!hasSubcategories} title={hasSubcategories ? undefined : t.categories.needSubFirst} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
-        <div className="flex items-center gap-1 mr-1">
+        <div className="flex items-center gap-2 mr-1">
           {(['tree', 'all'] as const).map(v => (
             <button key={v} onClick={() => setView(v)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${view === v ? 'bg-selected text-ink' : 'text-ink2 hover:bg-hover'}`}>
+              className={`h-8 px-3 rounded-lg border border-field text-sm transition-colors ${view === v ? 'bg-surface text-ink' : 'bg-white text-ink2 hover:bg-hover'}`}>
               {v === 'tree' ? t.categories.viewTree : t.categories.viewAll}
             </button>
           ))}

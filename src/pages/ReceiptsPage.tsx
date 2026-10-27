@@ -111,7 +111,7 @@ export default function ReceiptsPage() {
       <PageToolbar attached>
         {(['queue', 'history'] as const).map(tb => (
           <button key={tb} onClick={() => setTab(tb)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === tb ? 'bg-selected text-ink' : 'text-ink2 hover:bg-hover'}`}>
+            className={`h-8 px-3 rounded-lg border border-field text-sm transition-colors ${tab === tb ? 'bg-surface text-ink' : 'bg-white text-ink2 hover:bg-hover'}`}>
             {tb === 'queue' ? `${s.toReceive} (${queue.length})` : s.history}
           </button>
         ))}
