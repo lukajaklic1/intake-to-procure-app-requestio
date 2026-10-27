@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { Upload, Plus, Search, Pencil, Trash2, Package, Tag, ChevronDown, ChevronRight, ListChevronsDownUp, ListChevronsUpDown } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
@@ -43,6 +43,9 @@ export default function CatalogPage() {
   const catReq = useRequired(t.common.fieldRequired)
   const [importOpen, setImportOpen] = useState(false)
   const [importCatOpen, setImportCatOpen] = useState(false)
+  const [importSubOpen, setImportSubOpen] = useState(false)
+  const [importMenuOpen, setImportMenuOpen] = useState(false)
+  const importMenuRef = useRef<HTMLDivElement>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
@@ -55,6 +58,13 @@ export default function CatalogPage() {
   const [usage, setUsage] = useState<Map<string, number>>(new Map())
 
   useEffect(() => { if (company) { load(); loadCategories() } }, [company])
+
+  useEffect(() => {
+    if (!importMenuOpen) return
+    const onDown = (e: MouseEvent) => { if (!importMenuRef.current?.contains(e.target as Node)) setImportMenuOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [importMenuOpen])
 
   async function load() {
     if (!company) return
@@ -217,7 +227,17 @@ export default function CatalogPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<><Button variant="secondary" onClick={toggleAll} disabled={sections.length === 0} className="!px-0 w-8 h-8" title={allCollapsed ? t.common.expandAll : t.common.collapseAll} aria-label={allCollapsed ? t.common.expandAll : t.common.collapseAll}>{allCollapsed ? <ListChevronsUpDown className="w-4 h-4 text-icon" /> : <ListChevronsDownUp className="w-4 h-4 text-icon" />}</Button><Button variant="secondary" onClick={() => setImportCatOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.categoriesButton}</Button><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.itemsButton}</Button><Button onClick={() => openNewCategory()} className="gap-2"><Tag className="w-4 h-4" />{t.categories.new}</Button></>}>
+      <PageToolbar attached actions={<><Button variant="secondary" onClick={toggleAll} disabled={sections.length === 0} className="!px-0 w-8 h-8" title={allCollapsed ? t.common.expandAll : t.common.collapseAll} aria-label={allCollapsed ? t.common.expandAll : t.common.collapseAll}>{allCollapsed ? <ListChevronsUpDown className="w-4 h-4 text-icon" /> : <ListChevronsDownUp className="w-4 h-4 text-icon" />}</Button><div ref={importMenuRef} className="relative">
+          <Button variant="secondary" onClick={() => setImportMenuOpen(o => !o)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}<ChevronDown className="w-3.5 h-3.5 text-gray-400" /></Button>
+          {importMenuOpen && (
+            <div className="absolute right-0 top-full mt-1.5 z-40 min-w-[220px] bg-white border border-line rounded-xl shadow-[0_8px_30px_rgba(16,17,18,0.12)] p-1.5 flex flex-col gap-0.5">
+              {([[t.common.import.categoriesButton, setImportCatOpen], [t.common.import.subcategoriesButton, setImportSubOpen], [t.common.import.itemsButton, setImportOpen]] as const).map(([label, open]) => (
+                <button key={label} type="button" onClick={() => { setImportMenuOpen(false); open(true) }}
+                  className="w-full text-left px-3 py-2 rounded-lg text-[14px] text-ink hover:bg-selected transition-colors">{label}</button>
+              ))}
+            </div>
+          )}
+        </div><Button onClick={() => openNewCategory()} className="gap-2"><Tag className="w-4 h-4" />{t.categories.new}</Button></>}>
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
@@ -264,19 +284,27 @@ export default function CatalogPage() {
                           <span className={`${g.level === 0 ? 'font-medium' : ''} ${g.inactive ? 'text-muted' : 'text-ink'}`}>{g.name}</span>
                           <span className="text-xs text-gray-400 tabular-nums">{g.total}</span>
                           {g.inactive && <span className="badge badge-neutral">{t.common.inactiveF}</span>}
-                          {g.category && (
-                            <button onClick={e => { e.stopPropagation(); openEditCategory(g.category!) }}
-                              className="ml-1 p-1 text-gray-400 hover:text-ink rounded-md opacity-0 group-hover:opacity-100 transition-opacity" title={t.common.editEntity}>
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {g.category && (
-                            <button disabled={categoryInUse(g.category.id)} onClick={e => { e.stopPropagation(); setConfirmDeleteCat(g.category!) }}
-                              title={categoryInUse(g.category.id) ? `${t.common.cannotDelete} ${t.common.deactivateInstead}` : t.common.deleteEntity}
-                              className="p-1 text-gray-400 hover:text-red-600 rounded-md opacity-0 group-hover:opacity-100 transition-opacity disabled:cursor-not-allowed disabled:hover:text-gray-400">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+
+                          <div className="ml-auto flex items-center gap-1">
+                            {g.category && (
+                              <>
+                                <button onClick={e => { e.stopPropagation(); openEditCategory(g.category!) }}
+                                  className="p-1 text-gray-400 hover:text-ink rounded-md opacity-0 group-hover:opacity-100 transition-opacity" title={t.common.editEntity}>
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button disabled={categoryInUse(g.category.id)} onClick={e => { e.stopPropagation(); setConfirmDeleteCat(g.category!) }}
+                                  title={categoryInUse(g.category.id) ? `${t.common.cannotDelete} ${t.common.deactivateInstead}` : t.common.deleteEntity}
+                                  className="p-1 text-gray-400 hover:text-red-600 rounded-md opacity-0 group-hover:opacity-100 transition-opacity disabled:cursor-not-allowed disabled:hover:text-gray-400">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                                {/* Add: a subcategory under a category, an item under a subcategory */}
+                                <button onClick={e => { e.stopPropagation(); g.level === 0 ? openNewCategory(g.id) : openNew(g.id) }}
+                                  className="ml-1 inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs text-ink2 hover:text-ink hover:bg-selected transition-colors">
+                                  <Plus className="w-3.5 h-3.5" />{g.level === 0 ? t.categories.addSub : t.categories.addItem}
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -310,25 +338,6 @@ export default function CatalogPage() {
                       )
                     })}
 
-                    {/* Add rows: a subcategory, or an item where the items live */}
-                    {showItems && !filtering && g.category && (
-                      <tr>
-                        <td colSpan={6} className="!py-2">
-                          <div className={`flex items-center gap-4 ${g.level === 1 ? 'ml-6' : ''}`}>
-                            {g.level === 1 && (
-                              <button onClick={() => openNew(g.id)} className="inline-flex items-center gap-1.5 text-sm text-ink2 hover:text-ink transition-colors">
-                                <Plus className="w-4 h-4" />{t.categories.addItem}
-                              </button>
-                            )}
-                            {g.level === 0 && (
-                              <button onClick={() => openNewCategory(g.id)} className="inline-flex items-center gap-1.5 text-sm text-ink2 hover:text-ink transition-colors">
-                                <Plus className="w-4 h-4" />{t.categories.addSub}
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
                   </Fragment>
                 )
               })}
@@ -337,77 +346,73 @@ export default function CatalogPage() {
         )}
       </div>
 
+      {/* 1) main categories */}
       <ImportModal open={importCatOpen} onClose={() => setImportCatOpen(false)} title={t.common.import.categoriesTitle}
         templateName="categories"
-        columns={[
-          { key: 'name', label: t.common.import.cols.name, required: true, example: 'Hrana' },
-          { key: 'parent', label: t.common.import.cols.parent, example: '' },
-        ]}
-        existing={new Set(allCategories.map(c => `${(allCategories.find(p => p.id === c.parent_id)?.name ?? '').toLowerCase()}›${c.name.toLowerCase()}`))}
-        keyOf={row => `${row.parent.toLowerCase()}›${row.name.toLowerCase()}`}
+        columns={[{ key: 'name', label: t.common.import.cols.name, required: true, example: 'Hrana' }]}
+        existing={new Set(allCategories.filter(c => !c.parent_id).map(c => c.name.toLowerCase()))}
+        keyOf={row => row.name.toLowerCase()}
         onImport={async rows => {
-          // Parents named in the file that don't exist yet are created first, then the subcategories.
-          const topByName = new Map(allCategories.filter(c => !c.parent_id).map(c => [c.name.toLowerCase(), c.id]))
-          const missingParents = [...new Set(rows.map(r => r.parent).filter(n => n && !topByName.has(n.toLowerCase())))]
-          const newTop = [...missingParents, ...rows.filter(r => !r.parent).map(r => r.name)].filter((n, i, a) => !topByName.has(n.toLowerCase()) && a.indexOf(n) === i)
-          if (newTop.length) {
-            const { data, error } = await supabase.from('categories').insert(newTop.map(name => ({ company_id: company!.id, name, status: 'active' }))).select('id, name')
-            if (error) throw error
-            for (const c of data ?? []) topByName.set(c.name.toLowerCase(), c.id)
-          }
-          const subs = rows.filter(r => r.parent).map(r => ({ company_id: company!.id, name: r.name, status: 'active', parent_id: topByName.get(r.parent.toLowerCase()) }))
-          if (subs.length) {
-            const { error } = await supabase.from('categories').insert(subs)
-            if (error) throw error
-          }
+          const { error } = await supabase.from('categories').insert(rows.map(r => ({ company_id: company!.id, name: r.name, status: 'active' })))
+          if (error) throw error
           loadCategories()
         }} />
 
+      {/* 2) subcategories: each names its (existing) category */}
+      <ImportModal open={importSubOpen} onClose={() => setImportSubOpen(false)} title={t.common.import.subcategoriesTitle}
+        templateName="subcategories"
+        columns={[
+          { key: 'name', label: t.categories.subcategory, required: true, example: 'Meso in mesni izdelki' },
+          { key: 'category', label: t.common.import.cols.category, required: true, example: 'Hrana' },
+        ]}
+        existing={new Set(allCategories.filter(c => c.parent_id).map(c => `${(allCategories.find(p => p.id === c.parent_id)?.name ?? '').toLowerCase()}›${c.name.toLowerCase()}`))}
+        keyOf={row => `${row.category.toLowerCase()}›${row.name.toLowerCase()}`}
+        validate={row => allCategories.some(c => !c.parent_id && c.name.toLowerCase() === row.category.toLowerCase()) ? null : `${t.common.import.unknownCategory}: ${row.category}`}
+        onImport={async rows => {
+          const top = new Map(allCategories.filter(c => !c.parent_id).map(c => [c.name.toLowerCase(), c.id]))
+          const { error } = await supabase.from('categories').insert(rows.map(r => ({ company_id: company!.id, name: r.name, status: 'active', parent_id: top.get(r.category.toLowerCase()) })))
+          if (error) throw error
+          loadCategories()
+        }} />
+
+      {/* 3) items: each names its existing category and subcategory */}
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} title={t.common.import.itemsTitle}
         templateName="catalog"
         columns={[
           { key: 'name', label: t.common.import.cols.name, required: true, example: 'Olivno olje 1 L' },
           { key: 'category', label: t.common.import.cols.category, required: true, example: 'Hrana' },
-          { key: 'subcategory', label: t.common.import.cols.subcategory, required: true, example: 'Olja in omake' },
+          { key: 'subcategory', label: t.common.import.cols.subcategory, required: true, example: 'Začimbe, olja in omake' },
           { key: 'unit', label: t.common.import.cols.unit, example: 'kos' },
           { key: 'price', label: t.common.import.cols.price, example: '5,90' },
           { key: 'description', label: t.common.import.cols.description, example: 'Ekstra deviško' },
         ]}
         existing={new Set(items.map(i => i.name.toLowerCase()))}
         keyOf={row => row.name.toLowerCase()}
-        validate={row => (row.price && Number.isNaN(Number(row.price.replace(',', '.')))) ? t.common.import.invalidNumber + ': ' + row.price : null}
+        validate={row => {
+          if (row.price && Number.isNaN(Number(row.price.replace(',', '.')))) return t.common.import.invalidNumber + ': ' + row.price
+          const top = allCategories.find(c => !c.parent_id && c.name.toLowerCase() === row.category.toLowerCase())
+          if (!top) return `${t.common.import.unknownCategory}: ${row.category}`
+          if (!allCategories.some(c => c.parent_id === top.id && c.name.toLowerCase() === row.subcategory.toLowerCase())) return `${t.common.import.unknownSubcategory}: ${row.subcategory}`
+          return null
+        }}
         onImport={async rows => {
-          // Categories / subcategories named in the file that don't exist yet are created first.
           const top = new Map(allCategories.filter(c => !c.parent_id).map(c => [c.name.toLowerCase(), c.id]))
-          const missingTop = [...new Set(rows.map(r => r.category).filter(n => !top.has(n.toLowerCase())))]
-          if (missingTop.length) {
-            const { data, error } = await supabase.from('categories').insert(missingTop.map(name => ({ company_id: company!.id, name, status: 'active' }))).select('id, name')
-            if (error) throw error
-            for (const c of data ?? []) top.set(c.name.toLowerCase(), c.id)
-          }
-          const subKey = (cat: string, sub: string) => `${top.get(cat.toLowerCase())}|${sub.toLowerCase()}`
           const sub = new Map(allCategories.filter(c => c.parent_id).map(c => [`${c.parent_id}|${c.name.toLowerCase()}`, c.id]))
-          const wanted = [...new Map(rows.filter(r => r.subcategory).map(r => [subKey(r.category, r.subcategory), r])).values()].filter(r => !sub.has(subKey(r.category, r.subcategory)))
-          if (wanted.length) {
-            const { data, error } = await supabase.from('categories').insert(wanted.map(r => ({ company_id: company!.id, name: r.subcategory, status: 'active', parent_id: top.get(r.category.toLowerCase()) }))).select('id, name, parent_id')
-            if (error) throw error
-            for (const c of data ?? []) sub.set(`${c.parent_id}|${c.name.toLowerCase()}`, c.id)
-          }
           // Item numbers continue after the highest existing one.
           const last = items.reduce((m, i) => Math.max(m, parseInt(i.item_number, 10) || 0), 100000)
           const payload = rows.map((r, i) => ({
             company_id: company!.id, item_number: String(last + 1 + i), name: r.name,
             long_description: r.description || null,
-            category_id: sub.get(subKey(r.category, r.subcategory)),
+            category_id: sub.get(`${top.get(r.category.toLowerCase())}|${r.subcategory.toLowerCase()}`),
             default_unit: r.unit || null,
             default_unit_price: r.price ? Number(r.price.replace(',', '.')) : null,
             status: 'active',
           }))
-          for (let i = 0; i < payload.length; i += 500) {
-            const { error } = await supabase.from('items').insert(payload.slice(i, i + 500))
+          for (let k = 0; k < payload.length; k += 500) {
+            const { error } = await supabase.from('items').insert(payload.slice(k, k + 500))
             if (error) throw error
           }
-          load(); loadCategories()
+          load()
         }} />
 
       <Modal open={modalOpen} onClose={closeModal} title={editing.id ? t.common.editEntity : s.new} size="md">
