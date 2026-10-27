@@ -240,6 +240,9 @@ export default function CatalogPage() {
     return parent ? { top: parent.name, sub: c!.name } : { top: c?.name ?? '—', sub: '—' }
   }
 
+  const hasSubcategories = allCategories.some(c => c.parent_id)
+  const preselectSub = allCategories.find(c => c.id === categoryFilter)?.parent_id ? categoryFilter : undefined
+
   const allCollapsed = sections.length > 0 && sections.every(g => collapsed.has(g.id))
   function toggleAll() { setCollapsed(allCollapsed ? new Set() : new Set(sections.map(g => g.id))) }
   function toggleGroup(id: string) {
@@ -260,7 +263,7 @@ export default function CatalogPage() {
               ))}
             </div>
           )}
-        </div><Button onClick={() => openNewCategory()} className="gap-2"><Plus className="w-4 h-4" />{t.categories.new}</Button></>}>
+        </div><Button variant="secondary" onClick={() => openNewCategory()} className="gap-2"><Plus className="w-4 h-4" />{t.categories.new}</Button><Button onClick={() => openNew(preselectSub)} disabled={!hasSubcategories} title={hasSubcategories ? undefined : t.categories.needSubFirst} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
         <div className="flex items-center gap-1 mr-1">
           {(['tree', 'all'] as const).map(v => (
             <button key={v} onClick={() => setView(v)}

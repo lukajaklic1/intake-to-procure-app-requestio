@@ -412,6 +412,7 @@ export const translations = {
       subcategories: 'Subcategories',
       viewTree: 'Categories',
       viewAll: 'All items',
+      needSubFirst: 'Create a subcategory first',
     },
 
     // Projects
@@ -1171,6 +1172,7 @@ export const translations = {
       subcategories: 'Podkategorije',
       viewTree: 'Kategorije',
       viewAll: 'Vsi artikli',
+      needSubFirst: 'Najprej ustvarite podkategorijo',
     },
 
     // Projects
