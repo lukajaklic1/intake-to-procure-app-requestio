@@ -345,7 +345,7 @@ export default function DashboardPage() {
     <div className="p-4 lg:p-6">
       <PageToolbar>
 
-          <FilterSelect label={t.filters.labels.period} value={filters.dateRange} onChange={e => setFilter('dateRange', e.target.value as Filters['dateRange'])}>
+          <FilterSelect label={t.filters.labels.period} value={filters.dateRange} defaultValue={DEFAULT_FILTERS.dateRange} onChange={e => setFilter('dateRange', e.target.value as Filters['dateRange'])}>
             {dateRanges.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
           </FilterSelect>
 

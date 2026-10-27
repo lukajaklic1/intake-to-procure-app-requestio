@@ -23,8 +23,8 @@
   /* Borders */
   --color-line: #eeeff1;         /* sidebar, header, cards */
   --color-field: #eeeff1;        /* tables, form fields */
-  --color-field-hover: #d4d5d8;
-  --color-field-focus: #9b9ca0;  /* focused input border (no ring) */
+  --color-field-hover: #dfe0e3;
+  --color-field-focus: #c6c7cb;  /* focused input border (no ring) */
 
   /* Primary (buttons, page-header icon) */
   --color-primary: #266df0;

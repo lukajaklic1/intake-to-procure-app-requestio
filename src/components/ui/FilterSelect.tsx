@@ -4,6 +4,8 @@ import { Check, ChevronDown, Search } from 'lucide-react'
 interface FilterSelectProps {
   label: string
   value: string
+  /** Value that means "no filter" (defaults to the first option). A different value marks the chip as active. */
+  defaultValue?: string
   onChange: (e: { target: { value: string } }) => void
   children: ReactNode   // <option> elements, exactly as for a native <select>
 }
@@ -14,7 +16,7 @@ const textOf = (node: ReactNode): string =>
 /** Filter chip: grey filter name, black chosen value ("Supplier: All").
  *  Opens a small menu (with a search box for long lists); the highlighted row gets a grey
  *  background instead of an outline, like Attio. */
-export default function FilterSelect({ label, value, onChange, children }: FilterSelectProps) {
+export default function FilterSelect({ label, value, defaultValue, onChange, children }: FilterSelectProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
@@ -24,6 +26,7 @@ export default function FilterSelect({ label, value, onChange, children }: Filte
   const options = (Children.toArray(children).filter(isValidElement) as ReactElement<{ value?: string; children?: ReactNode }>[])
     .map(o => ({ value: String(o.props.value ?? ''), text: textOf(o.props.children) }))
   const selected = options.find(o => o.value === String(value)) ?? options[0]
+  const isActive = !!selected && selected.value !== (defaultValue ?? options[0]?.value)
   const q = query.trim().toLowerCase()
   const shown = q ? options.filter(o => o.text.toLowerCase().includes(q)) : options
   const searchable = options.length > 8
@@ -61,7 +64,7 @@ export default function FilterSelect({ label, value, onChange, children }: Filte
   return (
     <div ref={rootRef} className="relative inline-block" onKeyDown={onKeyDown}>
       <button type="button" onClick={() => (open ? close() : openMenu())} aria-haspopup="listbox" aria-expanded={open}
-        className={`inline-flex items-center gap-1.5 h-8 pl-3 pr-2 rounded-lg border bg-white text-sm outline-none transition-colors ${open ? 'border-field-hover bg-hover' : 'border-field hover:border-field-hover'}`}>
+        className={`inline-flex items-center gap-1.5 h-8 pl-3 pr-2 rounded-lg border text-sm outline-none transition-colors ${isActive ? 'border-primary bg-accent-light hover:brightness-95' : open ? 'border-field-hover bg-hover' : 'border-field bg-white hover:border-field-hover hover:bg-hover'}`}>
         <span className="text-filter-label whitespace-nowrap">{label}:</span>
         <span className="text-ink whitespace-nowrap max-w-[160px] truncate">{selected?.text}</span>
         <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
