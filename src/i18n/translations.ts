@@ -410,6 +410,8 @@ export const translations = {
       addItem: 'Add item',
       subcategory: 'Subcategory',
       subcategories: 'Subcategories',
+      viewTree: 'Categories',
+      viewAll: 'All items',
     },
 
     // Projects
@@ -1167,6 +1169,8 @@ export const translations = {
       addItem: 'Dodaj artikel',
       subcategory: 'Podkategorija',
       subcategories: 'Podkategorije',
+      viewTree: 'Kategorije',
+      viewAll: 'Vsi artikli',
     },
 
     // Projects

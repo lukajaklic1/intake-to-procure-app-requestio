@@ -12,6 +12,7 @@ import PageToolbar from '../components/layout/PageToolbar'
 import { useHeaderCounts } from '../components/layout/HeaderCounts'
 import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
+import Pagination from '../components/ui/Pagination'
 import type { Item, Category } from '../types/database'
 import { useLanguage } from '../hooks/useLanguage'
 import { useRequired } from '../lib/useRequired'
@@ -49,6 +50,10 @@ export default function CatalogPage() {
   const importMenuRef = useRef<HTMLDivElement>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [view, setViewState] = useState<'tree' | 'all'>(() => { try { return localStorage.getItem('catalogView') === 'all' ? 'all' : 'tree' } catch { return 'tree' } })
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  function setView(v: 'tree' | 'all') { setViewState(v); try { localStorage.setItem('catalogView', v) } catch { /* ignore */ } }
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Partial<Item>>(EMPTY)
@@ -218,6 +223,20 @@ export default function CatalogPage() {
   // A subcategory is hidden when its category (or itself) is collapsed.
   const isOpen = (sec: Section) => filtering || !(collapsed.has(sec.id) || (sec.parentId && collapsed.has(sec.parentId)))
   const headerOpen = (sec: Section) => filtering || !collapsed.has(sec.id)
+  // "All items" view: every item in one list (category filter includes subcategories)
+  const flatItems = filteredItems.filter(i => {
+    if (categoryFilter === 'all') return true
+    const c = allCategories.find(x => x.id === i.category_id)
+    return i.category_id === categoryFilter || c?.parent_id === categoryFilter
+  })
+  useEffect(() => { setPage(1) }, [search, statusFilter, categoryFilter, view])
+  const pagedItems = flatItems.slice((page - 1) * pageSize, page * pageSize)
+  const pathOf = (categoryId: string | null) => {
+    const c = allCategories.find(x => x.id === categoryId)
+    const parent = c?.parent_id ? allCategories.find(x => x.id === c.parent_id) : undefined
+    return parent ? { top: parent.name, sub: c!.name } : { top: c?.name ?? '—', sub: '—' }
+  }
+
   const allCollapsed = sections.length > 0 && sections.every(g => collapsed.has(g.id))
   function toggleAll() { setCollapsed(allCollapsed ? new Set() : new Set(sections.map(g => g.id))) }
   function toggleGroup(id: string) {
@@ -228,7 +247,7 @@ export default function CatalogPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<><Button variant="secondary" onClick={toggleAll} disabled={sections.length === 0} className="!px-0 w-8 h-8" title={allCollapsed ? t.common.expandAll : t.common.collapseAll} aria-label={allCollapsed ? t.common.expandAll : t.common.collapseAll}>{allCollapsed ? <ListChevronsUpDown className="w-4 h-4 text-icon" /> : <ListChevronsDownUp className="w-4 h-4 text-icon" />}</Button><div ref={importMenuRef} className="relative">
+      <PageToolbar attached actions={<>{view === 'tree' && <Button variant="secondary" onClick={toggleAll} disabled={sections.length === 0} className="!px-0 w-8 h-8" title={allCollapsed ? t.common.expandAll : t.common.collapseAll} aria-label={allCollapsed ? t.common.expandAll : t.common.collapseAll}>{allCollapsed ? <ListChevronsUpDown className="w-4 h-4 text-icon" /> : <ListChevronsDownUp className="w-4 h-4 text-icon" />}</Button>}<div ref={importMenuRef} className="relative">
           <Button variant="secondary" onClick={() => setImportMenuOpen(o => !o)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}<ChevronDown className="w-3.5 h-3.5 text-gray-400" /></Button>
           {importMenuOpen && (
             <div className="absolute right-0 top-full mt-1.5 z-40 min-w-[220px] bg-white border border-line rounded-xl shadow-[0_8px_30px_rgba(16,17,18,0.12)] p-1.5 flex flex-col gap-0.5">
@@ -239,6 +258,14 @@ export default function CatalogPage() {
             </div>
           )}
         </div><Button onClick={() => openNewCategory()} className="gap-2"><Plus className="w-4 h-4" />{t.categories.new}</Button></>}>
+        <div className="flex items-center gap-1 mr-1">
+          {(['tree', 'all'] as const).map(v => (
+            <button key={v} onClick={() => setView(v)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${view === v ? 'bg-selected text-ink' : 'text-ink2 hover:bg-hover'}`}>
+              {v === 'tree' ? t.categories.viewTree : t.categories.viewAll}
+            </button>
+          ))}
+        </div>
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
@@ -253,6 +280,7 @@ export default function CatalogPage() {
         </FilterSelect>
       </PageToolbar>
 
+      {view === 'tree' && (
       <div className="data-card table-bleed bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
@@ -346,6 +374,64 @@ export default function CatalogPage() {
           </table></div>
         )}
       </div>
+
+      )}
+
+      {view === 'all' && (
+        <div className="data-card table-bleed bg-white rounded-lg border border-field overflow-hidden">
+          {loading ? (
+            <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
+          ) : (
+            <div className="overflow-x-auto"><table className="w-full text-sm min-w-[820px]">
+              <thead className="bg-surface border-b border-field">
+                <tr>
+                  {[s.itemNumber, t.common.name, t.categories.title, t.categories.subcategory, s.defaultUnit, s.defaultUnitPrice, t.common.status, ''].map((h, i) => (
+                    <th key={i} className="text-left px-4 py-3 text-sm font-medium text-ink2">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-field">
+                {flatItems.length === 0 ? (
+                  <TableEmptyState icon={Package} colSpan={8}
+                    title={(search || statusFilter !== 'all' || categoryFilter !== 'all') ? t.common.empty.noResults.title : t.common.empty.items.title}
+                    subtitle={(search || statusFilter !== 'all' || categoryFilter !== 'all') ? t.common.empty.noResults.text : t.common.empty.items.text} />
+                ) : pagedItems.map(item => {
+                  const count = usage.get(item.id) ?? 0
+                  const inUse = count > 0
+                  const path = pathOf(item.category_id)
+                  return (
+                    <tr key={item.id} className="hover:bg-surface transition-colors">
+                      <td className="px-4 py-3 text-xs text-gray-500 font-medium">{item.item_number}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-gray-900">{item.name}</p>
+                        {item.long_description && <p className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{item.long_description}</p>}
+                      </td>
+                      <td className="px-4 py-3 text-ink2">{path.top}</td>
+                      <td className="px-4 py-3 text-ink2">{path.sub}</td>
+                      <td className="px-4 py-3 text-ink2">{item.default_unit ?? '—'}</td>
+                      <td className="px-4 py-3 text-ink2">{item.default_unit_price != null ? `${item.default_unit_price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '—'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`badge ${item.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>{item.status === 'active' ? t.common.active : t.common.inactive}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1 justify-end">
+                          <button onClick={() => openEdit(item)} className="p-1.5 text-gray-400 hover:text-accent hover:bg-accent-light rounded-lg transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                          <button disabled={inUse} onClick={() => !inUse && setConfirmDelete(item)}
+                            title={inUse ? (lang === 'sl' ? `${t.common.cannotDelete} ${t.common.usedOn} ${poLineLocSl(count)}. ${t.common.setInactiveInstead}` : `${t.common.cannotDelete} ${t.common.usedOn} ${poLineCountEn(count)}. ${t.common.setInactiveInstead}`) : undefined}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:bg-transparent">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table></div>
+          )}
+          <Pagination total={flatItems.length} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={n => { setPageSize(n); setPage(1) }} />
+        </div>
+      )}
 
       {/* 1) main categories */}
       <ImportModal open={importCatOpen} onClose={() => setImportCatOpen(false)} title={t.common.import.categoriesTitle}
