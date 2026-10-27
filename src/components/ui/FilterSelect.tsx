@@ -64,7 +64,7 @@ export default function FilterSelect({ label, value, defaultValue, onChange, chi
   return (
     <div ref={rootRef} className="relative inline-block" onKeyDown={onKeyDown}>
       <button type="button" onClick={() => (open ? close() : openMenu())} aria-haspopup="listbox" aria-expanded={open}
-        className={`inline-flex items-center gap-1.5 h-8 pl-3 pr-2 rounded-lg border text-sm outline-none transition-colors ${isActive ? 'border-field-hover bg-selected' : open ? 'border-field-hover bg-hover' : 'border-field bg-white hover:bg-hover'}`}>
+        className={`inline-flex items-center gap-1.5 h-8 pl-3 pr-2 rounded-lg border text-sm outline-none transition-colors ${isActive ? 'border-field-hover bg-surface' : open ? 'border-field-hover bg-surface' : 'border-field bg-white hover:bg-hover'}`}>
         <span className="text-filter-label whitespace-nowrap">{label}:</span>
         <span className="text-ink whitespace-nowrap max-w-[160px] truncate">{selected?.text}</span>
         <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
