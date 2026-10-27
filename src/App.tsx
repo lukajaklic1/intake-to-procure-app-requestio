@@ -11,6 +11,9 @@ import OnboardingPage from './pages/OnboardingPage'
 import DashboardPage from './pages/DashboardPage'
 import SuppliersPage from './pages/SuppliersPage'
 import ContractsPage from './pages/ContractsPage'
+import InvoicesPage from './pages/InvoicesPage'
+import InvoiceFormPage from './pages/InvoiceFormPage'
+import InvoiceDetailPage from './pages/InvoiceDetailPage'
 import ContractDetailPage from './pages/ContractDetailPage'
 import CatalogPage from './pages/CatalogPage'
 import LocationsPage from './pages/LocationsPage'
@@ -65,6 +68,10 @@ export default function Root() {
             <Route path="/purchase-orders/:id"    element={<App><PODetailPage /></App>} />
             <Route path="/purchase-orders/:id/edit" element={<App><POFormPage /></App>} />
             <Route path="/suppliers"              element={<App><SuppliersPage /></App>} />
+            <Route path="/invoices"               element={<App><InvoicesPage /></App>} />
+            <Route path="/invoices/new"           element={<App><InvoiceFormPage /></App>} />
+            <Route path="/invoices/:id"           element={<App><InvoiceDetailPage /></App>} />
+            <Route path="/invoices/:id/edit"      element={<App><InvoiceFormPage /></App>} />
             <Route path="/contracts"              element={<App><ContractsPage /></App>} />
             <Route path="/contracts/:id"          element={<App><ContractDetailPage /></App>} />
             <Route path="/catalog"                element={<App><CatalogPage /></App>} />

@@ -1,10 +1,10 @@
 import {
   LayoutDashboard, FileText, FileSignature, Building2, Package,
   MapPin, Users, UserCog, Settings,
-  ClipboardList, CheckCircle2, PackageCheck,
+  ClipboardList, CheckCircle2, PackageCheck, ReceiptText,
 } from 'lucide-react'
 
-export type NavKey = 'dashboard' | 'myRequests' | 'approvals' | 'purchaseOrders' | 'receipts'
+export type NavKey = 'dashboard' | 'myRequests' | 'approvals' | 'purchaseOrders' | 'receipts' | 'invoices'
   | 'suppliers' | 'contracts' | 'catalog' | 'locations' | 'departments' | 'users' | 'settings'
 
 export type SectionKey = 'sectionWorkflow' | 'sectionCatalog' | 'sectionOrganization' | 'sectionAdmin'
@@ -27,6 +27,7 @@ export const NAV_GROUPS: { section?: SectionKey; items: NavItem[] }[] = [
       { to: '/approvals', icon: CheckCircle2, key: 'approvals' },
       { to: '/purchase-orders', icon: FileText, key: 'purchaseOrders' },
       { to: '/receipts', icon: PackageCheck, key: 'receipts' },
+      { to: '/invoices', icon: ReceiptText, key: 'invoices' },
     ],
   },
   {

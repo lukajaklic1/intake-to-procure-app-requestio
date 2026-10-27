@@ -16,7 +16,7 @@ import TableEmptyState from '../components/ui/TableEmptyState'
 import type { User as AppUser, UserPermission, UserInvitation } from '../types/database'
 
 const MODULES: UserPermission['module'][] = ['requests', 'purchase_orders', 'receipts', 'invoices', 'budgets', 'reports']
-const ACTIONS: ('view' | 'create' | 'approve' | 'pay')[] = ['view', 'create', 'approve']
+const ACTIONS: ('view' | 'create' | 'approve' | 'pay')[] = ['view', 'create', 'approve', 'pay']
 
 type PermMap = Record<string, { can_view: boolean; can_create: boolean; can_approve: boolean; can_pay: boolean }>
 
