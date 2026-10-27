@@ -40,6 +40,7 @@ export default function CatalogPage() {
   const catReq = useRequired(t.common.fieldRequired)
   const [importOpen, setImportOpen] = useState(false)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Partial<Item>>(EMPTY)
@@ -97,6 +98,7 @@ export default function CatalogPage() {
     const { error } = await supabase.from('categories').delete().eq('id', c.id)
     setActionLoading(false); setConfirmDeleteCat(null)
     if (error) { toast.error(error.message); return }
+    if (categoryFilter === c.id) setCategoryFilter('all')
     toast.success(t.common.deleted); closeCategoryModal(); loadCategories()
   }
 
@@ -180,7 +182,7 @@ export default function CatalogPage() {
   const groups = [
     ...allCategories.map(c => ({ id: c.id, name: c.name, category: c as Category | null, inactive: c.status === 'inactive', rows: filteredItems.filter(i => i.category_id === c.id) })),
     { id: 'none', name: t.dashboard.noCategory, category: null, inactive: false, rows: filteredItems.filter(i => !i.category_id) },
-  ].filter(g => (g.category || g.rows.length > 0) && (!filtering || g.rows.length > 0))
+  ].filter(g => (g.category || g.rows.length > 0) && (!filtering || g.rows.length > 0) && (categoryFilter === 'all' || g.id === categoryFilter))
 
   function toggleGroup(id: string) {
     setCollapsed(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
@@ -194,6 +196,10 @@ export default function CatalogPage() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
             className="w-full pl-9 pr-4 h-8 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:ring-2 focus:ring-accent bg-white text-ink placeholder:text-filter-label" />
         </div>
+        <FilterSelect label={t.filters.labels.category} value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
+          <option value="all">{t.filters.allF}</option>
+          {allCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </FilterSelect>
         <FilterSelect label={t.filters.labels.status} value={statusFilter} onChange={e => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}>
           {(['all', 'active', 'inactive'] as const).map(v => <option key={v} value={v}>{v === 'all' ? t.common.allM : v === 'active' ? t.common.activeM : t.common.inactiveM}</option>)}
         </FilterSelect>
