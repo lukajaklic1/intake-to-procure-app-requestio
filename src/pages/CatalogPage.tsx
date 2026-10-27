@@ -20,7 +20,6 @@ import { dbError } from '../lib/dbError'
 import { poLineLocSl, poLineCountEn } from '../utils/pluralize'
 import { countByKey, mergeUsage } from '../lib/usageCounts'
 import { buildCategoryTree, categoryOptions } from '../lib/categories'
-import CategoryOptions from '../components/ui/CategoryOptions'
 
 interface ItemWithCategory extends Item {
   categories: { name: string } | null
@@ -59,6 +58,12 @@ export default function CatalogPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Partial<Item>>(EMPTY)
   const [priceStr, setPriceStr] = useState('')
+  // Item dialog: category + subcategory pickers; either can be created on the spot ("__new").
+  const NEW = '__new'
+  const [catSel, setCatSel] = useState('')
+  const [subSel, setSubSel] = useState('')
+  const [newCatName, setNewCatName] = useState('')
+  const [newSubName, setNewSubName] = useState('')
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<ItemWithCategory | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
@@ -138,19 +143,46 @@ export default function CatalogPage() {
     return String(isNaN(last) ? 100001 : last + 1)
   }
 
-  function openNew(categoryId?: string) { req.reset(); setEditing({ ...EMPTY, category_id: categoryId }); setPriceStr(''); setModalOpen(true) }
-  function openEdit(i: ItemWithCategory) { req.reset(); setEditing({ ...i }); setPriceStr(i.default_unit_price != null ? String(i.default_unit_price).replace('.', ',') : ''); setModalOpen(true) }
+  function startPickers(subId?: string | null) {
+    const sub = allCategories.find(c => c.id === subId && c.parent_id)
+    const empty = allCategories.length === 0
+    setCatSel(sub ? sub.parent_id! : empty ? NEW : '')
+    setSubSel(sub ? sub.id : empty ? NEW : '')
+    setNewCatName(''); setNewSubName('')
+  }
+  function openNew(categoryId?: string) { req.reset(); setEditing({ ...EMPTY, category_id: categoryId }); startPickers(categoryId); setPriceStr(''); setModalOpen(true) }
+  function openEdit(i: ItemWithCategory) { req.reset(); setEditing({ ...i }); startPickers(i.category_id); setPriceStr(i.default_unit_price != null ? String(i.default_unit_price).replace('.', ',') : ''); setModalOpen(true) }
   function closeModal() { setModalOpen(false); setEditing(EMPTY); setPriceStr('') }
 
   async function save() {
-    if (!company || !req.check(editing as Record<string, unknown>, ['name', 'category_id'], { name: 'i-name', category_id: 'i-cat' })) return
+    if (!company) return
+    const okName = req.check(editing as Record<string, unknown>, ['name'], { name: 'i-name' })
+    const catBad = !catSel || (catSel === NEW && !newCatName.trim())
+    const subBad = !subSel || (subSel === NEW && !newSubName.trim())
+    if (catBad) req.setError('cat', t.common.fieldRequired, catSel === NEW ? 'i-catnew' : 'i-cat')
+    else if (subBad) req.setError('sub', t.common.fieldRequired, subSel === NEW ? 'i-subnew' : 'i-sub')
+    if (!okName || catBad || subBad) return
     setSaving(true)
+
+    let categoryId = subSel
+    if (catSel === NEW || subSel === NEW) {
+      let topId = catSel
+      if (catSel === NEW) {
+        const { data, error } = await supabase.from('categories').insert({ company_id: company.id, name: newCatName.trim(), status: 'active' }).select('id').single()
+        if (error || !data) { toast.error(dbError(error, t)); setSaving(false); return }
+        topId = data.id
+      }
+      const { data, error } = await supabase.from('categories').insert({ company_id: company.id, name: newSubName.trim(), status: 'active', parent_id: topId }).select('id').single()
+      if (error || !data) { toast.error(dbError(error, t)); setSaving(false); return }
+      categoryId = data.id
+      loadCategories()
+    }
 
     if (editing.id) {
       const { error } = await supabase.from('items').update({
         name: editing.name,
         long_description: editing.long_description || null,
-        category_id: editing.category_id || null,
+        category_id: categoryId,
         default_unit: editing.default_unit || null,
         default_unit_price: editing.default_unit_price ?? null,
         status: editing.status,
@@ -165,7 +197,7 @@ export default function CatalogPage() {
         item_number: itemNumber,
         name: editing.name,
         long_description: editing.long_description || null,
-        category_id: editing.category_id || null,
+        category_id: categoryId,
         default_unit: editing.default_unit || null,
         default_unit_price: editing.default_unit_price ?? null,
         status: 'active',
@@ -240,7 +272,6 @@ export default function CatalogPage() {
     return parent ? { top: parent.name, sub: c!.name } : { top: c?.name ?? '—', sub: '—' }
   }
 
-  const hasSubcategories = allCategories.some(c => c.parent_id)
   const preselectSub = allCategories.find(c => c.id === categoryFilter)?.parent_id ? categoryFilter : undefined
 
   const allCollapsed = sections.length > 0 && sections.every(g => collapsed.has(g.id))
@@ -263,7 +294,7 @@ export default function CatalogPage() {
               ))}
             </div>
           )}
-        </div><Button variant="secondary" onClick={() => openNewCategory()} className="gap-2"><Plus className="w-4 h-4" />{t.categories.new}</Button><Button onClick={() => openNew(preselectSub)} disabled={!hasSubcategories} title={hasSubcategories ? undefined : t.categories.needSubFirst} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
+        </div><Button variant="secondary" onClick={() => openNewCategory()} className="gap-2"><Plus className="w-4 h-4" />{t.categories.new}</Button><Button onClick={() => openNew(preselectSub)} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
         <div className="flex items-center gap-1 mr-1">
           {(['tree', 'all'] as const).map(v => (
             <button key={v} onClick={() => setView(v)}
@@ -538,16 +569,28 @@ export default function CatalogPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
-              <label htmlFor="i-cat" className="text-sm font-medium text-gray-700">{t.categories.subcategory} *</label>
-              <select id="i-cat"
-                value={editing.category_id ?? ''}
-                onChange={e => { req.clear('category_id'); setEditing(f => ({ ...f, category_id: e.target.value || undefined })) }}
-                className={`rounded-lg border px-3 py-2 text-sm focus:outline-none ${req.errors.category_id ? 'border-red-400' : 'border-field hover:border-field-hover focus:border-field-focus'}`}
-              >
+              <label htmlFor="i-cat" className="text-sm font-medium text-gray-700">{t.categories.title} *</label>
+              <select id="i-cat" value={catSel}
+                onChange={e => { req.clear('cat'); req.clear('sub'); setCatSel(e.target.value); setSubSel(e.target.value === NEW ? NEW : '') }}
+                className={`rounded-lg border px-3 py-2 text-sm bg-white focus:outline-none ${req.errors.cat ? 'border-red-400' : 'border-field hover:border-field-hover focus:border-field-focus'}`}>
                 <option value="">{t.common.select}</option>
-                <CategoryOptions categories={allCategories} selectedId={editing.category_id ?? undefined} />
+                {tree.filter(n => n.category.status === 'active' || n.category.id === catSel).map(n => <option key={n.category.id} value={n.category.id}>{n.category.name}</option>)}
+                <option value={NEW}>+ {t.categories.new}</option>
               </select>
-              {req.errors.category_id && <p className="text-xs text-red-600">{req.errors.category_id}</p>}
+              {catSel === NEW && <Input id="i-catnew" placeholder={t.categories.categoryName} value={newCatName} onChange={e => { req.clear('cat'); setNewCatName(e.target.value) }} />}
+              {req.errors.cat && <p className="text-xs text-red-600">{req.errors.cat}</p>}
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="i-sub" className="text-sm font-medium text-gray-700">{t.categories.subcategory} *</label>
+              <select id="i-sub" value={subSel} disabled={!catSel || catSel === NEW}
+                onChange={e => { req.clear('sub'); setSubSel(e.target.value) }}
+                className={`rounded-lg border px-3 py-2 text-sm bg-white focus:outline-none ${req.errors.sub ? 'border-red-400' : 'border-field hover:border-field-hover focus:border-field-focus'}` + ' disabled:bg-gray-50 disabled:text-gray-400'}>
+                <option value="">{t.common.select}</option>
+                {(tree.find(n => n.category.id === catSel)?.children ?? []).filter(c => c.status === 'active' || c.id === subSel).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <option value={NEW}>+ {t.categories.newSub}</option>
+              </select>
+              {subSel === NEW && <Input id="i-subnew" placeholder={t.categories.subcategory} value={newSubName} onChange={e => { req.clear('sub'); setNewSubName(e.target.value) }} />}
+              {req.errors.sub && <p className="text-xs text-red-600">{req.errors.sub}</p>}
             </div>
             <Input id="i-unit" label={s.defaultUnit}
               placeholder={lang === 'sl' ? 'npr. kos, kg, m' : 'e.g. pcs, kg, m'}
