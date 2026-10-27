@@ -90,5 +90,5 @@ body {
 .badge-purple { background: var(--badge-purple-bg); border-color: var(--badge-purple-border); color: var(--badge-purple-text); }
 
 /* Bleed tables end with a hairline under the last row; the footer (when shown) sits below it. */
-.table-bleed tbody tr:last-child td:not([data-empty]) { border-bottom: 1px solid var(--color-line); }
+.table-bleed tbody tr:last-child td:not([data-empty]):not([data-nobottom]) { border-bottom: 1px solid var(--color-line); }
 .table-bleed [data-pagination] { border-top-width: 0; }
