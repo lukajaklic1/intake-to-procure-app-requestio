@@ -241,7 +241,7 @@ export const translations = {
       allStatuses: 'All statuses',
       allM: 'All',
       allF: 'All',
-      labels: { period: 'Period', supplier: 'Supplier', category: 'Category', department: 'Department', status: 'Status', requester: 'Requested by', poStatus: 'Order status', approver: 'Approver' },
+      labels: { period: 'Period', supplier: 'Supplier', category: 'Category', subcategory: 'Subcategory', department: 'Department', status: 'Status', requester: 'Requested by', poStatus: 'Order status', approver: 'Approver' },
     },
 
     // Purchase Orders
@@ -1002,7 +1002,7 @@ export const translations = {
       allStatuses: 'Vsi statusi',
       allM: 'Vsi',
       allF: 'Vse',
-      labels: { period: 'Obdobje', supplier: 'Dobavitelj', category: 'Kategorija', department: 'Oddelek', status: 'Status', requester: 'Kreator', poStatus: 'Status naročila', approver: 'Potrjevalec' },
+      labels: { period: 'Obdobje', supplier: 'Dobavitelj', category: 'Kategorija', subcategory: 'Podkategorija', department: 'Oddelek', status: 'Status', requester: 'Kreator', poStatus: 'Status naročila', approver: 'Potrjevalec' },
     },
 
     // Purchase Orders

@@ -19,7 +19,7 @@ import { useRequired } from '../lib/useRequired'
 import { dbError } from '../lib/dbError'
 import { poLineLocSl, poLineCountEn } from '../utils/pluralize'
 import { countByKey, mergeUsage } from '../lib/usageCounts'
-import { buildCategoryTree, categoryOptions } from '../lib/categories'
+import { buildCategoryTree } from '../lib/categories'
 
 interface ItemWithCategory extends Item {
   categories: { name: string } | null
@@ -49,6 +49,7 @@ export default function CatalogPage() {
   const importMenuRef = useRef<HTMLDivElement>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [subFilter, setSubFilter] = useState<string>('all')
   const initialCollapse = useRef(false)
   const [view, setViewState] = useState<'tree' | 'all'>(() => { try { return localStorage.getItem('catalogView') === 'all' ? 'all' : 'tree' } catch { return 'tree' } })
   const [page, setPage] = useState(1)
@@ -124,7 +125,8 @@ export default function CatalogPage() {
     const { error } = await supabase.from('categories').delete().eq('id', c.id)
     setActionLoading(false); setConfirmDeleteCat(null)
     if (error) { toast.error(dbError(error, t)); return }
-    if (categoryFilter === c.id) setCategoryFilter('all')
+    if (categoryFilter === c.id) { setCategoryFilter('all'); setSubFilter('all') }
+    if (subFilter === c.id) setSubFilter('all')
     toast.success(t.common.deleted); closeCategoryModal(); loadCategories()
   }
 
@@ -227,11 +229,12 @@ export default function CatalogPage() {
     const subs = children.map(c => ({ c, rows: filteredItems.filter(i => i.category_id === c.id) }))
     const total = own.length + subs.reduce((n, x) => n + x.rows.length, 0)
     if (filtering && total === 0) continue
-    if (categoryFilter !== 'all' && categoryFilter !== category.id && !children.some(c => c.id === categoryFilter)) continue
+    if (categoryFilter !== 'all' && categoryFilter !== category.id) continue
+    if (subFilter !== 'all' && !children.some(c => c.id === subFilter)) continue
     sections.push({ id: category.id, name: category.name, level: 0, category, inactive: category.status === 'inactive', rows: own, total, parentId: null, leaf: children.length === 0 })
     for (const { c, rows } of subs) {
       if (filtering && rows.length === 0) continue
-      if (categoryFilter !== 'all' && categoryFilter !== category.id && categoryFilter !== c.id) continue
+      if (subFilter !== 'all' && c.id !== subFilter) continue
       sections.push({ id: c.id, name: c.name, level: 1, category: c, inactive: c.status === 'inactive', rows, total: rows.length, parentId: category.id, leaf: true })
     }
   }
@@ -243,11 +246,12 @@ export default function CatalogPage() {
   const headerOpen = (sec: Section) => filtering || !collapsed.has(sec.id)
   // "All items" view: every item in one list (category filter includes subcategories)
   const flatItems = filteredItems.filter(i => {
-    if (categoryFilter === 'all') return true
     const c = allCategories.find(x => x.id === i.category_id)
-    return i.category_id === categoryFilter || c?.parent_id === categoryFilter
+    if (categoryFilter !== 'all' && i.category_id !== categoryFilter && c?.parent_id !== categoryFilter) return false
+    if (subFilter !== 'all' && i.category_id !== subFilter) return false
+    return true
   })
-  useEffect(() => { setPage(1) }, [search, statusFilter, categoryFilter, view])
+  useEffect(() => { setPage(1) }, [search, statusFilter, categoryFilter, subFilter, view])
   const pagedItems = flatItems.slice((page - 1) * pageSize, page * pageSize)
   const pathOf = (categoryId: string | null) => {
     const c = allCategories.find(x => x.id === categoryId)
@@ -256,7 +260,7 @@ export default function CatalogPage() {
   }
 
   const hasSubcategories = allCategories.some(c => c.parent_id)
-  const preselectSub = allCategories.find(c => c.id === categoryFilter)?.parent_id ? categoryFilter : undefined
+  const preselectSub = subFilter !== 'all' ? subFilter : undefined
 
   const allCollapsed = sections.length > 0 && sections.every(g => collapsed.has(g.id))
   function toggleAll() { setCollapsed(allCollapsed ? new Set() : new Set(sections.map(g => g.id))) }
@@ -287,9 +291,13 @@ export default function CatalogPage() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
             className="w-full pl-9 pr-4 h-8 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
         </div>
-        <FilterSelect label={t.filters.labels.category} value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
+        <FilterSelect label={t.filters.labels.category} value={categoryFilter} onChange={e => { setCategoryFilter(e.target.value); setSubFilter('all') }}>
           <option value="all">{t.filters.allF}</option>
-          {categoryOptions(allCategories, false).map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+          {tree.map(n => <option key={n.category.id} value={n.category.id}>{n.category.name}</option>)}
+        </FilterSelect>
+        <FilterSelect label={t.filters.labels.subcategory} value={subFilter} onChange={e => setSubFilter(e.target.value)}>
+          <option value="all">{t.filters.allF}</option>
+          {tree.filter(n => categoryFilter === 'all' || n.category.id === categoryFilter).flatMap(n => n.children.map(c => <option key={c.id} value={c.id}>{categoryFilter === 'all' ? `${n.category.name} › ${c.name}` : c.name}</option>))}
         </FilterSelect>
         <FilterSelect label={t.filters.labels.status} value={statusFilter} onChange={e => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}>
           {(['all', 'active', 'inactive'] as const).map(v => <option key={v} value={v}>{v === 'all' ? t.common.allM : v === 'active' ? t.common.activeM : t.common.inactiveM}</option>)}
@@ -409,8 +417,8 @@ export default function CatalogPage() {
               <tbody className="divide-y divide-field">
                 {flatItems.length === 0 ? (
                   <TableEmptyState icon={Package} colSpan={8}
-                    title={(search || statusFilter !== 'all' || categoryFilter !== 'all') ? t.common.empty.noResults.title : t.common.empty.items.title}
-                    subtitle={(search || statusFilter !== 'all' || categoryFilter !== 'all') ? t.common.empty.noResults.text : t.common.empty.items.text} />
+                    title={(search || statusFilter !== 'all' || categoryFilter !== 'all' || subFilter !== 'all') ? t.common.empty.noResults.title : t.common.empty.items.title}
+                    subtitle={(search || statusFilter !== 'all' || categoryFilter !== 'all' || subFilter !== 'all') ? t.common.empty.noResults.text : t.common.empty.items.text} />
                 ) : pagedItems.map(item => {
                   const count = usage.get(item.id) ?? 0
                   const inUse = count > 0
