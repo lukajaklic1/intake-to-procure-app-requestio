@@ -108,6 +108,10 @@ export const translations = {
       noDataFound: 'No data found',
       import: {
         button: 'Import',
+        categoriesButton: 'Import categories',
+        itemsButton: 'Import items',
+        categoriesTitle: 'Import categories from Excel',
+        itemsTitle: 'Import items from Excel',
         title: 'Import from Excel',
         intro: 'Download the template, fill it in Excel and upload it. Rows that already exist are skipped.',
         downloadTemplate: 'Download template',
@@ -845,6 +849,10 @@ export const translations = {
       noDataFound: 'Ni podatkov',
       import: {
         button: 'Uvozi',
+        categoriesButton: 'Uvozi kategorije',
+        itemsButton: 'Uvozi artikle',
+        categoriesTitle: 'Uvoz kategorij iz Excela',
+        itemsTitle: 'Uvoz artiklov iz Excela',
         title: 'Uvoz iz Excela',
         intro: 'Prenesite predlogo, jo izpolnite v Excelu in naložite. Vrstice, ki že obstajajo, se preskočijo.',
         downloadTemplate: 'Prenesi predlogo',

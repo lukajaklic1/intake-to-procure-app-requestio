@@ -39,6 +39,7 @@ export default function CatalogPage() {
   const req = useRequired(t.common.fieldRequired)
   const catReq = useRequired(t.common.fieldRequired)
   const [importOpen, setImportOpen] = useState(false)
+  const [importCatOpen, setImportCatOpen] = useState(false)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
@@ -190,7 +191,7 @@ export default function CatalogPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}</Button><Button onClick={openNewCategory} className="gap-2"><Tag className="w-4 h-4" />{t.categories.new}</Button></>}>
+      <PageToolbar attached actions={<><Button variant="secondary" onClick={() => setImportCatOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.categoriesButton}</Button><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.itemsButton}</Button><Button onClick={openNewCategory} className="gap-2"><Tag className="w-4 h-4" />{t.categories.new}</Button></>}>
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
@@ -292,7 +293,18 @@ export default function CatalogPage() {
         )}
       </div>
 
-      <ImportModal open={importOpen} onClose={() => setImportOpen(false)} title={t.common.import.title}
+      <ImportModal open={importCatOpen} onClose={() => setImportCatOpen(false)} title={t.common.import.categoriesTitle}
+        templateName="categories"
+        columns={[{ key: 'name', label: t.common.import.cols.name, required: true, example: 'Hrana' }]}
+        existing={new Set(allCategories.map(c => c.name.toLowerCase()))}
+        keyOf={row => row.name.toLowerCase()}
+        onImport={async rows => {
+          const { error } = await supabase.from('categories').insert(rows.map(r => ({ company_id: company!.id, name: r.name, status: 'active' })))
+          if (error) throw error
+          loadCategories()
+        }} />
+
+      <ImportModal open={importOpen} onClose={() => setImportOpen(false)} title={t.common.import.itemsTitle}
         templateName="catalog"
         columns={[
           { key: 'name', label: t.common.import.cols.name, required: true, example: 'Olivno olje 1 L' },
