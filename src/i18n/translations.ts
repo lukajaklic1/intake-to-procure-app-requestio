@@ -150,8 +150,9 @@ export const translations = {
         receipts: { title: 'No receipts', text: "You haven't received any orders yet." },
         suppliers: { title: 'No suppliers', text: "You haven't added any suppliers yet." },
         items: { title: 'No items', text: "You haven't added any items yet." },
-        categories: { title: 'No categories', text: "Create a category first, then add items." },
-        categoryEmpty: 'No items in this category yet.',
+        categories: { title: 'No categories', text: "Create a category, then a subcategory, then add items." },
+        categoryEmpty: 'No items in this subcategory yet.',
+        categoryNoSubs: 'No subcategories yet.',
         locations: { title: 'No locations', text: "You haven't added any locations yet." },
         departments: { title: 'No departments', text: "You haven't added any departments yet." },
         users: { title: 'No users', text: "You haven't added any users yet." },
@@ -400,6 +401,7 @@ export const translations = {
       parent: 'Parent category',
       noParent: 'None (main category)',
       newSub: 'New subcategory',
+      subcategory: 'Subcategory',
     },
 
     // Projects
@@ -897,8 +899,9 @@ export const translations = {
         receipts: { title: 'Ni prevzemov', text: 'Prevzeli niste še nobenega naročila.' },
         suppliers: { title: 'Ni dobaviteljev', text: 'Dodali niste še nobenega dobavitelja.' },
         items: { title: 'Ni artiklov', text: 'Dodali niste še nobenega artikla.' },
-        categories: { title: 'Ni kategorij', text: 'Najprej ustvarite kategorijo, nato dodajte artikle.' },
-        categoryEmpty: 'V tej kategoriji še ni artiklov.',
+        categories: { title: 'Ni kategorij', text: 'Ustvarite kategorijo, nato podkategorijo, nato dodajte artikle.' },
+        categoryEmpty: 'V tej podkategoriji še ni artiklov.',
+        categoryNoSubs: 'Še ni podkategorij.',
         locations: { title: 'Ni lokacij', text: 'Dodali niste še nobene lokacije.' },
         departments: { title: 'Ni oddelkov', text: 'Dodali niste še nobenega oddelka.' },
         users: { title: 'Ni uporabnikov', text: 'Dodali niste še nobenega uporabnika.' },
@@ -1147,6 +1150,7 @@ export const translations = {
       parent: 'Nadrejena kategorija',
       noParent: 'Brez (glavna kategorija)',
       newSub: 'Nova podkategorija',
+      subcategory: 'Podkategorija',
     },
 
     // Projects

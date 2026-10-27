@@ -18,6 +18,7 @@ import { useRequired } from '../lib/useRequired'
 import { poLineLocSl, poLineCountEn } from '../utils/pluralize'
 import { countByKey, mergeUsage } from '../lib/usageCounts'
 import { buildCategoryTree, categoryOptions } from '../lib/categories'
+import CategoryOptions from '../components/ui/CategoryOptions'
 
 interface ItemWithCategory extends Item {
   categories: { name: string } | null
@@ -278,7 +279,7 @@ export default function CatalogPage() {
                       const inUse = count > 0
                       return (
                         <tr key={item.id} className="hover:bg-surface transition-colors">
-                          <td className="px-4 py-3 text-xs text-gray-500 font-medium" style={g.level === 1 ? { paddingLeft: 'calc(var(--page-px) + 1.5rem)' } : undefined}>{item.item_number}</td>
+                          <td className="px-4 py-3 text-xs text-gray-500 font-medium" style={g.level === 1 ? { paddingLeft: 'calc(var(--page-px) + 3rem)' } : undefined}>{item.item_number}</td>
                           <td className="px-4 py-3">
                             <p className="font-medium text-gray-900">{item.name}</p>
                             {item.long_description && <p className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{item.long_description}</p>}
@@ -307,14 +308,14 @@ export default function CatalogPage() {
                       <tr>
                         <td colSpan={6} className="!py-2">
                           <div className={`flex items-center gap-4 ${g.level === 1 ? 'ml-6' : ''}`}>
-                            {(g.level === 1 || g.leaf) && (
+                            {g.level === 1 && (
                               <button onClick={() => openNew(g.id)} className="inline-flex items-center gap-1.5 text-sm text-ink2 hover:text-ink transition-colors">
                                 <Plus className="w-4 h-4" />{g.rows.length === 0 ? t.common.empty.categoryEmpty + ' ' : ''}{s.new}
                               </button>
                             )}
                             {g.level === 0 && (
                               <button onClick={() => openNewCategory(g.id)} className="inline-flex items-center gap-1.5 text-sm text-ink2 hover:text-ink transition-colors">
-                                <Plus className="w-4 h-4" />{t.categories.newSub}
+                                <Plus className="w-4 h-4" />{g.leaf ? t.common.empty.categoryNoSubs + ' ' : ''}{t.categories.newSub}
                               </button>
                             )}
                           </div>
@@ -360,7 +361,7 @@ export default function CatalogPage() {
         columns={[
           { key: 'name', label: t.common.import.cols.name, required: true, example: 'Olivno olje 1 L' },
           { key: 'category', label: t.common.import.cols.category, required: true, example: 'Hrana' },
-          { key: 'subcategory', label: t.common.import.cols.subcategory, example: 'Olja in omake' },
+          { key: 'subcategory', label: t.common.import.cols.subcategory, required: true, example: 'Olja in omake' },
           { key: 'unit', label: t.common.import.cols.unit, example: 'kos' },
           { key: 'price', label: t.common.import.cols.price, example: '5,90' },
           { key: 'description', label: t.common.import.cols.description, example: 'Ekstra deviško' },
@@ -390,7 +391,7 @@ export default function CatalogPage() {
           const payload = rows.map((r, i) => ({
             company_id: company!.id, item_number: String(last + 1 + i), name: r.name,
             long_description: r.description || null,
-            category_id: r.subcategory ? sub.get(subKey(r.category, r.subcategory)) : top.get(r.category.toLowerCase()),
+            category_id: sub.get(subKey(r.category, r.subcategory)),
             default_unit: r.unit || null,
             default_unit_price: r.price ? Number(r.price.replace(',', '.')) : null,
             status: 'active',
@@ -432,24 +433,14 @@ export default function CatalogPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
-              <label htmlFor="i-cat" className="text-sm font-medium text-gray-700">{t.po.category} *</label>
+              <label htmlFor="i-cat" className="text-sm font-medium text-gray-700">{t.categories.subcategory} *</label>
               <select id="i-cat"
                 value={editing.category_id ?? ''}
                 onChange={e => { req.clear('category_id'); setEditing(f => ({ ...f, category_id: e.target.value || undefined })) }}
                 className={`rounded-lg border px-3 py-2 text-sm focus:outline-none ${req.errors.category_id ? 'border-red-400' : 'border-field hover:border-field-hover focus:border-field-focus'}`}
               >
                 <option value="">{t.common.select}</option>
-                {tree.map(({ category, children }) => {
-                  const subs = children.filter(c => c.status === 'active' || c.id === editing.category_id)
-                  const topOk = category.status === 'active' || category.id === editing.category_id
-                  if (children.length === 0) return topOk ? <option key={category.id} value={category.id}>{category.name}</option> : null
-                  return (
-                    <optgroup key={category.id} label={category.name}>
-                      {category.id === editing.category_id && <option value={category.id}>{category.name}</option>}
-                      {subs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </optgroup>
-                  )
-                })}
+                <CategoryOptions categories={allCategories} selectedId={editing.category_id ?? undefined} />
               </select>
               {req.errors.category_id && <p className="text-xs text-red-600">{req.errors.category_id}</p>}
             </div>
