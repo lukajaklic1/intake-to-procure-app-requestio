@@ -9,6 +9,7 @@ import { toast } from '../components/ui/Toast'
 import Modal from '../components/ui/Modal'
 import Button from '../components/ui/Button'
 import PageToolbar from '../components/layout/PageToolbar'
+import { useHeaderCounts } from '../components/layout/HeaderCounts'
 import Input from '../components/ui/Input'
 import Pagination from '../components/ui/Pagination'
 import TableEmptyState from '../components/ui/TableEmptyState'
@@ -215,6 +216,8 @@ export default function UsersPage() {
     setEditUser(null)
     load()
   }
+
+  useHeaderCounts(dataLoading ? [] : [{ value: users.length + invites.length }])
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
   if (!isAdmin) return <Navigate to="/dashboard" replace />

@@ -7,6 +7,7 @@ import { useLanguage } from '../hooks/useLanguage'
 import Button from '../components/ui/Button'
 import Pagination from '../components/ui/Pagination'
 import PageToolbar from '../components/layout/PageToolbar'
+import { useHeaderCounts } from '../components/layout/HeaderCounts'
 import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import { format, subMonths, startOfMonth } from 'date-fns'
@@ -102,6 +103,8 @@ export default function ReceiptsPage() {
   function handleQueuePageSizeChange(n: number) { setQueuePageSize(n); setQueuePage(1) }
   const paginatedReceipts = filteredReceipts.slice((histPage - 1) * histPageSize, histPage * histPageSize)
   function handleHistPageSizeChange(n: number) { setHistPageSize(n); setHistPage(1) }
+
+  useHeaderCounts(loading ? [] : [{ label: s.toReceive, value: queue.length }, { label: s.history, value: filteredReceipts.length }])
 
   return (
     <div className="p-4 lg:p-6">

@@ -9,6 +9,7 @@ import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import ImportModal from '../components/ui/ImportModal'
 import PageToolbar from '../components/layout/PageToolbar'
+import { useHeaderCounts } from '../components/layout/HeaderCounts'
 import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Item, Category } from '../types/database'
@@ -191,6 +192,8 @@ export default function CatalogPage() {
   function toggleGroup(id: string) {
     setCollapsed(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
   }
+
+  useHeaderCounts(loading ? [] : [{ label: t.categories.title, value: allCategories.length }, { label: t.nav.items, value: filteredItems.length }])
 
   return (
     <div className="p-4 lg:p-6">

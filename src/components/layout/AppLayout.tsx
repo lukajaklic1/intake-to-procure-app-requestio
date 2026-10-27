@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth'
 import Sidebar from './Sidebar'
 import AppLogo from '../ui/AppLogo'
 import PageHeader from './PageHeader'
+import { HeaderCountsProvider } from './HeaderCounts'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { session, loading, isPasswordRecovery } = useAuth()
@@ -28,6 +29,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!session || isPasswordRecovery) return <Navigate to={isPasswordRecovery ? '/reset-password' : '/'} replace />
 
   return (
+    <HeaderCountsProvider>
     <div className="flex h-screen bg-page overflow-hidden">
 
       {/* Mobile backdrop */}
@@ -68,5 +70,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
     </div>
+    </HeaderCountsProvider>
   )
 }

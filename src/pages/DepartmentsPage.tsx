@@ -10,6 +10,7 @@ import Input from '../components/ui/Input'
 import Pagination from '../components/ui/Pagination'
 import ImportModal from '../components/ui/ImportModal'
 import PageToolbar from '../components/layout/PageToolbar'
+import { useHeaderCounts } from '../components/layout/HeaderCounts'
 import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Department } from '../types/database'
@@ -83,6 +84,8 @@ export default function DepartmentsPage() {
   useEffect(() => { setPage(1) }, [search, statusFilter])
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
+
+  useHeaderCounts(loading ? [] : [{ value: filtered.length }])
 
   return (
     <div className="p-4 lg:p-6">
