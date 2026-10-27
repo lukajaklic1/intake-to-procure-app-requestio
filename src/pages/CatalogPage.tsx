@@ -270,6 +270,13 @@ export default function CatalogPage() {
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                           )}
+                          {g.category && (
+                            <button disabled={categoryInUse(g.category.id)} onClick={e => { e.stopPropagation(); setConfirmDeleteCat(g.category!) }}
+                              title={categoryInUse(g.category.id) ? `${t.common.cannotDelete} ${t.common.deactivateInstead}` : t.common.deleteEntity}
+                              className="p-1 text-gray-400 hover:text-red-600 rounded-md opacity-0 group-hover:opacity-100 transition-opacity disabled:cursor-not-allowed disabled:hover:text-gray-400">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
