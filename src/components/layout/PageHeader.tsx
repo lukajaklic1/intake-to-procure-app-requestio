@@ -43,5 +43,5 @@ export default function PageHeader({ sidebarCollapsed, onShowSidebar }: PageHead
 }
 
 function CountBadge({ value }: { value: number }) {
-  return <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-md bg-selected text-xs tabular-nums text-ink2">{value}</span>
+  return <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-md bg-surface border border-line text-xs tabular-nums text-ink2">{value}</span>
 }
