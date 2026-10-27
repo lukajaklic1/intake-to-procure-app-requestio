@@ -50,6 +50,7 @@ export default function CatalogPage() {
   const importMenuRef = useRef<HTMLDivElement>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const initialCollapse = useRef(false)
   const [view, setViewState] = useState<'tree' | 'all'>(() => { try { return localStorage.getItem('catalogView') === 'all' ? 'all' : 'tree' } catch { return 'tree' } })
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
@@ -92,6 +93,8 @@ export default function CatalogPage() {
       supabase.from('request_line_items').select('category_id, requests!inner(company_id)').eq('requests.company_id', company.id),
     ])
     setAllCategories(data ?? [])
+    // First load: show the tree collapsed; the user expands what they need.
+    if (!initialCollapse.current) { initialCollapse.current = true; setCollapsed(new Set((data ?? []).map(c => c.id))) }
     setCatUsage(mergeUsage(countByKey(poLines, 'category_id'), countByKey(reqLines, 'category_id')))
   }
 
