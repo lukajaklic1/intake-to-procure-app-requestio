@@ -9,7 +9,7 @@ interface ConfirmDialogProps {
   onClose: () => void
   onConfirm: () => void
   title: string
-  /** May contain {name}, which is replaced by `name` in the darker text colour. */
+  /** May contain {name}, which is replaced by `name` (same text colour as the rest). */
   message: string
   name?: string
   confirmLabel?: string
@@ -25,9 +25,7 @@ export default function ConfirmDialog({
   return (
     <Modal open={open} onClose={onClose} title={title} size="sm" icon={danger ? TriangleAlert : CircleHelp} iconTone={danger ? 'danger' : 'primary'}>
       <p className="text-sm leading-6 text-ink2">
-        {name !== undefined && message.includes('{name}')
-          ? message.split('{name}').flatMap((part, i, all) => (i < all.length - 1 ? [part, <span key={i} className="text-ink">{name}</span>] : [part]))
-          : message}
+        {name !== undefined ? message.replaceAll('{name}', name) : message}
       </p>
       <ModalActions className="justify-end mt-6">
         <Button variant="secondary" onClick={onClose} disabled={loading}>{t.common.cancel}</Button>
