@@ -31,6 +31,10 @@ export const translations = {
 
     // Common
     common: {
+      deleteDocTitle: 'Delete document',
+      deleteDocQuestion: 'Are you sure you want to delete the document {name}? This action cannot be undone.',
+      deletePriceTitle: 'Remove price',
+      deletePriceQuestion: 'Are you sure you want to remove the agreed price for {name} from this contract? This action cannot be undone.',
       save: 'Save',
       cancel: 'Cancel',
       edit: 'Edit',
@@ -1010,6 +1014,10 @@ export const translations = {
 
     // Common
     common: {
+      deleteDocTitle: 'Brisanje dokumenta',
+      deleteDocQuestion: 'Ali ste prepričani, da želite izbrisati dokument {name}? Tega dejanja ni mogoče razveljaviti.',
+      deletePriceTitle: 'Odstranitev cene',
+      deletePriceQuestion: 'Ali ste prepričani, da želite iz pogodbe odstraniti dogovorjeno ceno za {name}? Tega dejanja ni mogoče razveljaviti.',
       save: 'Shrani',
       cancel: 'Prekliči',
       edit: 'Uredi',

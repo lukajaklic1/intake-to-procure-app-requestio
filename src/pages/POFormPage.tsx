@@ -172,6 +172,7 @@ export default function POFormPage() {
   const [saving, setSaving] = useState(false)
   const [poStatus, setPoStatus] = useState<string>('draft')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [attToDelete, setAttToDelete] = useState<{ id: string; file_path: string; file_name: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [poNumber, setPoNumber] = useState<string | null>(null)
 
@@ -590,7 +591,7 @@ export default function POFormPage() {
                 {att.file_name}
               </button>
               {!isReadOnly && (
-                <button type="button" onClick={() => deleteAttachment(att)}
+                <button type="button" onClick={() => setAttToDelete(att)}
                   className="text-gray-400 hover:text-red-500 transition-colors shrink-0">
                   <X className="w-4 h-4" />
                 </button>
@@ -791,6 +792,10 @@ export default function POFormPage() {
       )}
       <ConfirmDialog open={confirmDelete} onClose={() => setConfirmDelete(false)} onConfirm={deleteDraft}
         title={t.po.deleteTitle} message={t.po.deleteQuestion} name={poNumber ?? ''} danger loading={deleting} confirmLabel={t.common.deleteEntity} />
+      <ConfirmDialog open={!!attToDelete} onClose={() => setAttToDelete(null)}
+        onConfirm={async () => { if (attToDelete) await deleteAttachment(attToDelete); setAttToDelete(null) }}
+        title={t.common.deleteDocTitle} message={t.common.deleteDocQuestion} name={attToDelete?.file_name ?? ''} danger confirmLabel={t.common.deleteEntity} />
+
     </div>
   )
 }

@@ -13,6 +13,7 @@ import Modal from '../components/ui/Modal'
 import type { Item } from '../types/database'
 import { matchesSearch } from '../lib/search'
 import ModalActions from '../components/ui/ModalActions'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 
 // ─── Catalog search ────────────────────────────────────────────
 function ItemSearch({ items, onSelect, placeholder }: { items: Item[]; onSelect: (item: Item) => void; placeholder: string }) {
@@ -137,6 +138,7 @@ export default function RequestFormPage() {
   const [saving, setSaving] = useState(false)
   const [reqStatus, setReqStatus] = useState<'draft' | 'pending' | 'rejected' | 'approved'>('draft')
   const [submitOpen, setSubmitOpen] = useState(false)
+  const [attToDelete, setAttToDelete] = useState<{ id: string; file_path: string; file_name: string } | null>(null)
   const [submitNote, setSubmitNote] = useState('')
   const [attachments, setAttachments] = useState<{ id: string; file_name: string; file_path: string }[]>([])
   const [newFiles, setNewFiles] = useState<File[]>([])
@@ -357,7 +359,7 @@ export default function RequestFormPage() {
             <div key={att.id} className="flex items-center gap-2 p-2.5 bg-accent-light border border-accent-border rounded-lg mb-2">
               <FileText className="w-4 h-4 text-accent shrink-0" />
               <button type="button" onClick={() => openAttachment(att.file_path)} className="text-sm text-accent hover:underline font-medium flex-1 text-left truncate">{att.file_name}</button>
-              <button type="button" onClick={() => deleteAttachment(att)} className="text-gray-400 hover:text-red-500 transition-colors shrink-0"><X className="w-4 h-4" /></button>
+              <button type="button" onClick={() => setAttToDelete(att)} className="text-gray-400 hover:text-red-500 transition-colors shrink-0"><X className="w-4 h-4" /></button>
             </div>
           ))}
           {newFiles.map((f, i) => (
@@ -469,6 +471,10 @@ export default function RequestFormPage() {
           <Button loading={saving} onClick={() => { setSubmitOpen(false); doSubmit() }}>{s.submit}</Button>
         </ModalActions>
       </Modal>
+      <ConfirmDialog open={!!attToDelete} onClose={() => setAttToDelete(null)}
+        onConfirm={async () => { if (attToDelete) await deleteAttachment(attToDelete); setAttToDelete(null) }}
+        title={t.common.deleteDocTitle} message={t.common.deleteDocQuestion} name={attToDelete?.file_name ?? ''} danger confirmLabel={t.common.deleteEntity} />
+
     </div>
   )
 }

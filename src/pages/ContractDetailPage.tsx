@@ -44,6 +44,8 @@ export default function ContractDetailPage() {
   const [tab, setTab] = useState<Tab>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [confirm, setConfirm] = useState<'terminate' | 'delete' | null>(null)
+  const [removePriceRow, setRemovePriceRow] = useState<PriceRow | null>(null)
+  const [removeDocRow, setRemoveDocRow] = useState<ContractAttachment | null>(null)
   const [newItem, setNewItem] = useState({ item_id: '', price: '' })
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -265,7 +267,7 @@ export default function ContractDetailPage() {
                             className="w-28 text-right rounded-lg border border-transparent hover:border-field focus:border-field-focus px-2 py-1 focus:outline-none disabled:bg-transparent" />
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right">{canEdit && <button onClick={() => removePrice(p)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>}</td>
+                      <td className="px-4 py-3 text-right">{canEdit && <button onClick={() => setRemovePriceRow(p)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>}</td>
                     </tr>
                   )
                 })}
@@ -293,7 +295,7 @@ export default function ContractDetailPage() {
                   <button onClick={() => openDoc(a)} className="flex-1 min-w-0 text-left text-sm text-ink truncate hover:text-accent">{a.file_name}</button>
                   <span className="text-xs text-gray-400">{a.file_size ? `${Math.max(1, Math.round(a.file_size / 1024))} KB` : ''} · {fmtDate(a.created_at.slice(0, 10))}</span>
                   <button onClick={() => openDoc(a)} className="p-1.5 text-gray-400 hover:text-ink rounded-lg"><Download className="w-3.5 h-3.5" /></button>
-                  {canEdit && <button onClick={() => removeDoc(a)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>}
+                  {canEdit && <button onClick={() => setRemoveDocRow(a)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>}
                 </li>
               ))}
             </ul>
@@ -331,6 +333,14 @@ export default function ContractDetailPage() {
         title={s.terminateTitle} message={s.terminateQuestion} name={`${contract.contract_number} · ${contract.title}`} danger confirmLabel={s.terminate} />
       <ConfirmDialog open={confirm === 'delete'} onClose={() => setConfirm(null)} onConfirm={deleteContract}
         title={s.deleteTitle} message={s.deleteQuestion} name={`${contract.contract_number} · ${contract.title}`} danger confirmLabel={t.common.deleteEntity} />
+      <ConfirmDialog open={!!removePriceRow} onClose={() => setRemovePriceRow(null)}
+        onConfirm={async () => { if (removePriceRow) await removePrice(removePriceRow); setRemovePriceRow(null) }}
+        title={t.common.deletePriceTitle} message={t.common.deletePriceQuestion} name={removePriceRow ? `${removePriceRow.items?.name ?? ''} (${removePriceRow.items?.item_number ?? ''})` : ''} danger confirmLabel={t.common.deleteEntity} />
+
+      <ConfirmDialog open={!!removeDocRow} onClose={() => setRemoveDocRow(null)}
+        onConfirm={async () => { if (removeDocRow) await removeDoc(removeDocRow); setRemoveDocRow(null) }}
+        title={t.common.deleteDocTitle} message={t.common.deleteDocQuestion} name={removeDocRow?.file_name ?? ''} danger confirmLabel={t.common.deleteEntity} />
+
     </div>
   )
 }

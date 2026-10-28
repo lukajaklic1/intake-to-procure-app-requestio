@@ -52,6 +52,7 @@ export default function InvoiceDetailPage() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [dialog, setDialog] = useState<null | 'approve' | 'reject' | 'pay' | 'delete'>(null)
+  const [removeDocRow, setRemoveDocRow] = useState<Doc | null>(null)
   const [note, setNote] = useState('')
   const [paidAt, setPaidAt] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [payRef, setPayRef] = useState('')
@@ -282,7 +283,7 @@ export default function InvoiceDetailPage() {
                   <FileText className="w-4 h-4 text-icon shrink-0" />
                   <button onClick={() => openDoc(d)} className="flex-1 min-w-0 text-left text-sm text-ink truncate hover:text-accent">{d.file_name}</button>
                   <button onClick={() => openDoc(d)} className="p-1.5 text-gray-400 hover:text-ink rounded-lg"><Download className="w-3.5 h-3.5" /></button>
-                  {canEdit && <button onClick={() => removeDoc(d)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>}
+                  {canEdit && <button onClick={() => setRemoveDocRow(d)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>}
                 </li>
               ))}
             </ul>
@@ -340,6 +341,10 @@ export default function InvoiceDetailPage() {
 
       <ConfirmDialog open={dialog === 'delete'} onClose={() => setDialog(null)} onConfirm={deleteInvoice}
         title={s.deleteTitle} message={s.deleteQuestion} name={inv.invoice_number} danger confirmLabel={t.common.deleteEntity} />
+      <ConfirmDialog open={!!removeDocRow} onClose={() => setRemoveDocRow(null)}
+        onConfirm={async () => { if (removeDocRow) await removeDoc(removeDocRow); setRemoveDocRow(null) }}
+        title={t.common.deleteDocTitle} message={t.common.deleteDocQuestion} name={removeDocRow?.file_name ?? ''} danger confirmLabel={t.common.deleteEntity} />
+
     </div>
   )
 }
