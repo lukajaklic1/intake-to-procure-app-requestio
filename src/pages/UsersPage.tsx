@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Users, Mail, X } from 'lucide-react'
+import { Plus, Pencil, Users, Mail, X, User, Briefcase, Shield, CircleDot, UserPlus } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
@@ -14,6 +14,12 @@ import Input from '../components/ui/Input'
 import Pagination from '../components/ui/Pagination'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import type { User as AppUser, UserPermission, UserInvitation } from '../types/database'
+import PersonCell from '../components/ui/PersonCell'
+import GridHead from '../components/ui/GridHead'
+import RowMenu from '../components/ui/RowMenu'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
+import ModalActions from '../components/ui/ModalActions'
+import Select from '../components/ui/Select'
 
 const MODULES: UserPermission['module'][] = ['requests', 'purchase_orders', 'receipts', 'invoices', 'budgets', 'reports']
 const ACTIONS: ('view' | 'create' | 'approve' | 'pay')[] = ['view', 'create', 'approve', 'pay']
@@ -96,6 +102,7 @@ export default function UsersPage() {
   const [editForm, setEditForm] = useState({ first_name: '', last_name: '', department_id: '', job_title: '', is_admin: false })
   const [editPerms, setEditPerms] = useState<PermMap>(emptyPerms())
   const [savingPerms, setSavingPerms] = useState(false)
+  const [confirmRevoke, setConfirmRevoke] = useState<UserInvitation | null>(null)
 
   useEffect(() => { if (company && isAdmin) load() }, [company, isAdmin])
 
@@ -233,25 +240,19 @@ export default function UsersPage() {
     <div className="p-4 lg:p-6">
       <PageToolbar attached actions={<Button onClick={openInvite} className="gap-2"><Plus className="w-4 h-4" />{s.addUser}</Button>} />
 
-      <div className="data-card table-bleed bg-white rounded-lg border border-field overflow-hidden">
+      <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
         {dataLoading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[700px]">
-            <thead className="bg-surface border-b border-field">
-              <tr>
-                {[t.common.name, t.common.email, s.department, s.jobTitle, s.role, t.common.status, ''].map((h, i) => (
-                  <th key={i} className="text-left px-4 py-3 text-sm font-medium text-ink2">{h}</th>
-                ))}
-              </tr>
-            </thead>
+            <GridHead cols={[[t.common.name, User], [t.common.email, Mail], [s.department, Users], [s.jobTitle, Briefcase], [s.role, Shield], [t.common.status, CircleDot], ['']]} />
             <tbody className="divide-y divide-field">
               {totalRows === 0 ? (
                 <TableEmptyState icon={Users} colSpan={7} title={t.common.empty.users.title} subtitle={t.common.empty.users.text} />
               ) : <>
               {visibleUsers.map(u => (
                 <tr key={u.id} className="hover:bg-surface transition-colors">
-                  <td className="px-4 py-3 font-medium text-ink">{u.first_name} {u.last_name}</td>
+                  <td className="px-4 py-3 font-medium text-ink"><PersonCell name={`${u.first_name} ${u.last_name}`} /></td>
                   <td className="px-4 py-3 text-ink2">{u.email}</td>
                   <td className="px-4 py-3 text-ink2">{deptName(u.department_id)}</td>
                   <td className="px-4 py-3 text-ink2">{u.job_title ?? '—'}</td>
@@ -264,10 +265,7 @@ export default function UsersPage() {
                     <span className="badge badge-success">{t.common.active}</span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 justify-end">
-                      <button onClick={() => openEdit(u)} title={s.editPermissions}
-                        className="p-1.5 text-gray-400 hover:text-accent hover:bg-accent-light rounded-lg transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-                    </div>
+                    <div className="flex justify-end"><RowMenu items={[{ label: s.editPermissions, icon: Pencil, onClick: () => openEdit(u) }]} /></div>
                   </td>
                 </tr>
               ))}
@@ -286,10 +284,7 @@ export default function UsersPage() {
                     <span className="badge badge-warn">{s.invited}</span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 justify-end">
-                      <button onClick={() => revokeInvite(invite)} title={s.revoke}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><X className="w-3.5 h-3.5" /></button>
-                    </div>
+                    <div className="flex justify-end"><RowMenu items={[{ label: s.revoke, icon: X, onClick: () => setConfirmRevoke(invite) }]} /></div>
                   </td>
                 </tr>
               ))}
@@ -301,31 +296,25 @@ export default function UsersPage() {
       </div>
 
       {/* Invite modal */}
-      <Modal open={inviteOpen} onClose={() => setInviteOpen(false)} title={s.addUser} size="lg">
+      <Modal open={inviteOpen} onClose={() => setInviteOpen(false)} title={s.addUser} size="lg" icon={UserPlus}>
         {sentTo ? (
           <div>
             <p className="text-sm text-gray-600">{s.inviteSent} <span className="font-medium text-gray-900">{sentTo}</span>.</p>
-            <div className="flex justify-end mt-5">
+            <ModalActions className="justify-end">
               <Button onClick={() => setInviteOpen(false)}>{t.common.cancel}</Button>
-            </div>
+            </ModalActions>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input id="inv-first" label={s.firstName + ' *'} value={inv.first_name} error={invReq.errors.first_name} onChange={e => { invReq.clear('first_name'); setInv(v => ({ ...v, first_name: e.target.value })) }} />
-              <Input id="inv-last" label={s.lastName + ' *'} value={inv.last_name} error={invReq.errors.last_name} onChange={e => { invReq.clear('last_name'); setInv(v => ({ ...v, last_name: e.target.value })) }} />
+              <Input id="inv-first" placeholder={t.common.ph.firstName} label={s.firstName + ' *'} value={inv.first_name} error={invReq.errors.first_name} onChange={e => { invReq.clear('first_name'); setInv(v => ({ ...v, first_name: e.target.value })) }} />
+              <Input id="inv-last" placeholder={t.common.ph.lastName} label={s.lastName + ' *'} value={inv.last_name} error={invReq.errors.last_name} onChange={e => { invReq.clear('last_name'); setInv(v => ({ ...v, last_name: e.target.value })) }} />
               <div className="col-span-1 sm:col-span-2">
-                <Input id="inv-email" label={s.inviteEmail + ' *'} type="email" value={inv.email} error={invReq.errors.email} onChange={e => { invReq.clear('email'); setInv(v => ({ ...v, email: e.target.value })) }} />
+                <Input id="inv-email" placeholder={t.common.ph.email} label={s.inviteEmail + ' *'} type="email" value={inv.email} error={invReq.errors.email} onChange={e => { invReq.clear('email'); setInv(v => ({ ...v, email: e.target.value })) }} />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700">{s.department}</label>
-                <select value={inv.department_id} onChange={e => setInv(v => ({ ...v, department_id: e.target.value }))}
-                  className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus bg-white">
-                  <option value="">{s.noDepartment}</option>
-                  {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-              </div>
-              <Input id="inv-job" label={s.jobTitle} value={inv.job_title} onChange={e => setInv(v => ({ ...v, job_title: e.target.value }))} />
+              <Select label={s.department} value={inv.department_id} onChange={v => setInv(x => ({ ...x, department_id: v }))}
+                options={[{ value: '', label: s.noDepartment }, ...departments.map(d => ({ value: d.id, label: d.name }))]} />
+              <Input id="inv-job" placeholder={t.common.ph.jobTitle} label={s.jobTitle} value={inv.job_title} onChange={e => setInv(v => ({ ...v, job_title: e.target.value }))} />
             </div>
 
             <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -343,35 +332,29 @@ export default function UsersPage() {
               </div>
             )}
 
-            <div className="flex gap-3 justify-end mt-1">
+            <ModalActions className="justify-end">
               <Button variant="secondary" onClick={() => setInviteOpen(false)}>{t.common.cancel}</Button>
               <Button loading={inviting} onClick={sendInvite}
                 disabled={!inv.email.trim() || !inv.first_name.trim() || !inv.last_name.trim()}>{s.sendInvite}</Button>
-            </div>
+            </ModalActions>
           </div>
         )}
       </Modal>
 
       {/* Edit user modal */}
-      <Modal open={!!editUser} onClose={() => setEditUser(null)} title={`${s.permissionsFor} ${editUser?.first_name ?? ''} ${editUser?.last_name ?? ''}`} size="lg">
+      <Modal open={!!editUser} onClose={() => setEditUser(null)} title={`${s.permissionsFor} ${editUser?.first_name ?? ''} ${editUser?.last_name ?? ''}`} size="lg" icon={User}>
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input id="edit-first" label={s.firstName + ' *'} value={editForm.first_name} error={editReq.errors.first_name} onChange={e => { editReq.clear('first_name'); setEditForm(v => ({ ...v, first_name: e.target.value })) }} />
-            <Input id="edit-last" label={s.lastName + ' *'} value={editForm.last_name} error={editReq.errors.last_name} onChange={e => { editReq.clear('last_name'); setEditForm(v => ({ ...v, last_name: e.target.value })) }} />
+            <Input id="edit-first" placeholder={t.common.ph.firstName} label={s.firstName + ' *'} value={editForm.first_name} error={editReq.errors.first_name} onChange={e => { editReq.clear('first_name'); setEditForm(v => ({ ...v, first_name: e.target.value })) }} />
+            <Input id="edit-last" placeholder={t.common.ph.lastName} label={s.lastName + ' *'} value={editForm.last_name} error={editReq.errors.last_name} onChange={e => { editReq.clear('last_name'); setEditForm(v => ({ ...v, last_name: e.target.value })) }} />
             <div className="col-span-1 sm:col-span-2 flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700">{t.common.email}</label>
               <input value={editUser?.email ?? ''} disabled
                 className="rounded-lg border border-field bg-gray-50 px-3 py-2 text-sm text-gray-500 cursor-not-allowed" />
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">{s.department}</label>
-              <select value={editForm.department_id} onChange={e => setEditForm(v => ({ ...v, department_id: e.target.value }))}
-                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus bg-white">
-                <option value="">{s.noDepartment}</option>
-                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            </div>
-            <Input id="edit-job" label={s.jobTitle} value={editForm.job_title} onChange={e => setEditForm(v => ({ ...v, job_title: e.target.value }))} />
+            <Select label={s.department} value={editForm.department_id} onChange={v => setEditForm(x => ({ ...x, department_id: v }))}
+              options={[{ value: '', label: s.noDepartment }, ...departments.map(d => ({ value: d.id, label: d.name }))]} />
+            <Input id="edit-job" placeholder={t.common.ph.jobTitle} label={s.jobTitle} value={editForm.job_title} onChange={e => setEditForm(v => ({ ...v, job_title: e.target.value }))} />
           </div>
 
           {editUser?.id !== primaryAdminId && (
@@ -391,13 +374,17 @@ export default function UsersPage() {
             </div>
           )}
 
-          <div className="flex gap-3 justify-end mt-1">
+          <ModalActions className="justify-end">
             <Button variant="secondary" onClick={() => setEditUser(null)}>{t.common.cancel}</Button>
             <Button loading={savingPerms} onClick={saveUser}
               disabled={!editForm.first_name.trim() || !editForm.last_name.trim()}>{t.common.saveChanges}</Button>
-          </div>
+          </ModalActions>
         </div>
       </Modal>
+
+      <ConfirmDialog open={!!confirmRevoke} onClose={() => setConfirmRevoke(null)}
+        onConfirm={async () => { if (confirmRevoke) await revokeInvite(confirmRevoke); setConfirmRevoke(null) }}
+        title={s.revokeTitle} message={s.revokeQuestion} name={confirmRevoke?.email ?? ''} danger confirmLabel={s.revoke} />
     </div>
   )
 }

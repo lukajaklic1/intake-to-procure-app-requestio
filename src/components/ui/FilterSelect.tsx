@@ -1,8 +1,12 @@
 import { Children, Fragment, isValidElement, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { Check, ChevronDown, Search } from 'lucide-react'
+import { matchesSearch } from '../../lib/search'
 
 interface FilterSelectProps {
-  label: string
+  /** Grey filter name before the value; leave out for a plain value picker (e.g. page size). */
+  label?: string
+  /** Where the menu opens; `up` suits controls at the bottom of a card. */
+  placement?: 'down' | 'up'
   value: string
   /** Value that means "no filter" (defaults to the first option). A different value marks the chip as active. */
   defaultValue?: string
@@ -16,7 +20,7 @@ const textOf = (node: ReactNode): string =>
 /** Filter chip: grey filter name, black chosen value ("Supplier: All").
  *  Opens a small menu (with a search box for long lists); the highlighted row gets a grey
  *  background instead of an outline, like Attio. */
-export default function FilterSelect({ label, value, defaultValue, onChange, children }: FilterSelectProps) {
+export default function FilterSelect({ label, placement = 'down', value, defaultValue, onChange, children }: FilterSelectProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
@@ -28,7 +32,7 @@ export default function FilterSelect({ label, value, defaultValue, onChange, chi
   const selected = options.find(o => o.value === String(value)) ?? options[0]
   const isActive = !!selected && selected.value !== (defaultValue ?? options[0]?.value)
   const q = query.trim().toLowerCase()
-  const shown = q ? options.filter(o => o.text.toLowerCase().includes(q)) : options
+  const shown = q ? options.filter(o => matchesSearch(query, [o.text])) : options
   const searchable = options.length > 8
 
   useEffect(() => {
@@ -64,14 +68,14 @@ export default function FilterSelect({ label, value, defaultValue, onChange, chi
   return (
     <div ref={rootRef} className="relative inline-block" onKeyDown={onKeyDown}>
       <button type="button" onClick={() => (open ? close() : openMenu())} aria-haspopup="listbox" aria-expanded={open}
-        className={`inline-flex items-center gap-1.5 h-8 pl-3 pr-2 rounded-lg border text-sm outline-none transition-colors ${isActive ? 'border-field-hover bg-surface' : open ? 'border-field-hover bg-surface' : 'border-field bg-white hover:bg-hover'}`}>
-        <span className="text-filter-label whitespace-nowrap">{label}:</span>
+        className={`inline-flex items-center gap-1.5 ${label ? "h-9 pl-3 pr-2 text-sm" : "h-7 pl-2.5 pr-1.5 text-[13px] font-medium"} rounded-lg border outline-none transition-colors ${isActive ? 'border-field-hover bg-surface' : open ? 'border-field-hover bg-surface' : 'border-field bg-white hover:bg-hover'}`}>
+        {label && <span className="text-filter-label whitespace-nowrap">{label}:</span>}
         <span className="text-ink whitespace-nowrap max-w-[160px] truncate">{selected?.text}</span>
         <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1.5 z-40 min-w-[220px] w-max max-w-[340px] bg-white border border-line rounded-xl shadow-[0_8px_30px_rgba(16,17,18,0.12)] p-1.5">
+        <div className={`absolute left-0 ${placement === 'up' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'} z-40 ${label ? 'min-w-[220px]' : 'min-w-[96px]'} w-max max-w-[340px] bg-white border border-line rounded-xl shadow-[0_8px_30px_rgba(16,17,18,0.12)] p-1.5`}>
           {searchable && (
             <div className="relative mb-1.5">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-filter-label" />
@@ -92,7 +96,7 @@ export default function FilterSelect({ label, value, defaultValue, onChange, chi
                   )}
                 </button>
                 {/* The first option ("All") is set apart from the rest by a thin line */}
-                {!q && i === 0 && shown.length > 1 && <div className="h-px bg-line mx-1 my-0.5" />}
+                {!q && label && i === 0 && shown.length > 1 && <div className="h-px bg-line mx-1 my-0.5" />}
               </Fragment>
             ))}
           </div>

@@ -44,6 +44,7 @@ export interface User {
 export interface Supplier {
   id: string
   company_id: string
+  supplier_number: string
   name: string
   vat_number: string | null
   contact_name: string | null

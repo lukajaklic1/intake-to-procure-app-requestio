@@ -169,7 +169,6 @@ export default function ContractDetailPage() {
             {contract.status === 'terminated' && <Button variant="secondary" onClick={() => setStatus('active')}>{s.reactivate}</Button>}
             {contract.status === 'active' && <Button variant="secondary" onClick={() => setConfirm('terminate')}>{s.terminate}</Button>}
             <Button variant="secondary" onClick={() => setEditOpen(true)} className="gap-2"><Pencil className="w-4 h-4" />{t.common.editEntity}</Button>
-            <Button variant="secondary" disabled={orders.length > 0} title={orders.length > 0 ? s.cannotDeleteLinked : undefined} onClick={() => setConfirm('delete')} className="!px-2.5"><Trash2 className="w-4 h-4 text-icon" /></Button>
           </div>
         )}
       </div>
@@ -186,7 +185,7 @@ export default function ContractDetailPage() {
           <button key={x.id} onClick={() => setTab(x.id)}
             className={`inline-flex items-center gap-2 h-8 px-3 rounded-lg border text-sm transition-colors ${tab === x.id ? 'border-field bg-surface text-ink' : 'border-transparent text-ink2 hover:bg-hover'}`}>
             {x.label}
-            {x.count != null && <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-md bg-surface border border-field text-[11px] tabular-nums text-ink2">{x.count}</span>}
+            {x.count != null && <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-md bg-surface border border-field text-[11px] text-ink2">{x.count}</span>}
           </button>
         ))}
       </div>
@@ -206,11 +205,11 @@ export default function ContractDetailPage() {
 
           <div className="bg-white rounded-lg border border-field p-6">
             <p className="text-xs text-gray-400 mb-1">{s.spent} / {s.totalValue}</p>
-            <p className="text-2xl font-semibold text-ink tabular-nums">{money(spent)}</p>
+            <p className="text-2xl font-semibold text-ink">{money(spent)}</p>
             {contract.total_value != null ? (
               <>
                 <div className="h-1.5 rounded-full bg-selected mt-3 overflow-hidden"><div className={`h-full rounded-full ${over ? 'bg-danger' : pct >= 80 ? 'bg-warn' : 'bg-primary'}`} style={{ width: `${pct}%` }} /></div>
-                <div className="flex justify-between text-xs text-ink2 mt-2 tabular-nums">
+                <div className="flex justify-between text-xs text-ink2 mt-2">
                   <span>{money(contract.total_value)}</span>
                   <span>{s.remaining}: {money(Math.max(0, contract.total_value - spent))}</span>
                 </div>
@@ -237,7 +236,7 @@ export default function ContractDetailPage() {
               <div className="flex flex-col gap-1 w-36">
                 <label className="text-xs text-gray-400">{s.agreedPrice}</label>
                 <input value={newItem.price} onChange={e => { if (/^[0-9]*[,.]?[0-9]*$/.test(e.target.value)) setNewItem(n => ({ ...n, price: e.target.value })) }}
-                  placeholder="0,00" className="rounded-lg border border-field px-3 py-2 text-sm text-right tabular-nums focus:outline-none hover:border-field-hover" />
+                  placeholder="0,00" className="rounded-lg border border-field px-3 py-2 text-sm text-right focus:outline-none hover:border-field-hover" />
               </div>
               <Button onClick={addPrice} className="gap-2"><Plus className="w-4 h-4" />{t.common.create}</Button>
             </div>
@@ -258,12 +257,12 @@ export default function ContractDetailPage() {
                       <td className="px-4 py-3 text-xs text-gray-500">{p.items?.item_number}</td>
                       <td className="px-4 py-3 font-medium text-ink">{p.items?.name}</td>
                       <td className="px-4 py-3 text-ink2">{p.items?.default_unit ?? '—'}</td>
-                      <td className="px-4 py-3 text-right text-ink2 tabular-nums">{cat != null ? money(cat) : '—'}</td>
+                      <td className="px-4 py-3 text-right text-ink2">{cat != null ? money(cat) : '—'}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex items-center gap-2">
                           {diff != null && diff !== 0 && <span className={`text-xs ${diff < 0 ? 'text-success' : 'text-danger'}`}>{diff > 0 ? '+' : ''}{diff}%</span>}
                           <input defaultValue={String(p.agreed_price).replace('.', ',')} disabled={!canEdit} onBlur={e => savePrice(p, e.target.value)}
-                            className="w-28 text-right rounded-lg border border-transparent hover:border-field focus:border-field-focus px-2 py-1 tabular-nums focus:outline-none disabled:bg-transparent" />
+                            className="w-28 text-right rounded-lg border border-transparent hover:border-field focus:border-field-focus px-2 py-1 focus:outline-none disabled:bg-transparent" />
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right">{canEdit && <button onClick={() => removePrice(p)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>}</td>
@@ -292,7 +291,7 @@ export default function ContractDetailPage() {
                 <li key={a.id} className="flex items-center gap-3 px-4 py-3">
                   <FileText className="w-4 h-4 text-icon shrink-0" />
                   <button onClick={() => openDoc(a)} className="flex-1 min-w-0 text-left text-sm text-ink truncate hover:text-accent">{a.file_name}</button>
-                  <span className="text-xs text-gray-400 tabular-nums">{a.file_size ? `${Math.max(1, Math.round(a.file_size / 1024))} KB` : ''} · {fmtDate(a.created_at.slice(0, 10))}</span>
+                  <span className="text-xs text-gray-400">{a.file_size ? `${Math.max(1, Math.round(a.file_size / 1024))} KB` : ''} · {fmtDate(a.created_at.slice(0, 10))}</span>
                   <button onClick={() => openDoc(a)} className="p-1.5 text-gray-400 hover:text-ink rounded-lg"><Download className="w-3.5 h-3.5" /></button>
                   {canEdit && <button onClick={() => removeDoc(a)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>}
                 </li>
@@ -317,7 +316,7 @@ export default function ContractDetailPage() {
                     <td className="px-4 py-3 font-medium text-ink">{o.po_number}</td>
                     <td className="px-4 py-3"><span className={`badge ${PO_BADGE[o.status] ?? 'badge-neutral'}`}>{t.status[o.status as keyof typeof t.status] ?? o.status}</span></td>
                     <td className="px-4 py-3 text-ink2">{fmtDate(o.created_at.slice(0, 10))}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{money(Number(o.total_amount ?? 0))}</td>
+                    <td className="px-4 py-3 text-right">{money(Number(o.total_amount ?? 0))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -326,11 +325,12 @@ export default function ContractDetailPage() {
         </div>
       )}
 
-      <ContractFormModal open={editOpen} onClose={() => setEditOpen(false)} contract={contract} suppliers={suppliers} people={people} onSaved={load} />
+      <ContractFormModal open={editOpen} onClose={() => setEditOpen(false)} contract={contract} suppliers={suppliers} people={people} onSaved={load}
+        onDelete={() => setConfirm('delete')} deleteBlocked={orders.length > 0 ? s.cannotDeleteLinked : null} />
       <ConfirmDialog open={confirm === 'terminate'} onClose={() => setConfirm(null)} onConfirm={() => setStatus('terminated')}
-        title={s.terminate} danger message={s.confirmTerminate} confirmLabel={s.terminate} />
+        title={s.terminateTitle} message={s.terminateQuestion} name={`${contract.contract_number} · ${contract.title}`} danger confirmLabel={s.terminate} />
       <ConfirmDialog open={confirm === 'delete'} onClose={() => setConfirm(null)} onConfirm={deleteContract}
-        title={t.common.deleteEntity} danger message={s.deleteConfirm} confirmLabel={t.common.deleteEntity} />
+        title={s.deleteTitle} message={s.deleteQuestion} name={`${contract.contract_number} · ${contract.title}`} danger confirmLabel={t.common.deleteEntity} />
     </div>
   )
 }

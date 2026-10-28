@@ -20,3 +20,27 @@ export function countryList(lang: string): CountryList {
   const all = CODES.map(nameOf).sort((a, b) => a.localeCompare(b, locale))
   return { popular: POPULAR.map(nameOf), all }
 }
+
+const fold = (v: string) => v.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase()
+let index: Map<string, string> | null = null
+
+/** Country name, code or any language's spelling -> ISO code. Built once. */
+function codeIndex() {
+  if (index) return index
+  index = new Map()
+  for (const locale of ['en', 'sl']) {
+    const names = new Intl.DisplayNames([locale], { type: 'region' })
+    for (const code of CODES) { const n = names.of(code); if (n) index.set(fold(n), code) }
+  }
+  for (const code of CODES) index.set(code.toLowerCase(), code)
+  return index
+}
+
+/** A stored country (saved in whichever language was active at the time) shown in `lang`.
+ *  Unknown free text is returned unchanged. */
+export function localizeCountry(value: string | null | undefined, lang: string): string {
+  if (!value) return ''
+  const code = codeIndex().get(fold(value))
+  if (!code) return value
+  return new Intl.DisplayNames([lang === 'sl' ? 'sl' : 'en'], { type: 'region' }).of(code) ?? value
+}

@@ -79,7 +79,7 @@ function OverviewBar({ items }: { items: { icon: React.ElementType; label: strin
           <div className="mb-2">
             <span className="text-sm font-semibold text-ink2">{item.label}</span>
           </div>
-          <div className={cn('font-semibold tabular-nums tracking-tight text-ink', item.primary ? 'text-3xl' : 'text-2xl')}>
+          <div className={cn('font-semibold tracking-tight text-ink', item.primary ? 'text-3xl' : 'text-2xl')}>
             {item.value}
           </div>
         </div>
@@ -152,11 +152,11 @@ function BreakdownTable({ rows, currency }: { rows: BreakdownRow[]; currency: st
             return (
               <tr key={i} className="hover:bg-surface transition-colors">
                 <td className="px-4 py-3 font-medium text-ink max-w-[220px] truncate" title={r.name}>{r.name}</td>
-                <td className="px-4 py-3 text-right text-ink2 tabular-nums" style={{ fontFamily: SANS }}>{fmt(r.sentAmount, currency)}</td>
-                <td className="px-4 py-3 text-right text-ink2 tabular-nums" style={{ fontFamily: SANS }}>{fmt(r.receivedAmount, currency)}</td>
-                <td className="px-4 py-3 text-right text-ink2 tabular-nums" style={{ fontFamily: SANS }}>{r.sentCount}</td>
-                <td className="px-4 py-3 text-right text-success font-semibold tabular-nums" style={{ fontFamily: SANS }}>{r.receivedCount}</td>
-                <td className="px-4 py-3 text-right text-ink2 tabular-nums" style={{ fontFamily: SANS }}>{pct.toFixed(1).replace('.', ',')}%</td>
+                <td className="px-4 py-3 text-right text-ink2" style={{ fontFamily: SANS }}>{fmt(r.sentAmount, currency)}</td>
+                <td className="px-4 py-3 text-right text-ink2" style={{ fontFamily: SANS }}>{fmt(r.receivedAmount, currency)}</td>
+                <td className="px-4 py-3 text-right text-ink2" style={{ fontFamily: SANS }}>{r.sentCount}</td>
+                <td className="px-4 py-3 text-right text-success font-semibold" style={{ fontFamily: SANS }}>{r.receivedCount}</td>
+                <td className="px-4 py-3 text-right text-ink2" style={{ fontFamily: SANS }}>{pct.toFixed(1).replace('.', ',')}%</td>
               </tr>
             )
           })}
@@ -172,7 +172,7 @@ const CustomTooltip = ({ active, payload, label, currency }: any) => {
   return (
     <div className="bg-white border border-line rounded-lg shadow-lg px-3 py-2 text-xs">
       {label && <p className="text-ink2 mb-1">{label}</p>}
-      <p className="font-semibold text-ink tabular-nums" style={{ fontFamily: SANS }}>{fmt(payload[0].value, currency)}</p>
+      <p className="font-semibold text-ink" style={{ fontFamily: SANS }}>{fmt(payload[0].value, currency)}</p>
     </div>
   )
 }
@@ -380,7 +380,7 @@ export default function DashboardPage() {
           <button onClick={() => setBannerDismissed(true)} className="absolute top-4 right-4 text-gray-400 hover:text-ink2"><X className="w-4 h-4" /></button>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm font-semibold text-ink">{t.dashboard.completeSetup}</span>
-            <span className="text-xs text-gray-400 tabular-nums">{doneCount} / {checklistItems.length} {t.dashboard.done}</span>
+            <span className="text-xs text-gray-400">{doneCount} / {checklistItems.length} {t.dashboard.done}</span>
           </div>
           <div className="h-1.5 bg-selected rounded-full mb-4 overflow-hidden">
             <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${(doneCount / checklistItems.length) * 100}%` }} />

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Download, FileSpreadsheet } from 'lucide-react'
+import { Download, FileSpreadsheet, Upload } from 'lucide-react'
 import { readSheet } from 'read-excel-file/browser'
 import writeExcelFile from 'write-excel-file/browser'
 import Modal from './Modal'
@@ -7,6 +7,7 @@ import Button from './Button'
 import { toast } from './Toast'
 import { useLanguage } from '../../hooks/useLanguage'
 import { dbError } from '../../lib/dbError'
+import ModalActions from './ModalActions'
 
 export type ImportRow = Record<string, string>
 
@@ -112,7 +113,7 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
   }
 
   return (
-    <Modal open={open} onClose={close} title={title} size="lg">
+    <Modal open={open} onClose={close} title={title} size="lg" icon={Upload}>
       <p className="text-sm text-ink2 mb-4">{s.intro}</p>
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -127,7 +128,7 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
       </p>
 
       {parsed && (
-        <div className="rounded-lg border border-field p-4 mb-4 text-sm flex flex-col gap-2">
+        <div className="rounded-xl border border-line p-4 mb-4 text-sm flex flex-col gap-2">
           <div className="flex flex-wrap gap-2">
             <span className="badge badge-success">{s.toImport}: {parsed.valid.length}</span>
             {parsed.duplicates > 0 && <span className="badge badge-neutral">{s.skipped}: {parsed.duplicates}</span>}
@@ -140,7 +141,7 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
       )}
 
       {parsed && parsed.preview.length > 0 && (
-        <div className="rounded-lg border border-field mb-4 overflow-auto max-h-72">
+        <div className="rounded-xl border border-line mb-4 overflow-auto max-h-72">
           <table className="w-full text-sm">
             <thead className="bg-surface border-b border-field sticky top-0">
               <tr>
@@ -152,7 +153,7 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
             <tbody className="divide-y divide-field">
               {parsed.preview.map(p => (
                 <tr key={p.line} className={p.status === 'new' ? '' : 'bg-surface'}>
-                  <td className="px-3 py-2 text-xs text-gray-400 tabular-nums">{p.line}</td>
+                  <td className="px-3 py-2 text-xs text-gray-400">{p.line}</td>
                   {columns.map(c => <td key={c.key} className={`px-3 py-2 max-w-[180px] truncate ${p.status === 'new' ? 'text-ink' : 'text-muted'}`} title={p.data[c.key]}>{p.data[c.key] || '—'}</td>)}
                   <td className="px-3 py-2 whitespace-nowrap">
                     {p.status === 'new' && <span className="badge badge-success">{s.statusNew}</span>}
@@ -166,12 +167,12 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
         </div>
       )}
 
-      <div className="flex gap-3 justify-end">
+      <ModalActions className="justify-end">
         <Button variant="secondary" onClick={close}>{t.common.cancel}</Button>
         <Button loading={busy} disabled={!parsed || parsed.valid.length === 0} onClick={run}>
           {s.importBtn}{parsed && parsed.valid.length > 0 ? ` (${parsed.valid.length})` : ''}
         </Button>
-      </div>
+      </ModalActions>
     </Modal>
   )
 }

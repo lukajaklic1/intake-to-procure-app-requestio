@@ -64,7 +64,7 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
   }
 
   const navLinkCls = ({ isActive }: { isActive: boolean }) => cn(
-    'group flex items-center gap-2.5 px-2.5 py-[6px] rounded-lg mb-0.5 text-[15px] leading-5 font-medium transition-colors',
+    'group flex items-center gap-2.5 px-2.5 py-[4px] rounded-lg mb-px text-[14px] leading-5 font-medium transition-colors',
     isActive ? 'bg-selected text-ink' : 'text-ink hover:bg-hover',
   )
 
@@ -90,7 +90,7 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
         <div className="px-3 pt-3 pb-1">
           <div className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-white border border-line">
             <Building2 className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
-            <span className="flex-1 min-w-0 text-[15px] font-medium text-ink truncate">{company.name}</span>
+            <span className="flex-1 min-w-0 text-[14px] font-medium text-ink truncate">{company.name}</span>
           </div>
         </div>
       )}
@@ -101,9 +101,9 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
           const items = group.items.filter(item => !item.adminOnly || isAdmin)
           if (items.length === 0) return null
           return (
-            <div key={gi} className={gi > 0 ? 'mt-4' : undefined}>
+            <div key={gi} className={gi > 0 ? 'mt-3' : undefined}>
               {group.section && (
-                <p className="px-2.5 mb-1 text-xs font-medium text-muted">
+                <p className="px-2.5 mb-1.5 text-xs font-medium text-muted">
                   {t.nav[group.section]}
                 </p>
               )}
@@ -117,7 +117,7 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
                         <span className="flex-1">{t.nav[key]}</span>
                         {badge > 0 && (
                           <span className={cn(
-                            'min-w-[18px] h-[18px] px-1 rounded-full text-accent-hover text-[11px] font-semibold flex items-center justify-center shrink-0',
+                            'min-w-[18px] h-[18px] px-1 rounded-full text-accent-hover text-[11px] font-medium flex items-center justify-center shrink-0',
                             isActive ? 'bg-accent-active' : 'bg-accent-light',
                           )}>
                             {badge}
@@ -164,7 +164,7 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
             {profile ? `${profile.first_name[0]}${profile.last_name[0]}` : '?'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[15px] font-medium text-ink truncate">
+            <p className="text-[14px] font-medium text-ink truncate">
               {profile ? `${profile.first_name} ${profile.last_name}` : '—'}
             </p>
           </div>

@@ -32,3 +32,7 @@ export function useLanguage() {
   if (!ctx) throw new Error('useLanguage must be used within LanguageProvider')
   return ctx
 }
+
+// A hot-swapped copy of this module gets its own context object, which no longer matches the
+// provider mounted at the root. In dev, reload the page instead of patching it in place.
+if (import.meta.hot) import.meta.hot.accept(() => window.location.reload())

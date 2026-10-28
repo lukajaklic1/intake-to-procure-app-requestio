@@ -57,6 +57,14 @@
   --badge-danger-bg:  #ffe3e3;  --badge-danger-border:  #ffc9c9;  --badge-danger-text:  #e03131;
   --badge-purple-bg:  #f3e8ff;  --badge-purple-border:  #e9d5ff;  --badge-purple-text:  #7c3aed;
 
+  /* Person avatars (initials circles): no red/green, those mean status */
+  --avatar-yellow-bg: #fdf1b8;  --avatar-yellow-border: #f3dc6b;  --avatar-yellow-text: #8a6500;
+  --avatar-orange-bg: #ffe4cc;  --avatar-orange-border: #f8c791;  --avatar-orange-text: #b45309;
+  --avatar-purple-bg: #efe6ff;  --avatar-purple-border: #dccbfb;  --avatar-purple-text: #6d3fd6;
+  --avatar-pink-bg:   #fde2f3;  --avatar-pink-border:   #f7c1e2;  --avatar-pink-text:   #b4278c;
+  --avatar-blue-bg:   #e1ecff;  --avatar-blue-border:   #c6dafb;  --avatar-blue-text:   #215bcf;
+  --avatar-cyan-bg:   #d9f1f8;  --avatar-cyan-border:   #b5e2ee;  --avatar-cyan-text:   #0e7490;
+
   /* Company avatar */
   --color-company: #7c3aed;
   --color-company-light: #f0e4fc;

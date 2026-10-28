@@ -10,6 +10,7 @@ import Button from '../components/ui/Button'
 import { usePODownload } from '../hooks/usePODownload'
 import { format } from 'date-fns'
 import type { PoActivityLog } from '../types/database'
+import { localizeCountry } from '../lib/countries'
 
 interface LineItem {
   id: string; position: number; name: string; long_description: string | null
@@ -55,7 +56,7 @@ export default function PODetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { company, profile, isAdmin, hasPerm } = useCompany()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const s = t.po
   const [po, setPo] = useState<POFull | null>(null)
   const [lines, setLines] = useState<LineItem[]>([])
@@ -248,7 +249,7 @@ export default function PODetailPage() {
           {(po.suppliers?.address_postal_code || po.suppliers?.address_city) && (
             <p className="text-xs text-gray-500">{[po.suppliers.address_postal_code, po.suppliers.address_city].filter(Boolean).join(' ')}</p>
           )}
-          {po.suppliers?.address_country && <p className="text-xs text-gray-500">{po.suppliers.address_country}</p>}
+          {po.suppliers?.address_country && <p className="text-xs text-gray-500">{localizeCountry(po.suppliers.address_country, lang)}</p>}
         </div>
 
         {/* Delivery */}
@@ -396,20 +397,12 @@ export default function PODetailPage() {
         </div>
       )}
 
-      <ConfirmDialog
-        open={!!confirmTransition} onClose={() => setConfirmTransition(null)}
+      <ConfirmDialog open={!!confirmTransition} onClose={() => setConfirmTransition(null)}
         onConfirm={() => confirmTransition && transition(confirmTransition.status)}
-        title={confirmTransition?.label ?? ''} loading={actionLoading}
-        message={`${t.po.confirmStatusChange} ${po.po_number} → ${confirmTransition?.label ?? ''}?`}
-        confirmLabel={confirmTransition?.label ?? t.common.save}
-      />
-      <ConfirmDialog
-        open={confirmCancel} onClose={() => setConfirmCancel(false)}
-        onConfirm={() => transition('cancelled')}
-        title={t.po.cancelPO} loading={actionLoading} danger
-        message={`${t.po.cancelConfirmMessage} ${po.po_number}? ${t.po.cancelConfirmNote}`}
-        confirmLabel={t.po.cancelPO}
-      />
+        title={t.po.statusChangeTitle} message={t.po.statusChangeQuestion.replace('{status}', confirmTransition?.label ?? '')} name={po.po_number}
+        loading={actionLoading} confirmLabel={confirmTransition?.label ?? t.common.save} />
+      <ConfirmDialog open={confirmCancel} onClose={() => setConfirmCancel(false)} onConfirm={() => transition('cancelled')}
+        title={t.po.cancelTitle} message={t.po.cancelQuestion} name={po.po_number} danger loading={actionLoading} confirmLabel={t.po.cancelPO} />
     </div>
   )
 }

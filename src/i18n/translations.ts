@@ -72,6 +72,30 @@ export const translations = {
       cityRequired: 'City is required',
       postalRequired: 'Postal code is required',
       fieldRequired: 'This field is required',
+      ph: {
+        companyName: 'Planina d.o.o.',
+        vat: 'SI12345678',
+        contact: 'John Smith',
+        street: '1 Main Street',
+        city: 'Lake Bohinj',
+        postal: '4264',
+        email: 'name@company.com',
+        phone: '+386 40 123 456',
+        paymentTerms: '30 days',
+        locationName: 'Main entrance',
+        departmentName: 'Kitchen',
+        itemName: 'All-purpose cleaner 5 L',
+        itemDesc: 'Additional details about the item',
+        price: '0.00',
+        categoryName: 'Cleaning products',
+        subcategoryName: 'Surface cleaners',
+        firstName: 'John',
+        lastName: 'Smith',
+        jobTitle: 'Procurement manager',
+        noticeDays: '30',
+        renewalMonths: '12',
+        contractDesc: 'Contract description or notes',
+      },
       alreadyExists: 'This already exists',
       collapseAll: 'Collapse all',
       expandAll: 'Expand all',
@@ -83,6 +107,8 @@ export const translations = {
       notFound: 'Not found',
       cannotDelete: 'Cannot delete —',
       usedOn: 'used on',
+      usedIn: 'used in',
+      usage: { requests: 'requests', orders: 'orders', contracts: 'contracts', invoices: 'invoices', requestLines: 'request lines', poLines: 'order lines', contractItems: 'contract prices', items: 'items', subcategories: 'subcategories', users: 'users', invitations: 'invitations' } as Record<string, string>,
       andWord: 'and',
       deactivateInstead: 'Deactivate instead.',
       setInactiveInstead: 'Set status to Inactive instead.',
@@ -249,12 +275,16 @@ export const translations = {
     },
 
     contracts: {
+      terminateTitle: 'Terminate contract',
+      terminateQuestion: 'Are you sure you want to terminate the contract {name}? You can reactivate it later.',
+      deleteTitle: 'Delete contract',
+      deleteQuestion: 'Are you sure you want to delete the contract {name}? This action cannot be undone.',
       title: 'Contracts',
       new: 'New contract',
       editTitle: 'Edit contract',
       number: 'Contract no.',
       contractTitle: 'Title',
-      titlePlaceholder: 'e.g. Annual meat supply agreement',
+      titlePlaceholder: 'Annual meat supply agreement',
       supplier: 'Supplier',
       status: 'Status',
       st: { draft: 'Draft', active: 'Active', expired: 'Expired', terminated: 'Terminated' },
@@ -304,6 +334,8 @@ export const translations = {
     },
 
     invoices: {
+      deleteTitle: 'Delete draft invoice',
+      deleteQuestion: 'Are you sure you want to delete the draft invoice {name}? This action cannot be undone.',
       title: 'Invoices',
       new: 'New invoice',
       editTitle: 'Edit invoice',
@@ -389,6 +421,12 @@ export const translations = {
 
     // Purchase Orders
     po: {
+      cancelTitle: 'Cancel purchase order',
+      cancelQuestion: 'Are you sure you want to cancel the purchase order {name}? It will stay visible as cancelled and can no longer be edited.',
+      statusChangeTitle: 'Change status',
+      statusChangeQuestion: 'Are you sure you want to change the status of purchase order {name} to {status}?',
+      deleteTitle: 'Delete draft order',
+      deleteQuestion: 'Are you sure you want to delete the draft purchase order {name}? This action cannot be undone.',
       title: 'Purchase Orders',
       new: 'New PO',
       shown: 'shown',
@@ -412,6 +450,7 @@ export const translations = {
       cancelPO: 'Cancel PO',
       confirmStatusChange: 'Update status of',
       cancelConfirmMessage: 'Cancel PO',
+      deleteDraftConfirm: 'Delete this draft order? This cannot be undone.',
       cancelConfirmNote: 'The PO will remain visible as cancelled but cannot be edited.',
       downloadPDF: 'Download PDF',
       orderDetails: 'Order details',
@@ -498,9 +537,13 @@ export const translations = {
 
     // Suppliers
     suppliers: {
+      deleteTitle: 'Delete supplier',
+      deleteQuestion: 'Are you sure you want to delete the supplier {name}? This action cannot be undone.',
+      deleteBlockedMsg: 'This supplier cannot be deleted because it has been used in one or more documents.',
       title: 'Suppliers',
       activeCount: 'active suppliers',
       new: 'New Supplier',
+      edit: 'Edit supplier',
       noMatch: 'No suppliers match your search',
       noData: 'No suppliers yet',
       createFirst: 'Add your first supplier →',
@@ -510,6 +553,7 @@ export const translations = {
       paymentTerms: 'Payment terms',
       incoterm: 'Incoterm',
       companyName: 'Company name',
+      number: 'Number',
       vatNumber: 'VAT number',
       contactName: 'Contact name',
       streetAddress: 'Street address',
@@ -521,9 +565,13 @@ export const translations = {
 
     // Items
     items: {
+      deleteTitle: 'Delete item',
+      deleteQuestion: 'Are you sure you want to delete the item {name}? This action cannot be undone.',
+      deleteBlockedMsg: 'This item cannot be deleted because it has been used in one or more documents.',
       title: 'Items / Catalog',
       activeCount: 'active items',
       new: 'New Item',
+      edit: 'Edit item',
       noMatch: 'No items match your search',
       noData: 'No items yet',
       createFirst: 'Add your first item →',
@@ -537,10 +585,16 @@ export const translations = {
 
     // Categories
     categories: {
+      deleteSubTitle: 'Delete subcategory',
+      deleteSubQuestion: 'Are you sure you want to delete the subcategory {name}? This action cannot be undone.',
+      deleteTitle: 'Delete category',
+      deleteQuestion: 'Are you sure you want to delete the category {name}? This action cannot be undone.',
+      deleteBlockedMsg: 'This category cannot be deleted because it contains subcategories or items, or has been used in documents.',
       title: 'Categories',
       count: 'categories',
       activeCount: 'active categories',
       new: 'New Category',
+      edit: 'Edit category',
       noMatch: 'No categories match your search',
       noData: 'No categories yet',
       createFirst: 'Add your first category →',
@@ -549,6 +603,7 @@ export const translations = {
       parent: 'Parent category',
       noParent: 'None (main category)',
       newSub: 'New subcategory',
+      editSub: 'Edit subcategory',
       addSub: 'Add subcategory',
       addCategory: 'Add category',
       addItem: 'Add item',
@@ -581,10 +636,14 @@ export const translations = {
 
     // Locations
     locations: {
+      deleteTitle: 'Delete location',
+      deleteQuestion: 'Are you sure you want to delete the location {name}? This action cannot be undone.',
+      deleteBlockedMsg: 'This location cannot be deleted because it has been used in one or more documents.',
       title: 'Locations',
       subtitle: 'Delivery addresses for purchase orders',
       activeCount: 'active locations',
       new: 'New Location',
+      edit: 'Edit location',
       noMatch: 'No locations match',
       noData: 'No locations yet',
       createFirst: 'Add your first location →',
@@ -594,10 +653,14 @@ export const translations = {
 
     // Departments
     departments: {
+      deleteTitle: 'Delete department',
+      deleteQuestion: 'Are you sure you want to delete the department {name}? This action cannot be undone.',
+      deleteBlockedMsg: 'This department cannot be deleted because it has been used in one or more documents.',
       title: 'Departments',
       count: 'departments',
       activeCount: 'active departments',
       new: 'New Department',
+      edit: 'Edit department',
       noMatch: 'No departments match',
       noData: 'No departments yet',
       createFirst: 'Add your first department →',
@@ -607,6 +670,8 @@ export const translations = {
 
     // Settings
     settings: {
+      revokeTitle: 'Cancel invitation',
+      revokeQuestion: 'Are you sure you want to cancel the invitation for {name}? This action cannot be undone.',
       title: 'Settings',
       subtitle: 'Manage your company profile and preferences.',
       personalProfile: 'Personal Profile',
@@ -689,11 +754,15 @@ export const translations = {
     },
 
     requests: {
+      cancelTitle: 'Cancel request',
+      cancelQuestion: 'Are you sure you want to cancel the request {name}? This action cannot be undone.',
+      deleteTitle: 'Delete draft request',
+      deleteQuestion: 'Are you sure you want to delete the draft request {name}? This action cannot be undone.',
       title: 'Requests',
       subtitle: 'Procurement requests.',
       new: 'New request',
       requestTitle: 'Title',
-      requestTitlePlaceholder: 'e.g. Weekly meat delivery',
+      requestTitlePlaceholder: 'Weekly meat delivery',
       noData: 'No requests yet.',
       noMatch: 'No requests match',
       createFirst: 'Create your first request →',
@@ -736,7 +805,11 @@ export const translations = {
       decidedBy: 'Decided by',
       decisionNote: 'Note',
       cancelRequest: 'Cancel request',
+      cancelEdit: 'Cancel editing',
       cancelConfirm: 'Cancel this request? This cannot be undone.',
+      deleteDraft: 'Delete draft',
+      deleteDraftConfirm: 'Delete this draft? This cannot be undone.',
+      draftDeleted: 'Draft deleted.',
       submittedToManager: 'Submitted to the project manager for approval.',
       autoApproved: 'Auto-approved (you are the project manager).',
       approvalChain: 'Approval chain',
@@ -978,6 +1051,30 @@ export const translations = {
       cityRequired: 'Kraj je obvezen',
       postalRequired: 'Poštna številka je obvezna',
       fieldRequired: 'To polje je obvezno',
+      ph: {
+        companyName: 'Planina d.o.o.',
+        vat: 'SI12345678',
+        contact: 'Janez Novak',
+        street: 'Cesta 1',
+        city: 'Bohinjsko jezero',
+        postal: '4264',
+        email: 'ime@podjetje.si',
+        phone: '+386 40 123 456',
+        paymentTerms: '30 dni',
+        locationName: 'Hotel Jezero – glavni vhod',
+        departmentName: 'Kuhinja',
+        itemName: 'Univerzalno čistilo 5 L',
+        itemDesc: 'Dodatne podrobnosti o artiklu',
+        price: '0,00',
+        categoryName: 'Čistila',
+        subcategoryName: 'Čistila za površine',
+        firstName: 'Janez',
+        lastName: 'Novak',
+        jobTitle: 'Vodja nabave',
+        noticeDays: '30',
+        renewalMonths: '12',
+        contractDesc: 'Opis ali opombe pogodbe',
+      },
       alreadyExists: 'Ta vnos že obstaja',
       collapseAll: 'Skrči vse',
       expandAll: 'Razširi vse',
@@ -989,6 +1086,8 @@ export const translations = {
       notFound: 'Ni najdeno',
       cannotDelete: 'Ni mogoče izbrisati —',
       usedOn: 'uporabljeno na',
+      usedIn: 'uporabljeno v',
+      usage: { requests: 'zahtevki', orders: 'naročila', contracts: 'pogodbe', invoices: 'računi', requestLines: 'vrstice zahtevkov', poLines: 'vrstice naročil', contractItems: 'cenik pogodb', items: 'artikli', subcategories: 'podkategorije', users: 'uporabniki', invitations: 'vabila' } as Record<string, string>,
       andWord: 'in',
       deactivateInstead: 'Namesto tega deaktivirajte.',
       setInactiveInstead: 'Namesto tega nastavite status na neaktivno.',
@@ -1155,12 +1254,16 @@ export const translations = {
     },
 
     contracts: {
+      terminateTitle: 'Prekinitev pogodbe',
+      terminateQuestion: 'Ali ste prepričani, da želite prekiniti pogodbo {name}? Pogodbo lahko pozneje znova aktivirate.',
+      deleteTitle: 'Brisanje pogodbe',
+      deleteQuestion: 'Ali ste prepričani, da želite izbrisati pogodbo {name}? Tega dejanja ni mogoče razveljaviti.',
       title: 'Pogodbe',
       new: 'Nova pogodba',
       editTitle: 'Uredi pogodbo',
       number: 'Št. pogodbe',
       contractTitle: 'Naslov',
-      titlePlaceholder: 'npr. Letna pogodba o dobavi mesa',
+      titlePlaceholder: 'Letna pogodba o dobavi mesa',
       supplier: 'Dobavitelj',
       status: 'Status',
       st: { draft: 'Osnutek', active: 'Veljavna', expired: 'Potekla', terminated: 'Prekinjena' },
@@ -1210,6 +1313,8 @@ export const translations = {
     },
 
     invoices: {
+      deleteTitle: 'Brisanje osnutka računa',
+      deleteQuestion: 'Ali ste prepričani, da želite izbrisati osnutek računa {name}? Tega dejanja ni mogoče razveljaviti.',
       title: 'Računi',
       new: 'Nov račun',
       editTitle: 'Uredi račun',
@@ -1295,6 +1400,12 @@ export const translations = {
 
     // Purchase Orders
     po: {
+      cancelTitle: 'Preklic naročilnice',
+      cancelQuestion: 'Ali ste prepričani, da želite preklicati naročilnico {name}? Ostala bo vidna kot preklicana, urejati je ne bo več mogoče.',
+      statusChangeTitle: 'Sprememba statusa',
+      statusChangeQuestion: 'Ali ste prepričani, da želite status naročilnice {name} spremeniti v {status}?',
+      deleteTitle: 'Brisanje osnutka naročilnice',
+      deleteQuestion: 'Ali ste prepričani, da želite izbrisati osnutek naročilnice {name}? Tega dejanja ni mogoče razveljaviti.',
       title: 'Naročila',
       new: 'Novo naročilo',
       shown: 'prikazano',
@@ -1318,6 +1429,7 @@ export const translations = {
       cancelPO: 'Prekliči naročilo',
       confirmStatusChange: 'Spremenite status naročila',
       cancelConfirmMessage: 'Prekličete naročilo',
+      deleteDraftConfirm: 'Izbrišem ta osnutek naročilnice? Tega ni mogoče razveljaviti.',
       cancelConfirmNote: 'Naročilo bo ostalo vidno kot preklicano in ga ne bo mogoče urejati.',
       downloadPDF: 'Prenesi PDF',
       orderDetails: 'Podrobnosti naročila',
@@ -1404,9 +1516,13 @@ export const translations = {
 
     // Suppliers
     suppliers: {
+      deleteTitle: 'Brisanje dobavitelja',
+      deleteQuestion: 'Ali ste prepričani, da želite izbrisati dobavitelja {name}? Tega dejanja ni mogoče razveljaviti.',
+      deleteBlockedMsg: 'Izbranega dobavitelja ni mogoče izbrisati, ker je bil uporabljen na enem ali več drugih dokumentih.',
       title: 'Dobavitelji',
       activeCount: 'aktivnih dobaviteljev',
       new: 'Nov dobavitelj',
+      edit: 'Uredi dobavitelja',
       noMatch: 'Noben dobavitelj ne ustreza iskanju',
       noData: 'Ni dobaviteljev.',
       createFirst: 'Dodajte prvega dobavitelja →',
@@ -1416,6 +1532,7 @@ export const translations = {
       paymentTerms: 'Plačilni pogoji',
       incoterm: 'Pariteta',
       companyName: 'Ime podjetja',
+      number: 'Številka',
       vatNumber: 'Davčna številka',
       contactName: 'Kontaktna oseba',
       streetAddress: 'Ulica',
@@ -1427,9 +1544,13 @@ export const translations = {
 
     // Items
     items: {
+      deleteTitle: 'Brisanje artikla',
+      deleteQuestion: 'Ali ste prepričani, da želite izbrisati artikel {name}? Tega dejanja ni mogoče razveljaviti.',
+      deleteBlockedMsg: 'Izbranega artikla ni mogoče izbrisati, ker je bil uporabljen na enem ali več drugih dokumentih.',
       title: 'Artikli / Katalog',
       activeCount: 'aktivnih artiklov',
       new: 'Nov artikel',
+      edit: 'Uredi artikel',
       noMatch: 'Noben artikel ne ustreza iskanju',
       noData: 'Ni artiklov.',
       createFirst: 'Dodajte prvi artikel →',
@@ -1443,10 +1564,16 @@ export const translations = {
 
     // Categories
     categories: {
+      deleteSubTitle: 'Brisanje podkategorije',
+      deleteSubQuestion: 'Ali ste prepričani, da želite izbrisati podkategorijo {name}? Tega dejanja ni mogoče razveljaviti.',
+      deleteTitle: 'Brisanje kategorije',
+      deleteQuestion: 'Ali ste prepričani, da želite izbrisati kategorijo {name}? Tega dejanja ni mogoče razveljaviti.',
+      deleteBlockedMsg: 'Izbrane kategorije ni mogoče izbrisati, ker vsebuje podkategorije ali artikle oziroma je bila uporabljena v dokumentih.',
       title: 'Kategorije',
       count: 'kategorij',
       activeCount: 'aktivnih kategorij',
       new: 'Nova kategorija',
+      edit: 'Uredi kategorijo',
       noMatch: 'Nobena kategorija ne ustreza iskanju',
       noData: 'Ni kategorij.',
       createFirst: 'Dodajte prvo kategorijo →',
@@ -1455,6 +1582,7 @@ export const translations = {
       parent: 'Nadrejena kategorija',
       noParent: 'Brez (glavna kategorija)',
       newSub: 'Nova podkategorija',
+      editSub: 'Uredi podkategorijo',
       addSub: 'Dodaj podkategorijo',
       addCategory: 'Dodaj kategorijo',
       addItem: 'Dodaj artikel',
@@ -1487,10 +1615,14 @@ export const translations = {
 
     // Locations
     locations: {
+      deleteTitle: 'Brisanje lokacije',
+      deleteQuestion: 'Ali ste prepričani, da želite izbrisati lokacijo {name}? Tega dejanja ni mogoče razveljaviti.',
+      deleteBlockedMsg: 'Izbrane lokacije ni mogoče izbrisati, ker je bila uporabljena na enem ali več drugih dokumentih.',
       title: 'Lokacije',
       subtitle: 'Naslovi za dostavo naročil',
       activeCount: 'aktivnih lokacij',
       new: 'Nova lokacija',
+      edit: 'Uredi lokacijo',
       noMatch: 'Nobena lokacija ne ustreza',
       noData: 'Ni lokacij.',
       createFirst: 'Dodajte prvo lokacijo dobave →',
@@ -1500,10 +1632,14 @@ export const translations = {
 
     // Departments
     departments: {
+      deleteTitle: 'Brisanje oddelka',
+      deleteQuestion: 'Ali ste prepričani, da želite izbrisati oddelek {name}? Tega dejanja ni mogoče razveljaviti.',
+      deleteBlockedMsg: 'Izbranega oddelka ni mogoče izbrisati, ker je bil uporabljen na enem ali več drugih dokumentih.',
       title: 'Oddelki',
       count: 'oddelkov',
       activeCount: 'aktivnih oddelkov',
       new: 'Nov oddelek',
+      edit: 'Uredi oddelek',
       noMatch: 'Noben oddelek ne ustreza',
       noData: 'Ni oddelkov.',
       createFirst: 'Dodajte prvi oddelek →',
@@ -1513,6 +1649,8 @@ export const translations = {
 
     // Settings
     settings: {
+      revokeTitle: 'Preklic vabila',
+      revokeQuestion: 'Ali ste prepričani, da želite preklicati vabilo za {name}? Tega dejanja ni mogoče razveljaviti.',
       title: 'Nastavitve',
       subtitle: 'Upravljajte profil podjetja in nastavitve.',
       personalProfile: 'Osebni profil',
@@ -1595,11 +1733,15 @@ export const translations = {
     },
 
     requests: {
+      cancelTitle: 'Preklic zahtevka',
+      cancelQuestion: 'Ali ste prepričani, da želite preklicati zahtevek {name}? Tega dejanja ni mogoče razveljaviti.',
+      deleteTitle: 'Brisanje osnutka zahtevka',
+      deleteQuestion: 'Ali ste prepričani, da želite izbrisati osnutek zahtevka {name}? Tega dejanja ni mogoče razveljaviti.',
       title: 'Zahtevki',
       subtitle: 'Nabavni zahtevki.',
       new: 'Nov zahtevek',
       requestTitle: 'Naslov',
-      requestTitlePlaceholder: 'npr. Tedenska dobava mesa',
+      requestTitlePlaceholder: 'Tedenska dobava mesa',
       noData: 'Še ni zahtevkov.',
       noMatch: 'Noben zahtevek ne ustreza',
       createFirst: 'Ustvarite prvi zahtevek →',
@@ -1642,7 +1784,11 @@ export const translations = {
       decidedBy: 'Odločil',
       decisionNote: 'Opomba',
       cancelRequest: 'Prekliči zahtevek',
+      cancelEdit: 'Prekliči urejanje',
       cancelConfirm: 'Prekličem ta zahtevek? Tega ni mogoče razveljaviti.',
+      deleteDraft: 'Izbriši osnutek',
+      deleteDraftConfirm: 'Izbrišem ta osnutek? Tega ni mogoče razveljaviti.',
+      draftDeleted: 'Osnutek izbrisan.',
       submittedToManager: 'Oddano vodji projekta v potrditev.',
       autoApproved: 'Samodejno odobreno (ste vodja projekta).',
       approvalChain: 'Veriga odobritev',

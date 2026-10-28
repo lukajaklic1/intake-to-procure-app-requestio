@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, Pencil, Trash2, Upload, FileText, Download } from 'lucide-react'
+import { ChevronLeft, Pencil, Trash2, Upload, FileText, Download, Check, Coins } from 'lucide-react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
@@ -14,6 +14,7 @@ import { computeMatch, type InvLine } from '../lib/invoiceMatching'
 import { loadMatchData, type MatchData } from '../lib/invoiceData'
 import { INVOICE_BADGE, MATCH_BADGE, dueState, type InvoiceStatus } from '../lib/invoices'
 import { daysUntil } from '../lib/contracts'
+import ModalActions from '../components/ui/ModalActions'
 
 interface Inv {
   id: string; invoice_number: string; supplier_invoice_number: string; supplier_id: string; po_id: string | null
@@ -180,7 +181,7 @@ export default function InvoiceDetailPage() {
           <button key={x.id} onClick={() => setTab(x.id)}
             className={`inline-flex items-center gap-2 h-8 px-3 rounded-lg border text-sm transition-colors ${tab === x.id ? 'border-field bg-surface text-ink' : 'border-transparent text-ink2 hover:bg-hover'}`}>
             {x.label}
-            {x.count != null && <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-md bg-surface border border-field text-[11px] tabular-nums text-ink2">{x.count}</span>}
+            {x.count != null && <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-md bg-surface border border-field text-[11px] text-ink2">{x.count}</span>}
           </button>
         ))}
       </div>
@@ -201,7 +202,7 @@ export default function InvoiceDetailPage() {
             {inv.approved_by && inv.status !== 'draft' && <Field label={inv.status === 'rejected' ? s.reject : s.approve}>{names[inv.approved_by]}{inv.decision_note ? ` – ${inv.decision_note}` : ''}</Field>}
             {inv.notes && <div className="col-span-2 sm:col-span-3"><Field label={s.notes}><span className="whitespace-pre-wrap">{inv.notes}</span></Field></div>}
           </div>
-          <div className="bg-white rounded-lg border border-field p-6 text-sm tabular-nums">
+          <div className="bg-white rounded-lg border border-field p-6 text-sm">
             <div className="flex justify-between py-0.5"><span className="text-ink2">{s.subtotal}</span><span>{money(Number(inv.subtotal))}</span></div>
             <div className="flex justify-between py-0.5"><span className="text-ink2">{s.tax} ({Number(inv.tax_rate)} %)</span><span>{money(Number(inv.tax_amount))}</span></div>
             <div className="flex justify-between py-1.5 mt-1 border-t border-field text-lg font-semibold"><span>{s.total}</span><span>{money(Number(inv.total_amount))}</span></div>
@@ -247,15 +248,15 @@ export default function InvoiceDetailPage() {
                         <p className="text-ink">{l.name}</p>
                         {issues.map((i, k) => <p key={k} className="text-xs text-danger mt-0.5">{s.issue[i.code]}</p>)}
                       </td>
-                      <td className={`px-3 py-2.5 text-right tabular-nums ${has('qty_over_received') || has('qty_over_ordered') ? 'text-danger' : ''}`}>{l.quantity}</td>
+                      <td className={`px-3 py-2.5 text-right ${has('qty_over_received') || has('qty_over_ordered') ? 'text-danger' : ''}`}>{l.quantity}</td>
                       <td className="px-3 py-2.5 text-ink2">{l.unit ?? '—'}</td>
-                      <td className={`px-3 py-2.5 text-right tabular-nums ${has('price') ? 'text-danger' : ''}`}>{money(l.unit_price)}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums">{money(l.line_total)}</td>
+                      <td className={`px-3 py-2.5 text-right ${has('price') ? 'text-danger' : ''}`}>{money(l.unit_price)}</td>
+                      <td className="px-3 py-2.5 text-right">{money(l.line_total)}</td>
                       {inv.po_id && <>
-                        <td className="px-3 py-2.5 text-right text-ink2 tabular-nums">{po ? po.quantity : '—'}</td>
-                        <td className="px-3 py-2.5 text-right text-ink2 tabular-nums">{po ? (match?.received.get(po.id) ?? 0) : '—'}</td>
-                        <td className="px-3 py-2.5 text-right text-ink2 tabular-nums">{po ? (match?.invoicedElsewhere.get(po.id) ?? 0) : '—'}</td>
-                        <td className="px-3 py-2.5 text-right text-ink2 tabular-nums">{po ? money(po.unit_price) : '—'}</td>
+                        <td className="px-3 py-2.5 text-right text-ink2">{po ? po.quantity : '—'}</td>
+                        <td className="px-3 py-2.5 text-right text-ink2">{po ? (match?.received.get(po.id) ?? 0) : '—'}</td>
+                        <td className="px-3 py-2.5 text-right text-ink2">{po ? (match?.invoicedElsewhere.get(po.id) ?? 0) : '—'}</td>
+                        <td className="px-3 py-2.5 text-right text-ink2">{po ? money(po.unit_price) : '—'}</td>
                       </>}
                     </tr>
                   )
@@ -309,20 +310,20 @@ export default function InvoiceDetailPage() {
       )}
 
       {/* approve / reject (note) */}
-      <Modal open={dialog === 'approve' || dialog === 'reject'} onClose={() => setDialog(null)} title={dialog === 'reject' ? s.reject : s.approve} size="sm">
+      <Modal open={dialog === 'approve' || dialog === 'reject'} onClose={() => setDialog(null)} title={dialog === 'reject' ? s.reject : s.approve} size="sm" icon={Check}>
         {dialog === 'approve' && result.status === 'mismatch' && <p className="text-sm text-danger mb-3">{s.noteRequiredMismatch}</p>}
         {dialog === 'reject' && <p className="text-sm text-ink2 mb-3">{s.noteRequiredReject}</p>}
         <textarea rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder={s.decisionNote}
           className="w-full rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none" />
-        <div className="flex gap-3 justify-end mt-4">
+        <ModalActions className="justify-end">
           <Button variant="secondary" onClick={() => setDialog(null)}>{t.common.cancel}</Button>
           <Button variant={dialog === 'reject' ? 'danger' : 'primary'} loading={busy} disabled={needNote && note.trim() === ''}
             onClick={() => rpc(dialog === 'reject' ? 'rejected' : 'approved', { note })}>{dialog === 'reject' ? s.reject : s.approve}</Button>
-        </div>
+        </ModalActions>
       </Modal>
 
       {/* mark paid */}
-      <Modal open={dialog === 'pay'} onClose={() => setDialog(null)} title={s.markPaid} size="sm">
+      <Modal open={dialog === 'pay'} onClose={() => setDialog(null)} title={s.markPaid} size="sm" icon={Coins}>
         <div className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">{s.paidDate}
             <input type="date" value={paidAt} onChange={e => setPaidAt(e.target.value)} className="rounded-lg border border-field px-3 py-2 text-sm font-normal focus:outline-none hover:border-field-hover" />
@@ -331,14 +332,14 @@ export default function InvoiceDetailPage() {
             <input value={payRef} onChange={e => setPayRef(e.target.value)} className="rounded-lg border border-field px-3 py-2 text-sm font-normal focus:outline-none hover:border-field-hover" />
           </label>
         </div>
-        <div className="flex gap-3 justify-end mt-4">
+        <ModalActions className="justify-end">
           <Button variant="secondary" onClick={() => setDialog(null)}>{t.common.cancel}</Button>
           <Button loading={busy} onClick={() => rpc('paid', { paid: paidAt, ref: payRef })}>{s.markPaid}</Button>
-        </div>
+        </ModalActions>
       </Modal>
 
       <ConfirmDialog open={dialog === 'delete'} onClose={() => setDialog(null)} onConfirm={deleteInvoice}
-        title={t.common.deleteEntity} danger message={s.deleteConfirm} confirmLabel={t.common.deleteEntity} />
+        title={s.deleteTitle} message={s.deleteQuestion} name={inv.invoice_number} danger confirmLabel={t.common.deleteEntity} />
     </div>
   )
 }

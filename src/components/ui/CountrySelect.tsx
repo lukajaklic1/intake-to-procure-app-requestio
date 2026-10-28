@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import SearchSelect from './SearchSelect'
-import { countryList } from '../../lib/countries'
+import { countryList, localizeCountry } from '../../lib/countries'
 import { useLanguage } from '../../hooks/useLanguage'
 
 interface CountrySelectProps {
@@ -16,5 +16,5 @@ interface CountrySelectProps {
 export default function CountrySelect({ id, label, required, error, value, onChange }: CountrySelectProps) {
   const { lang } = useLanguage()
   const list = useMemo(() => countryList(lang), [lang])
-  return <SearchSelect id={id} label={label} required={required} error={error} value={value} onChange={onChange} options={list.all} popular={list.popular} />
+  return <SearchSelect id={id} label={label} required={required} error={error} value={localizeCountry(value, lang)} onChange={onChange} options={list.all} popular={list.popular} />
 }

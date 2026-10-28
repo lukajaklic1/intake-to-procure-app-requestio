@@ -1,11 +1,13 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { Upload, Plus, Search, Pencil, Trash2, Package, Tag, ChevronDown, ChevronRight, ListChevronsDownUp, ListChevronsUpDown, ListTree, List } from 'lucide-react'
+import { Upload, Plus, Search, Pencil, Package, Tag, ChevronDown, ChevronRight, ListChevronsDownUp, ListChevronsUpDown, ListTree, List, IdCard, Ruler, Coins, CircleDot, Layers } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { toast } from '../components/ui/Toast'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Button from '../components/ui/Button'
+import RowMenu from '../components/ui/RowMenu'
+import ModalFooter from '../components/ui/ModalFooter'
 import Input from '../components/ui/Input'
 import ImportModal from '../components/ui/ImportModal'
 import PageToolbar from '../components/layout/PageToolbar'
@@ -17,9 +19,12 @@ import type { Item, Category } from '../types/database'
 import { useLanguage } from '../hooks/useLanguage'
 import { useRequired } from '../lib/useRequired'
 import { dbError } from '../lib/dbError'
-import { poLineLocSl, poLineCountEn } from '../utils/pluralize'
-import { countByKey, mergeUsage } from '../lib/usageCounts'
+import { USAGE, loadUsage, usageFor, recheckUsage, isUsed, usageMessage, type UsageMaps } from '../lib/usage'
 import { buildCategoryTree } from '../lib/categories'
+import GridHead from '../components/ui/GridHead'
+import { matchesSearch } from '../lib/search'
+import StatusSelect from '../components/ui/StatusSelect'
+import Select from '../components/ui/Select'
 
 interface ItemWithCategory extends Item {
   categories: { name: string } | null
@@ -33,7 +38,7 @@ export default function CatalogPage() {
   const s = t.items
   const [items, setItems] = useState<ItemWithCategory[]>([])
   const [allCategories, setAllCategories] = useState<Category[]>([])
-  const [catUsage, setCatUsage] = useState<Map<string, number>>(new Map())
+  const [catUsage, setCatUsage] = useState<UsageMaps>({})
   const [catModalOpen, setCatModalOpen] = useState(false)
   const [catEditing, setCatEditing] = useState<{ id?: string; name: string; status: 'active' | 'inactive'; parent_id: string }>({ name: '', status: 'active', parent_id: '' })
   const [catSaving, setCatSaving] = useState(false)
@@ -65,7 +70,7 @@ export default function CatalogPage() {
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<ItemWithCategory | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
-  const [usage, setUsage] = useState<Map<string, number>>(new Map())
+  const [usage, setUsage] = useState<UsageMaps>({})
 
   useEffect(() => { if (company) { load(); loadCategories() } }, [company])
 
@@ -79,26 +84,25 @@ export default function CatalogPage() {
   async function load() {
     if (!company) return
     setLoading(true)
-    const [{ data }, { data: lineRows }] = await Promise.all([
+    const [{ data }, usageMaps] = await Promise.all([
       supabase.from('items').select('*, categories(name)').eq('company_id', company.id).order('item_number'),
-      supabase.from('po_line_items').select('item_id, purchase_orders!inner(company_id)').eq('purchase_orders.company_id', company.id),
+      loadUsage(company.id, USAGE.item),
     ])
     setItems((data as ItemWithCategory[]) ?? [])
-    setUsage(countByKey(lineRows, 'item_id'))
+    setUsage(usageMaps)
     setLoading(false)
   }
 
   async function loadCategories() {
     if (!company) return
-    const [{ data }, { data: poLines }, { data: reqLines }] = await Promise.all([
+    const [{ data }, usageMaps] = await Promise.all([
       supabase.from('categories').select('*').eq('company_id', company.id).order('name'),
-      supabase.from('po_line_items').select('category_id, purchase_orders!inner(company_id)').eq('purchase_orders.company_id', company.id),
-      supabase.from('request_line_items').select('category_id, requests!inner(company_id)').eq('requests.company_id', company.id),
+      loadUsage(company.id, USAGE.category),
     ])
     setAllCategories(data ?? [])
     // First load: show the tree collapsed; the user expands what they need.
     if (!initialCollapse.current) { initialCollapse.current = true; setCollapsed(new Set((data ?? []).map(c => c.id))) }
-    setCatUsage(mergeUsage(countByKey(poLines, 'category_id'), countByKey(reqLines, 'category_id')))
+    setCatUsage(usageMaps)
   }
 
   function openNewCategory(parentId = '') { catReq.reset(); setCatEditing({ name: '', status: 'active', parent_id: parentId }); setCatModalOpen(true) }
@@ -117,11 +121,17 @@ export default function CatalogPage() {
     toast.success(t.common.saved); closeCategoryModal(); loadCategories()
   }
 
-  // A category is in use if any item or any request/PO line references it.
-  function categoryInUse(id: string) { return (catUsage.get(id) ?? 0) > 0 || items.some(i => i.category_id === id) || allCategories.some(c => c.parent_id === id) }
+  // A category is in use if a subcategory, an item, a request/order or one of their lines references it.
+  const categoryUsage = (id: string) => usageFor(catUsage, id)
+  function categoryInUse(id: string) { return isUsed(categoryUsage(id)) }
 
   async function handleDeleteCategory(c: Category) {
     setActionLoading(true)
+    const fresh = await recheckUsage(USAGE.category, c.id)
+    if (isUsed(fresh)) {
+      setActionLoading(false); setConfirmDeleteCat(null)
+      toast.error(usageMessage(t, fresh, t.common.deactivateInstead)); loadCategories(); return
+    }
     const { error } = await supabase.from('categories').delete().eq('id', c.id)
     setActionLoading(false); setConfirmDeleteCat(null)
     if (error) { toast.error(dbError(error, t)); return }
@@ -196,17 +206,10 @@ export default function CatalogPage() {
 
   async function handleDelete(item: ItemWithCategory) {
     setActionLoading(true)
-    const { count } = await supabase
-      .from('po_line_items')
-      .select('*', { count: 'exact', head: true })
-      .eq('item_id', item.id)
-
-    if ((count ?? 0) > 0) {
+    const fresh = await recheckUsage(USAGE.item, item.id)
+    if (isUsed(fresh)) {
       setActionLoading(false); setConfirmDelete(null)
-      toast.error(lang === 'sl'
-        ? `${t.common.cannotDelete} ${t.common.usedOn} ${poLineLocSl(count ?? 0)}. ${t.common.setInactiveInstead}`
-        : `${t.common.cannotDelete} ${t.common.usedOn} ${poLineCountEn(count ?? 0)}. ${t.common.setInactiveInstead}`)
-      return
+      toast.error(usageMessage(t, fresh, t.common.setInactiveInstead)); load(); return
     }
     const { error } = await supabase.from('items').delete().eq('id', item.id)
     setActionLoading(false); setConfirmDelete(null)
@@ -216,8 +219,13 @@ export default function CatalogPage() {
 
   const q = search.toLowerCase()
   const filtering = q !== '' || statusFilter !== 'all'
+  const categoryNames = (id: string | null) => {
+    const c = allCategories.find(x => x.id === id)
+    return [c?.name, c?.parent_id ? allCategories.find(x => x.id === c.parent_id)?.name : null]
+  }
   const filteredItems = items.filter(i =>
-    (i.name.toLowerCase().includes(q) || i.item_number.includes(q)) && (statusFilter === 'all' || i.status === statusFilter))
+    matchesSearch(search, [i.item_number, i.name, i.long_description, i.default_unit, ...categoryNames(i.category_id)])
+    && (statusFilter === 'all' || i.status === statusFilter))
 
   // Sections: a header per category and per subcategory, each followed by its own items.
   // While filtering, sections with no matching item are hidden.
@@ -289,7 +297,7 @@ export default function CatalogPage() {
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
-            className="w-full pl-9 pr-4 h-8 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
+            className="w-full pl-9 pr-4 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
         </div>
         <FilterSelect label={t.filters.labels.category} value={categoryFilter} onChange={e => { setCategoryFilter(e.target.value); setSubFilter('all') }}>
           <option value="all">{t.filters.allF}</option>
@@ -305,18 +313,12 @@ export default function CatalogPage() {
       </PageToolbar>
 
       {view === 'tree' && (
-      <div className="data-card table-bleed bg-white rounded-lg border border-field overflow-hidden">
+      <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
-            <thead className="bg-surface border-b border-field">
-              <tr>
-                {[s.itemNumber, t.common.name, s.defaultUnit, s.defaultUnitPrice, t.common.status, ''].map((h, i) => (
-                  <th key={i} className="text-left px-4 py-3 text-sm font-medium text-ink2">{h}</th>
-                ))}
-              </tr>
-            </thead>
+            <GridHead cols={[[s.itemNumber, IdCard], [t.common.name, Package], [s.defaultUnit, Ruler], [s.defaultUnitPrice, Coins], [t.common.status, CircleDot], ['']]} />
             <tbody className="divide-y divide-field">
               {sections.length === 0 ? (
                 <TableEmptyState icon={filtering ? Package : Tag} colSpan={6}
@@ -335,21 +337,15 @@ export default function CatalogPage() {
                         <div className={`flex items-center gap-2 ${g.level === 1 ? 'ml-6' : ''}`}>
                           {headerOpen(g) ? <ChevronDown className="w-4 h-4 text-icon shrink-0" /> : <ChevronRight className="w-4 h-4 text-icon shrink-0" />}
                           <span className={`${g.level === 0 ? 'font-medium' : ''} ${g.inactive ? 'text-muted' : 'text-ink'}`}>{g.name}</span>
-                          <span className="text-xs text-gray-400 tabular-nums">{g.total}</span>
+                          <span className="text-xs text-gray-400">{g.total}</span>
                           {g.inactive && <span className="badge badge-neutral">{t.common.inactiveF}</span>}
 
                           <div className="ml-auto flex items-center gap-1">
                             {g.category && (
                               <>
-                                <button onClick={e => { e.stopPropagation(); openEditCategory(g.category!) }}
-                                  className="p-1 text-gray-400 hover:text-ink rounded-md opacity-0 group-hover:opacity-100 transition-opacity" title={t.common.editEntity}>
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                                <button disabled={categoryInUse(g.category.id)} onClick={e => { e.stopPropagation(); setConfirmDeleteCat(g.category!) }}
-                                  title={categoryInUse(g.category.id) ? `${t.common.cannotDelete} ${t.common.deactivateInstead}` : t.common.deleteEntity}
-                                  className="p-1 text-gray-400 hover:text-red-600 rounded-md opacity-0 group-hover:opacity-100 transition-opacity disabled:cursor-not-allowed disabled:hover:text-gray-400">
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                <span className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                                  <RowMenu items={[{ label: t.common.editEntity, icon: Pencil, onClick: () => openEditCategory(g.category!) }]} />
+                                </span>
                                 {/* Add: a subcategory under a category, an item under a subcategory */}
                                 <button onClick={e => { e.stopPropagation(); g.level === 0 ? openNewCategory(g.id) : openNew(g.id) }}
                                   className="ml-1 inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs text-ink2 hover:text-ink hover:bg-selected transition-colors">
@@ -363,8 +359,6 @@ export default function CatalogPage() {
                     </tr>
 
                     {showItems && g.rows.map(item => {
-                      const count = usage.get(item.id) ?? 0
-                      const inUse = count > 0
                       return (
                         <tr key={item.id} className="hover:bg-surface transition-colors">
                           <td className="px-4 py-3 text-xs text-gray-500 font-medium" style={g.level === 1 ? { paddingLeft: 'calc(var(--page-px) + 3rem)' } : undefined}>{item.item_number}</td>
@@ -378,14 +372,7 @@ export default function CatalogPage() {
                             <span className={`badge ${item.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>{item.status === 'active' ? t.common.active : t.common.inactive}</span>
                           </td>
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-1 justify-end">
-                              <button onClick={() => openEdit(item)} className="p-1.5 text-gray-400 hover:text-accent hover:bg-accent-light rounded-lg transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-                              <button disabled={inUse} onClick={() => !inUse && setConfirmDelete(item)}
-                                title={inUse ? (lang === 'sl' ? `${t.common.cannotDelete} ${t.common.usedOn} ${poLineLocSl(count)}. ${t.common.setInactiveInstead}` : `${t.common.cannotDelete} ${t.common.usedOn} ${poLineCountEn(count)}. ${t.common.setInactiveInstead}`) : undefined}
-                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:bg-transparent">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                            <div className="flex justify-end"><RowMenu items={[{ label: t.common.editEntity, icon: Pencil, onClick: () => openEdit(item) }]} /></div>
                           </td>
                         </tr>
                       )
@@ -402,26 +389,18 @@ export default function CatalogPage() {
       )}
 
       {view === 'all' && (
-        <div className="data-card table-bleed bg-white rounded-lg border border-field overflow-hidden">
+        <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
           {loading ? (
             <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
           ) : (
             <div className="overflow-x-auto"><table className="w-full text-sm min-w-[820px]">
-              <thead className="bg-surface border-b border-field">
-                <tr>
-                  {[s.itemNumber, t.common.name, t.categories.title, t.categories.subcategory, s.defaultUnit, s.defaultUnitPrice, t.common.status, ''].map((h, i) => (
-                    <th key={i} className="text-left px-4 py-3 text-sm font-medium text-ink2">{h}</th>
-                  ))}
-                </tr>
-              </thead>
+              <GridHead cols={[[s.itemNumber, IdCard], [t.common.name, Package], [t.categories.title, Tag], [t.categories.subcategory, Layers], [s.defaultUnit, Ruler], [s.defaultUnitPrice, Coins], [t.common.status, CircleDot], ['']]} />
               <tbody className="divide-y divide-field">
                 {flatItems.length === 0 ? (
                   <TableEmptyState icon={Package} colSpan={8}
                     title={(search || statusFilter !== 'all' || categoryFilter !== 'all' || subFilter !== 'all') ? t.common.empty.noResults.title : t.common.empty.items.title}
                     subtitle={(search || statusFilter !== 'all' || categoryFilter !== 'all' || subFilter !== 'all') ? t.common.empty.noResults.text : t.common.empty.items.text} />
                 ) : pagedItems.map(item => {
-                  const count = usage.get(item.id) ?? 0
-                  const inUse = count > 0
                   const path = pathOf(item.category_id)
                   return (
                     <tr key={item.id} className="hover:bg-surface transition-colors">
@@ -438,14 +417,7 @@ export default function CatalogPage() {
                         <span className={`badge ${item.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>{item.status === 'active' ? t.common.active : t.common.inactive}</span>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 justify-end">
-                          <button onClick={() => openEdit(item)} className="p-1.5 text-gray-400 hover:text-accent hover:bg-accent-light rounded-lg transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-                          <button disabled={inUse} onClick={() => !inUse && setConfirmDelete(item)}
-                            title={inUse ? (lang === 'sl' ? `${t.common.cannotDelete} ${t.common.usedOn} ${poLineLocSl(count)}. ${t.common.setInactiveInstead}` : `${t.common.cannotDelete} ${t.common.usedOn} ${poLineCountEn(count)}. ${t.common.setInactiveInstead}`) : undefined}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:bg-transparent">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        <div className="flex justify-end"><RowMenu items={[{ label: t.common.editEntity, icon: Pencil, onClick: () => openEdit(item) }]} /></div>
                       </td>
                     </tr>
                   )
@@ -526,7 +498,7 @@ export default function CatalogPage() {
           load()
         }} />
 
-      <Modal open={modalOpen} onClose={closeModal} title={editing.id ? t.common.editEntity : s.new} size="md">
+      <Modal open={modalOpen} onClose={closeModal} title={editing.id ? s.edit : s.new} size="md" icon={Package}>
         <div className="flex flex-col gap-4">
           {/* Item number — read-only when editing */}
           {editing.id && (
@@ -538,7 +510,7 @@ export default function CatalogPage() {
             </div>
           )}
 
-          <Input id="i-name" label={t.common.name + " *"}
+          <Input id="i-name" placeholder={t.common.ph.itemName} label={t.common.name + " *"}
             value={editing.name ?? ''} error={req.errors.name}
             onChange={e => { req.clear('name'); setEditing(f => ({ ...f, name: e.target.value })) }}
           />
@@ -546,7 +518,7 @@ export default function CatalogPage() {
           <div className="flex flex-col gap-1">
             <label htmlFor="i-desc" className="text-sm font-medium text-gray-700">{s.longDescription}</label>
             <textarea
-              id="i-desc"
+              id="i-desc" placeholder={t.common.ph.itemDesc}
               rows={3}
               value={editing.long_description ?? ''}
               onChange={e => setEditing(f => ({ ...f, long_description: e.target.value }))}
@@ -555,28 +527,14 @@ export default function CatalogPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1">
-              <label htmlFor="i-cat" className="text-sm font-medium text-gray-700">{t.categories.title} *</label>
-              <select id="i-cat" value={catSel}
-                onChange={e => { req.clear('cat'); req.clear('sub'); setCatSel(e.target.value); setSubSel('') }}
-                className={`rounded-lg border px-3 py-2 text-sm bg-white focus:outline-none ${req.errors.cat ? 'border-red-400' : 'border-field hover:border-field-hover focus:border-field-focus'}`}>
-                <option value="">{t.common.select}</option>
-                {tree.filter(n => n.category.status === 'active' || n.category.id === catSel).map(n => <option key={n.category.id} value={n.category.id}>{n.category.name}</option>)}
-              </select>
-              {req.errors.cat && <p className="text-xs text-red-600">{req.errors.cat}</p>}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="i-sub" className="text-sm font-medium text-gray-700">{t.categories.subcategory} *</label>
-              <select id="i-sub" value={subSel} disabled={!catSel}
-                onChange={e => { req.clear('sub'); setSubSel(e.target.value) }}
-                className={`rounded-lg border px-3 py-2 text-sm bg-white focus:outline-none ${req.errors.sub ? 'border-red-400' : 'border-field hover:border-field-hover focus:border-field-focus'}` + ' disabled:bg-gray-50 disabled:text-gray-400'}>
-                <option value="">{t.common.select}</option>
-                {(tree.find(n => n.category.id === catSel)?.children ?? []).filter(c => c.status === 'active' || c.id === subSel).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              {req.errors.sub && <p className="text-xs text-red-600">{req.errors.sub}</p>}
-            </div>
+            <Select id="i-cat" label={t.categories.title} required value={catSel} error={req.errors.cat}
+              options={tree.filter(n => n.category.status === 'active' || n.category.id === catSel).map(n => ({ value: n.category.id, label: n.category.name }))}
+              onChange={v => { req.clear('cat'); req.clear('sub'); setCatSel(v); setSubSel('') }} />
+            <Select id="i-sub" label={t.categories.subcategory} required value={subSel} disabled={!catSel} error={req.errors.sub}
+              options={(tree.find(n => n.category.id === catSel)?.children ?? []).filter(x => x.status === 'active' || x.id === subSel).map(x => ({ value: x.id, label: x.name }))}
+              onChange={v => { req.clear('sub'); setSubSel(v) }} />
             <Input id="i-unit" label={s.defaultUnit}
-              placeholder={lang === 'sl' ? 'npr. kos, kg, m' : 'e.g. pcs, kg, m'}
+              placeholder={lang === 'sl' ? 'kos, kg, m' : 'pcs, kg, m'}
               value={editing.default_unit ?? ''}
               onChange={e => setEditing(f => ({ ...f, default_unit: e.target.value }))}
             />
@@ -595,78 +553,38 @@ export default function CatalogPage() {
 
           {/* Status toggle — only when editing */}
           {editing.id && (
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-field">
-              <div>
-                <p className="text-sm font-medium text-gray-700">
-                  {editing.status === 'active' ? t.common.statusActive : t.common.statusInactive}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {s.statusHelp}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditing(f => ({ ...f, status: f.status === 'active' ? 'inactive' : 'active' }))}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${editing.status === 'active' ? 'bg-accent' : 'bg-gray-300'}`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${editing.status === 'active' ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div>
-          )}
+          <StatusSelect active={editing.status === 'active'} activeLabel={t.common.statusActive} inactiveLabel={t.common.statusInactive}
+            onChange={on => setEditing(f => ({ ...f, status: on ? 'active' : 'inactive' }))} />
+        )}
         </div>
 
-        <div className="flex gap-3 justify-end mt-5">
-          <Button variant="secondary" onClick={closeModal}>{t.common.cancel}</Button>
-          <Button loading={saving} onClick={save}>{editing.id ? t.common.saveChanges : s.new}</Button>
-        </div>
+        <ModalFooter onCancel={closeModal} onSave={save} saving={saving} saveLabel={editing.id ? t.common.saveChanges : s.new}
+          onDelete={editing.id ? () => { const target = items.find(i => i.id === editing.id); closeModal(); if (target) setConfirmDelete(target) } : undefined}
+          deleteBlocked={editing.id && isUsed(usageFor(usage, editing.id)) ? s.deleteBlockedMsg : null} />
       </Modal>
 
-      <Modal open={catModalOpen} onClose={closeCategoryModal} title={catEditing.id ? t.common.editEntity : catEditing.parent_id ? t.categories.newSub : t.categories.new} size="sm">
-        <Input id="cat-name" label={(catEditing.parent_id ? t.categories.subcategory : t.categories.categoryName) + ' *'} value={catEditing.name} error={catReq.errors.name} onChange={e => { catReq.clear('name'); setCatEditing(f => ({ ...f, name: e.target.value })) }} />
+      <Modal open={catModalOpen} onClose={closeCategoryModal} title={catEditing.id ? (catEditing.parent_id ? t.categories.editSub : t.categories.edit) : catEditing.parent_id ? t.categories.newSub : t.categories.new} size="sm" icon={Tag}>
+        <Input id="cat-name" placeholder={t.common.ph.categoryName} label={(catEditing.parent_id ? t.categories.subcategory : t.categories.categoryName) + ' *'} value={catEditing.name} error={catReq.errors.name} onChange={e => { catReq.clear('name'); setCatEditing(f => ({ ...f, name: e.target.value })) }} />
         {catEditing.parent_id && (
           <p className="text-sm text-ink2 mt-3">{t.categories.parent}: <span className="text-ink font-medium">{allCategories.find(c => c.id === catEditing.parent_id)?.name}</span></p>
         )}
         {catEditing.id && (
-          <div className="flex items-center justify-between p-3 mt-4 bg-gray-50 rounded-lg border border-field">
-            <div>
-              <p className="text-sm font-medium text-gray-700">{catEditing.status === 'active' ? t.common.statusActiveF : t.common.statusInactiveF}</p>
-              <p className="text-xs text-gray-400">{t.categories.statusHelp}</p>
-            </div>
-            <button type="button" onClick={() => setCatEditing(f => ({ ...f, status: f.status === 'active' ? 'inactive' : 'active' }))}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${catEditing.status === 'active' ? 'bg-accent' : 'bg-gray-300'}`}>
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${catEditing.status === 'active' ? 'translate-x-6' : 'translate-x-1'}`} />
-            </button>
-          </div>
+          <StatusSelect active={catEditing.status === 'active'} activeLabel={t.common.statusActiveF} inactiveLabel={t.common.statusInactiveF}
+            onChange={on => setCatEditing(f => ({ ...f, status: on ? 'active' : 'inactive' }))} />
         )}
-        <div className="flex items-center gap-3 mt-5">
-          {catEditing.id && (
-            <button disabled={categoryInUse(catEditing.id)}
-              onClick={() => { const c = allCategories.find(x => x.id === catEditing.id); if (c) setConfirmDeleteCat(c) }}
-              title={categoryInUse(catEditing.id) ? `${t.common.cannotDelete} ${t.common.deactivateInstead}` : undefined}
-              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:bg-transparent">
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-          <div className="flex gap-3 ml-auto">
-            <Button variant="secondary" onClick={closeCategoryModal}>{t.common.cancel}</Button>
-            <Button loading={catSaving} onClick={saveCategory}>{catEditing.id ? t.common.saveChanges : t.common.create}</Button>
-          </div>
-        </div>
+        <ModalFooter onCancel={closeCategoryModal} onSave={saveCategory} saving={catSaving} saveLabel={catEditing.id ? t.common.saveChanges : t.common.create}
+          onDelete={catEditing.id ? () => { const c = allCategories.find(x => x.id === catEditing.id); closeCategoryModal(); if (c) setConfirmDeleteCat(c) } : undefined}
+          deleteBlocked={catEditing.id && categoryInUse(catEditing.id) ? t.categories.deleteBlockedMsg : null} />
       </Modal>
 
       <ConfirmDialog open={!!confirmDeleteCat} onClose={() => setConfirmDeleteCat(null)}
         onConfirm={() => confirmDeleteCat && handleDeleteCategory(confirmDeleteCat)}
-        title={t.common.deleteEntity} danger loading={actionLoading}
-        message={`${t.common.deleteEntity} "${confirmDeleteCat?.name}"? ${t.common.cannotUndo}`}
-        confirmLabel={t.common.deleteEntity} />
+        title={confirmDeleteCat?.parent_id ? t.categories.deleteSubTitle : t.categories.deleteTitle}
+        message={confirmDeleteCat?.parent_id ? t.categories.deleteSubQuestion : t.categories.deleteQuestion} name={confirmDeleteCat?.name ?? ''} danger loading={actionLoading} confirmLabel={t.common.deleteEntity} />
 
-      <ConfirmDialog
-        open={!!confirmDelete} onClose={() => setConfirmDelete(null)}
+      <ConfirmDialog open={!!confirmDelete} onClose={() => setConfirmDelete(null)}
         onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
-        title={t.common.deleteEntity} danger loading={actionLoading}
-        message={`${t.common.deleteEntity} "${confirmDelete?.name}" (${confirmDelete?.item_number})? ${t.common.cannotUndo} ${t.common.deleteInUse}`}
-        confirmLabel={t.common.deleteEntity}
-      />
+        title={s.deleteTitle} message={s.deleteQuestion} name={confirmDelete ? `${confirmDelete.name} (${confirmDelete.item_number})` : ''} danger loading={actionLoading} confirmLabel={t.common.deleteEntity} />
     </div>
   )
 }

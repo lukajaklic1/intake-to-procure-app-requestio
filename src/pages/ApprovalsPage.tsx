@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CheckCircle2, Search, X } from 'lucide-react'
+import { CheckCircle2, Search, X, ClipboardList, MapPin, User, UserCheck, CalendarClock, Coins } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -10,6 +10,9 @@ import { useHeaderCounts } from '../components/layout/HeaderCounts'
 import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import { format, subMonths, startOfMonth } from 'date-fns'
+import PersonCell from '../components/ui/PersonCell'
+import GridHead, { type GridCol } from '../components/ui/GridHead'
+import { matchesSearch } from '../lib/search'
 
 interface Row {
   id: string
@@ -88,8 +91,7 @@ export default function ApprovalsPage() {
   const dateFrom = getDateFrom(dateRange)
 
   const filtered = rows.filter(r => {
-    const q = search.toLowerCase()
-    if (search && !r.request_number.toLowerCase().includes(q) && !(r.title ?? '').toLowerCase().includes(q)) return false
+    if (!matchesSearch(search, [r.request_number, r.title, r.locations?.name, names[r.created_by], r.approver_id ? names[r.approver_id] : null])) return false
     if (dateFrom && r.created_at < dateFrom) return false
     if (approverId && r.approver_id !== approverId) return false
     return true
@@ -108,7 +110,7 @@ export default function ApprovalsPage() {
             <div className="relative min-w-40 flex-1 max-w-[220px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder={s.requestNumber + ' / ' + a.requestedBy}
-                className="w-full pl-9 pr-3 h-8 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
+                className="w-full pl-9 pr-3 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
             </div>
             <FilterSelect label={t.filters.labels.period} value={dateRange} onChange={e => setDateRange(e.target.value)}>
               <option value="all">{t.filters.allTime}</option>
@@ -131,16 +133,12 @@ export default function ApprovalsPage() {
       </PageToolbar>
       )}
 
-      <div className="data-card table-bleed bg-white rounded-lg border border-field overflow-hidden">
+      <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[680px]">
-            <thead className="bg-surface border-b border-field">
-              <tr>{[s.requestNumber, s.location, a.requestedBy, ...(isAdmin ? [s.approver] : []), s.neededBy, s.estTotalCol, ''].map((h, i) => (
-                <th key={i} className="text-left px-4 py-3 text-sm font-medium text-ink2 whitespace-nowrap">{h}</th>
-              ))}</tr>
-            </thead>
+            <GridHead cols={[[s.requestNumber, ClipboardList], [s.location, MapPin], [a.requestedBy, User], ...(isAdmin ? [[s.approver, UserCheck] as GridCol] : []), [s.neededBy, CalendarClock], [s.estTotalCol, Coins], ['']]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
                 <TableEmptyState icon={CheckCircle2} colSpan={isAdmin ? 8 : 7} title={hasActiveFilters ? t.common.empty.noResults.title : t.common.empty.approvals.title} subtitle={hasActiveFilters ? t.common.empty.noResults.text : t.common.empty.approvals.text} />
@@ -154,8 +152,8 @@ export default function ApprovalsPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-ink2">{r.locations?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-ink2">{names[r.created_by] ?? '—'}</td>
-                  {isAdmin && <td className="px-4 py-3 text-ink2">{r.approver_id ? names[r.approver_id] ?? '—' : '—'}</td>}
+                  <td className="px-4 py-3"><PersonCell name={names[r.created_by]} /></td>
+                  {isAdmin && <td className="px-4 py-3"><PersonCell name={r.approver_id ? names[r.approver_id] : null} /></td>}
                   <td className="px-4 py-3 text-gray-500 text-xs">{r.needed_by_date ? format(new Date(r.needed_by_date), 'dd.MM.yyyy') : '—'}</td>
                   <td className="px-4 py-3 font-medium text-ink">{fmt(r.total_estimate ?? 0, company?.currency)}</td>
                   <td className="px-4 py-3">

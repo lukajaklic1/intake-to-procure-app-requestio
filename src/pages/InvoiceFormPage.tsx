@@ -172,7 +172,7 @@ export default function InvoiceFormPage() {
     }
     setSaving(false)
     toast.success(t.common.saved)
-    navigate(`/invoices/${invoiceId}`)
+    navigate(submit ? `/invoices/${invoiceId}` : '/invoices')
   }
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
@@ -180,7 +180,7 @@ export default function InvoiceFormPage() {
   const mismatch = result.status === 'mismatch'
 
   return (
-    <div className="p-4 lg:p-6 max-w-5xl mx-auto">
+    <div className="p-4 lg:p-6 max-w-5xl mx-auto form-skin">
       <button onClick={() => navigate(isNew ? '/invoices' : `/invoices/${id}`)} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-4"><ChevronLeft className="w-4 h-4" />{s.back}</button>
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-gray-900">{isNew ? s.new : s.editTitle}</h1>
@@ -247,10 +247,10 @@ export default function InvoiceFormPage() {
                       <input value={l.name} onChange={e => setLine(l.key, { name: e.target.value })} className={inputCls} />
                       {issues.map((i, k) => <p key={k} className={`text-xs mt-1 ${i.severity === 'error' ? 'text-danger' : 'text-warn'}`}>{s.issue[i.code]}{i.expected != null ? ` (${i.expected} → ${i.actual})` : ''}</p>)}
                     </td>
-                    <td className="px-3 py-2 w-24"><input value={l.quantity} onChange={e => { if (/^[0-9]*[,.]?[0-9]*$/.test(e.target.value)) setLine(l.key, { quantity: e.target.value }) }} className={inputCls + ' text-right tabular-nums'} /></td>
+                    <td className="px-3 py-2 w-24"><input value={l.quantity} onChange={e => { if (/^[0-9]*[,.]?[0-9]*$/.test(e.target.value)) setLine(l.key, { quantity: e.target.value }) }} className={inputCls + ' text-right'} /></td>
                     <td className="px-3 py-2 w-20"><input value={l.unit} onChange={e => setLine(l.key, { unit: e.target.value })} className={inputCls} /></td>
-                    <td className="px-3 py-2 w-28"><input value={l.unit_price} onChange={e => { if (/^[0-9]*[,.]?[0-9]*$/.test(e.target.value)) setLine(l.key, { unit_price: e.target.value }) }} className={inputCls + ' text-right tabular-nums'} /></td>
-                    <td className="px-3 py-2 w-28 text-right pt-3.5 tabular-nums">{money(toNum(l.quantity) * toNum(l.unit_price))}</td>
+                    <td className="px-3 py-2 w-28"><input value={l.unit_price} onChange={e => { if (/^[0-9]*[,.]?[0-9]*$/.test(e.target.value)) setLine(l.key, { unit_price: e.target.value }) }} className={inputCls + ' text-right'} /></td>
+                    <td className="px-3 py-2 w-28 text-right pt-3.5">{money(toNum(l.quantity) * toNum(l.unit_price))}</td>
                     <td className="px-2 py-2 w-8 pt-3"><button type="button" onClick={() => setLines(ls => (ls.length > 1 ? ls.filter(x => x.key !== l.key) : ls))} className="p-1 text-gray-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
                   </tr>
                 )
@@ -260,7 +260,7 @@ export default function InvoiceFormPage() {
         </div>
         <div className="px-5 py-3 border-t border-field flex items-start justify-between gap-6 flex-wrap">
           <button type="button" onClick={() => setLines(ls => [...ls, newLine()])} className="inline-flex items-center gap-1.5 text-sm text-ink2 hover:text-ink"><Plus className="w-4 h-4" />{s.addLine}</button>
-          <div className="text-sm tabular-nums min-w-[260px]">
+          <div className="text-sm min-w-[260px]">
             <div className="flex justify-between py-0.5"><span className="text-ink2">{s.subtotal}</span><span>{money(totals.subtotal)}</span></div>
             <div className="flex justify-between items-center py-0.5">
               <span className="text-ink2 inline-flex items-center gap-2">{s.tax}

@@ -102,7 +102,7 @@ export default function ReceiveFormPage() {
   if (!canReceive) return <Navigate to="/receipts" replace />
 
   return (
-    <div className="p-4 lg:p-6 max-w-4xl mx-auto">
+    <div className="p-4 lg:p-6 max-w-4xl mx-auto form-skin">
       <button onClick={() => navigate('/receipts')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-4"><ChevronLeft className="w-4 h-4" />{s.title}</button>
       <h1 className="text-2xl font-bold text-gray-900 mb-1">{s.receive}</h1>
       <p className="text-gray-500 text-sm mb-5">{s.fromPo} <span className=" font-semibold text-gray-700">{poNumber}</span> · {supplierName}</p>

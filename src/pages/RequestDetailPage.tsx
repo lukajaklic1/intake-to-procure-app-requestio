@@ -1,6 +1,6 @@
 import { useEffect, useState, Fragment } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, Pencil, XCircle, Check, X, FileText, ShoppingCart } from 'lucide-react'
+import { ChevronLeft, Pencil, XCircle, Check, X, FileText, ShoppingCart, Send, Trash2, ClipboardList } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { refreshCounts } from '../lib/refreshCounts'
 import { useCompany } from '../hooks/useCompany'
@@ -11,6 +11,7 @@ import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { format } from 'date-fns'
 import type { Request, RequestLineItem, RequestStatus, Approval, ActivityLog } from '../types/database'
+import ModalActions from '../components/ui/ModalActions'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-neutral',
@@ -48,6 +49,7 @@ export default function RequestDetailPage() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [decision, setDecision] = useState<null | 'approve' | 'reject'>(null)
   const [note, setNote] = useState('')
 
@@ -98,6 +100,23 @@ export default function RequestDetailPage() {
     setActionLoading(false); setConfirmCancel(false)
     if (error) { toast.error(error.message); return }
     toast.success(s.st.cancelled); load(); refreshCounts()
+  }
+
+  async function doSubmit() {
+    setActionLoading(true)
+    const { error } = await (supabase as any).rpc('submit_request', { p_request_id: id, p_note: null })
+    setActionLoading(false)
+    if (error) { toast.error(error.message); return }
+    toast.success(s.submittedToManager); load(); refreshCounts()
+  }
+
+  async function doDeleteDraft() {
+    setActionLoading(true)
+    if (attachments.length) await supabase.storage.from('quotations').remove(attachments.map(a => a.file_path))
+    const { error } = await (supabase as any).rpc('delete_draft_request', { p_request_id: id })
+    setActionLoading(false); setConfirmDelete(false)
+    if (error) { toast.error(error.message); return }
+    toast.success(s.draftDeleted); refreshCounts(); navigate('/requests')
   }
 
   async function doCreatePo() {
@@ -193,6 +212,9 @@ export default function RequestDetailPage() {
           {st === 'approved' && !req.po_id && (hasPerm('purchase_orders', 'create') || isAdmin) && (
             <Button loading={actionLoading} onClick={doCreatePo} className="gap-1.5"><ShoppingCart className="w-3.5 h-3.5" />{s.createPO}</Button>
           )}
+          {st === 'draft' && (isCreator || isAdmin) && (
+            <Button loading={actionLoading} onClick={doSubmit} className="gap-1.5"><Send className="w-3.5 h-3.5" />{s.submit}</Button>
+          )}
           {st !== 'cancelled' && !req.po_id && (isCreator || isAdmin) && (
             <Button variant="secondary" onClick={() => navigate(`/requests/${id}/edit`)} className="gap-1.5"><Pencil className="w-3.5 h-3.5" />{s.edit}</Button>
           )}
@@ -202,7 +224,10 @@ export default function RequestDetailPage() {
               <Button onClick={() => { setDecision('approve'); setNote('') }} className="gap-1.5"><Check className="w-3.5 h-3.5" />{t.approvals.approve}</Button>
             </>
           )}
-          {st !== 'cancelled' && !req.po_id && (isCreator || isAdmin) && (
+          {st === 'draft' && (isCreator || isAdmin) && (
+            <Button variant="secondary" onClick={() => setConfirmDelete(true)} className="gap-1.5 text-red-600"><Trash2 className="w-3.5 h-3.5" />{s.deleteDraft}</Button>
+          )}
+          {st !== 'cancelled' && st !== 'draft' && !req.po_id && (isCreator || isAdmin) && (
             <Button variant="secondary" onClick={() => setConfirmCancel(true)} className="gap-1.5 text-red-600"><XCircle className="w-3.5 h-3.5" />{s.cancelRequest}</Button>
           )}
         </div>
@@ -350,20 +375,23 @@ export default function RequestDetailPage() {
       )}
 
       <ConfirmDialog open={confirmCancel} onClose={() => setConfirmCancel(false)} onConfirm={doCancel}
-        title={s.cancelRequest} danger loading={actionLoading} message={s.cancelConfirm} confirmLabel={s.cancelRequest} />
+        title={s.cancelTitle} message={s.cancelQuestion} name={req.request_number} danger loading={actionLoading} confirmLabel={s.cancelRequest} />
 
-      <Modal open={!!decision} onClose={() => setDecision(null)} title={decision === 'approve' ? t.approvals.approveTitle : t.approvals.rejectTitle} size="sm">
+      <ConfirmDialog open={confirmDelete} onClose={() => setConfirmDelete(false)} onConfirm={doDeleteDraft}
+        title={s.deleteTitle} message={s.deleteQuestion} name={req.request_number} danger loading={actionLoading} confirmLabel={t.common.deleteEntity} />
+
+      <Modal open={!!decision} onClose={() => setDecision(null)} title={decision === 'approve' ? t.approvals.approveTitle : t.approvals.rejectTitle} size="sm" icon={ClipboardList}>
         <div className="flex flex-col gap-1 mb-4">
           <label className="text-sm font-medium text-gray-700">{t.approvals.noteOptional}</label>
           <textarea value={note} onChange={e => setNote(e.target.value)} rows={3}
             className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus" />
         </div>
-        <div className="flex gap-3 justify-end">
+        <ModalActions className="justify-end">
           <Button variant="secondary" onClick={() => setDecision(null)}>{t.common.cancel}</Button>
           <Button loading={actionLoading} variant={decision === 'reject' ? 'danger' : 'primary'} onClick={doDecide}>
             {decision === 'approve' ? t.approvals.approve : t.approvals.reject}
           </Button>
-        </div>
+        </ModalActions>
       </Modal>
     </div>
   )

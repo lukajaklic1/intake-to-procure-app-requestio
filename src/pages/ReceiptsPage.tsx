@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { PackageCheck, Eye, Search, X } from 'lucide-react'
+import { PackageCheck, Eye, Search, X, FileText, Building2, Coins, CircleDot, CalendarClock, User } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -11,6 +11,10 @@ import { useHeaderTabs } from '../components/layout/HeaderCounts'
 import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import { format, subMonths, startOfMonth } from 'date-fns'
+import PersonCell from '../components/ui/PersonCell'
+import GridHead from '../components/ui/GridHead'
+import RowMenu from '../components/ui/RowMenu'
+import { matchesSearch } from '../lib/search'
 
 const RS_BADGE: Record<string, string> = {
   none: 'badge-neutral',
@@ -93,19 +97,20 @@ export default function ReceiptsPage() {
   useEffect(() => { setHistPage(1) }, [search, dateRange])
   const dateFrom = getDateFrom(dateRange)
   const filteredReceipts = receipts.filter(r => {
-    const q = search.toLowerCase()
-    if (search && !r.receipt_number.toLowerCase().includes(q) && !(r.purchase_orders?.po_number ?? '').toLowerCase().includes(q)) return false
+    if (!matchesSearch(search, [r.receipt_number, r.supplier_receipt_no, r.purchase_orders?.po_number, r.purchase_orders?.suppliers?.name, names[r.received_by]])) return false
     if (dateFrom && r.received_date < dateFrom) return false
     return true
   })
   const hasFilters = search || dateRange !== 'all'
-  const paginatedQueue = queue.slice((queuePage - 1) * queuePageSize, queuePage * queuePageSize)
+  const filteredQueue = queue.filter(r => matchesSearch(search, [r.po_number, r.suppliers?.name]))
+  useEffect(() => { setQueuePage(1) }, [search])
+  const paginatedQueue = filteredQueue.slice((queuePage - 1) * queuePageSize, queuePage * queuePageSize)
   function handleQueuePageSizeChange(n: number) { setQueuePageSize(n); setQueuePage(1) }
   const paginatedReceipts = filteredReceipts.slice((histPage - 1) * histPageSize, histPage * histPageSize)
   function handleHistPageSizeChange(n: number) { setHistPageSize(n); setHistPage(1) }
 
   useHeaderTabs(loading ? [] : [
-    { id: 'queue', label: s.toReceive, count: queue.length, active: tab === 'queue' },
+    { id: 'queue', label: s.toReceive, count: filteredQueue.length, active: tab === 'queue' },
     { id: 'history', label: s.history, count: filteredReceipts.length, active: tab === 'history' },
   ], id => setTab(id === 'history' ? 'history' : 'queue'))
 
@@ -116,7 +121,7 @@ export default function ReceiptsPage() {
               <div className="relative min-w-40 flex-1 max-w-[220px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder={s.receiptNumber + ' / ' + t.po.poNumber}
-                  className="w-full pl-9 pr-3 h-8 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
+                  className="w-full pl-9 pr-3 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
               </div>
               <FilterSelect label={t.filters.labels.period} value={dateRange} onChange={e => setDateRange(e.target.value)}>
                 <option value="all">{t.filters.allTime}</option>
@@ -136,15 +141,11 @@ export default function ReceiptsPage() {
       {loading ? (
         <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
       ) : tab === 'queue' ? (
-        <div className="data-card table-bleed bg-white rounded-lg border border-field overflow-hidden">
+        <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
-              <thead className="bg-surface border-b border-field"><tr>
-                {[t.po.poNumber, t.po.supplier, t.po.total, t.common.status, ''].map((h, i) => (
-                  <th key={i} className="text-left px-4 py-3 text-sm font-medium text-ink2">{h}</th>
-                ))}
-              </tr></thead>
+              <GridHead cols={[[t.po.poNumber, FileText], [t.po.supplier, Building2], [t.po.total, Coins], [t.common.status, CircleDot], ['']]} />
               <tbody className="divide-y divide-field">
-                {queue.length === 0 ? (
+                {filteredQueue.length === 0 ? (
                   <TableEmptyState icon={PackageCheck} colSpan={6} title={t.common.empty.toReceive.title} subtitle={t.common.empty.toReceive.text} />
                 ) : paginatedQueue.map(po => (
                   <tr key={po.id} className="hover:bg-surface transition-colors">
@@ -159,17 +160,13 @@ export default function ReceiptsPage() {
                 ))}
               </tbody>
             </table></div>
-          <Pagination total={queue.length} page={queuePage} pageSize={queuePageSize} onChange={setQueuePage} onPageSizeChange={handleQueuePageSizeChange} />
+          <Pagination total={filteredQueue.length} page={queuePage} pageSize={queuePageSize} onChange={setQueuePage} onPageSizeChange={handleQueuePageSizeChange} />
         </div>
       ) : (
         <div>
-          <div className="data-card table-bleed bg-white rounded-lg border border-field overflow-hidden">
+          <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
             <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
-                <thead className="bg-surface border-b border-field"><tr>
-                  {[s.receiptNumber, t.po.title, t.po.supplier, s.receivedDate, s.receivedBy, ''].map((h, i) => (
-                    <th key={i} className="text-left px-4 py-3 text-sm font-medium text-ink2">{h}</th>
-                  ))}
-                </tr></thead>
+                <GridHead cols={[[s.receiptNumber, PackageCheck], [t.po.title, FileText], [t.po.supplier, Building2], [s.receivedDate, CalendarClock], [s.receivedBy, User], ['']]} />
                 <tbody className="divide-y divide-field">
                   {filteredReceipts.length === 0 ? (
                     <TableEmptyState icon={PackageCheck} colSpan={6} title={hasFilters ? t.common.empty.noResults.title : t.common.empty.receipts.title} subtitle={hasFilters ? t.common.empty.noResults.text : t.common.empty.receipts.text} />
@@ -179,9 +176,9 @@ export default function ReceiptsPage() {
                       <td className="px-4 py-3 text-xs text-ink2">{r.purchase_orders?.po_number ?? '—'}</td>
                       <td className="px-4 py-3 text-ink2">{r.purchase_orders?.suppliers?.name ?? '—'}</td>
                       <td className="px-4 py-3 text-ink2">{format(new Date(r.received_date), 'dd.MM.yyyy')}</td>
-                      <td className="px-4 py-3 text-ink2">{names[r.received_by] ?? '—'}</td>
-                      <td className="px-4 py-3 text-right">
-                        <Link to={`/receipts/${r.id}`} onClick={e => e.stopPropagation()} title={t.common.view} className="inline-flex p-1.5 text-gray-400 hover:text-accent hover:bg-accent-light rounded-lg transition-colors"><Eye className="w-3.5 h-3.5" /></Link>
+                      <td className="px-4 py-3"><PersonCell name={names[r.received_by]} /></td>
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-end"><RowMenu items={[{ label: t.common.view, icon: Eye, onClick: () => navigate(`/receipts/${r.id}`) }]} /></div>
                       </td>
                     </tr>
                   ))}

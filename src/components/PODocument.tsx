@@ -1,5 +1,6 @@
 import { Document, Page, View, Text, StyleSheet, Font } from '@react-pdf/renderer'
 import { format } from 'date-fns'
+import { localizeCountry } from '../lib/countries'
 
 Font.register({
   family: 'Roboto',
@@ -220,14 +221,14 @@ function fmtNum(n: number) {
   return new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
 }
 
-function addrLines(obj: {
+function addrLines(lang: string, obj: {
   address_street?: string | null; address_city?: string | null
   address_postal_code?: string | null; address_country?: string | null
 }): string[] {
   return [
     obj.address_street,
     [obj.address_postal_code, obj.address_city].filter(Boolean).join(' '),
-    obj.address_country,
+    localizeCountry(obj.address_country, lang),
   ].filter((l): l is string => !!l)
 }
 
@@ -269,7 +270,7 @@ export default function PODocument({ data, lang = 'sl' }: { data: PODocData; lan
         <View style={s.companyBox}>
           <Text style={s.companyName}>{company.name}</Text>
           {company.tax_id ? <Text style={s.companyLine}>{L.vat}: {company.tax_id}</Text> : null}
-          {addrLines(company).map((l, i) => <Text key={i} style={s.companyLine}>{l}</Text>)}
+          {addrLines(lang, company).map((l, i) => <Text key={i} style={s.companyLine}>{l}</Text>)}
           {company.email ? <Text style={s.companyLine}>{company.email}</Text> : null}
           {company.phone ? <Text style={s.companyLine}>{company.phone}</Text> : null}
         </View>
@@ -283,12 +284,12 @@ export default function PODocument({ data, lang = 'sl' }: { data: PODocData; lan
             {supplier.contact_name ? <Text style={s.addressLine}>{supplier.contact_name}</Text> : null}
             {supplier.email ? <Text style={s.addressLine}>{supplier.email}</Text> : null}
             {supplier.phone ? <Text style={s.addressLine}>{supplier.phone}</Text> : null}
-            {addrLines(supplier).map((l, i) => <Text key={i} style={s.addressLine}>{l}</Text>)}
+            {addrLines(lang, supplier).map((l, i) => <Text key={i} style={s.addressLine}>{l}</Text>)}
           </View>
           <View style={s.addressBox}>
             <Text style={s.boxLabel}>{L.deliveryAddress}</Text>
             <Text style={s.addressName}>{location.name}</Text>
-            {addrLines(location).map((l, i) => <Text key={i} style={s.addressLine}>{l}</Text>)}
+            {addrLines(lang, location).map((l, i) => <Text key={i} style={s.addressLine}>{l}</Text>)}
           </View>
         </View>
 
@@ -367,8 +368,8 @@ export default function PODocument({ data, lang = 'sl' }: { data: PODocData; lan
         <View style={s.footer} fixed>
           <View>
             <Text style={s.footerBold}>{company.name}</Text>
-            {addrLines(company).length > 0
-              ? <Text style={s.footerText}>{addrLines(company).join(', ')}</Text>
+            {addrLines(lang, company).length > 0
+              ? <Text style={s.footerText}>{addrLines(lang, company).join(', ')}</Text>
               : null}
             {(company.bank_name || company.bank_iban) ? (
               <Text style={s.footerText}>

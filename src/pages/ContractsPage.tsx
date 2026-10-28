@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Pencil, Trash2, FileSignature } from 'lucide-react'
+import { Plus, Search, Pencil, FileSignature, Building2, CircleDot, CalendarClock, Coins, User } from 'lucide-react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
@@ -17,6 +17,10 @@ import type { Contract } from '../types/database'
 import { useLanguage } from '../hooks/useLanguage'
 import { dbError } from '../lib/dbError'
 import { daysUntil, effectiveStatus, noticeDate, STATUS_BADGE, type EffectiveStatus } from '../lib/contracts'
+import PersonCell from '../components/ui/PersonCell'
+import GridHead from '../components/ui/GridHead'
+import RowMenu from '../components/ui/RowMenu'
+import { matchesSearch } from '../lib/search'
 
 interface Row extends Contract { suppliers: { name: string; payment_terms: string | null } | null }
 interface Person { id: string; first_name: string; last_name: string }
@@ -86,7 +90,7 @@ export default function ContractsPage() {
   const q = search.toLowerCase()
   const filtered = useMemo(() => rows.filter(c => {
     const st = effectiveStatus(c)
-    if (q && !c.title.toLowerCase().includes(q) && !c.contract_number.toLowerCase().includes(q) && !(c.suppliers?.name ?? '').toLowerCase().includes(q)) return false
+    if (!matchesSearch(search, [c.title, c.contract_number, c.suppliers?.name, personName(c.owner_id)])) return false
     if (statusFilter !== 'all' && st !== statusFilter) return false
     if (supplierFilter !== 'all' && c.supplier_id !== supplierFilter) return false
     if (expiresFilter !== 'all') {
@@ -121,7 +125,7 @@ export default function ContractsPage() {
     const over = used > c.total_value
     return (
       <div className="min-w-[150px]">
-        <p className="text-sm text-ink tabular-nums">{fmt(used)} <span className="text-gray-400">/ {fmt(c.total_value)}</span></p>
+        <p className="text-sm text-ink">{fmt(used)} <span className="text-gray-400">/ {fmt(c.total_value)}</span></p>
         <div className="h-1 rounded-full bg-selected mt-1.5 overflow-hidden"><div className={`h-full rounded-full ${over ? 'bg-danger' : pct >= 80 ? 'bg-warn' : 'bg-primary'}`} style={{ width: `${pct}%` }} /></div>
       </div>
     )
@@ -135,7 +139,7 @@ export default function ContractsPage() {
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
-            className="w-full pl-9 pr-4 h-8 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
+            className="w-full pl-9 pr-4 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
         </div>
         <FilterSelect label={s.status} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="all">{t.filters.allM}</option>
@@ -154,18 +158,12 @@ export default function ContractsPage() {
         </FilterSelect>
       </PageToolbar>
 
-      <div className="data-card table-bleed bg-white rounded-lg border border-field overflow-hidden">
+      <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[980px]">
-            <thead className="bg-surface border-b border-field">
-              <tr>
-                {[s.contractTitle, s.supplier, s.status, s.validity, `${s.spent} / ${s.totalValue}`, s.owner, ''].map((h, i) => (
-                  <th key={i} className="text-left px-4 py-3 text-sm font-medium text-ink2 whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
+            <GridHead cols={[[s.contractTitle, FileSignature], [s.supplier, Building2], [s.status, CircleDot], [s.validity, CalendarClock], [`${s.spent} / ${s.totalValue}`, Coins], [s.owner, User], ['']]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
                 <TableEmptyState icon={FileSignature} colSpan={7}
@@ -175,7 +173,6 @@ export default function ContractsPage() {
                 const st = effectiveStatus(c)
                 const nd = noticeDate(c)
                 const noticeIn = daysUntil(nd)
-                const linked = (orderCount.get(c.id) ?? 0) > 0
                 return (
                   <tr key={c.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/contracts/${c.id}`)}>
                     <td className="px-4 py-3 max-w-[300px]">
@@ -189,15 +186,11 @@ export default function ContractsPage() {
                       {c.status === 'active' && noticeIn != null && noticeIn >= 0 && noticeIn <= 30 && <p className="text-xs text-warn mt-0.5">{s.noticeDue}: {fmtDate(nd)}</p>}
                     </td>
                     <td className="px-4 py-3">{valueCell(c)}</td>
-                    <td className="px-4 py-3 text-ink2 whitespace-nowrap">{personName(c.owner_id)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap"><PersonCell name={personName(c.owner_id)} /></td>
                     <td className="px-4 py-3">
                       {canEdit && (
-                        <div className="flex items-center gap-1 justify-end" onClick={e => e.stopPropagation()}>
-                          <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-accent hover:bg-accent-light rounded-lg transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-                          <button disabled={linked} onClick={() => setConfirmDelete(c)} title={linked ? s.cannotDeleteLinked : t.common.deleteEntity}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:bg-transparent">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                        <div className="flex justify-end" onClick={e => e.stopPropagation()}>
+                          <RowMenu items={[{ label: t.common.editEntity, icon: Pencil, onClick: () => openEdit(c) }]} />
                         </div>
                       )}
                     </td>
@@ -210,11 +203,13 @@ export default function ContractsPage() {
         <Pagination total={filtered.length} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={n => { setPageSize(n); setPage(1) }} />
       </div>
 
-      <ContractFormModal open={modalOpen} onClose={() => setModalOpen(false)} contract={editing} suppliers={suppliers} people={people} onSaved={load} />
+      <ContractFormModal open={modalOpen} onClose={() => setModalOpen(false)} contract={editing} suppliers={suppliers} people={people} onSaved={load}
+        onDelete={editing ? () => setConfirmDelete(editing) : undefined}
+        deleteBlocked={editing && (orderCount.get(editing.id) ?? 0) > 0 ? s.cannotDeleteLinked : null} />
 
       <ConfirmDialog open={!!confirmDelete} onClose={() => setConfirmDelete(null)}
         onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
-        title={t.common.deleteEntity} danger message={s.deleteConfirm} confirmLabel={t.common.deleteEntity} />
+        title={s.deleteTitle} message={s.deleteQuestion} name={confirmDelete ? `${confirmDelete.contract_number} · ${confirmDelete.title}` : ''} danger confirmLabel={t.common.deleteEntity} />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, Trash2, ChevronLeft, Search, X, Paperclip, FileText, UploadCloud } from 'lucide-react'
+import { Plus, Trash2, ChevronLeft, Search, X, Paperclip, FileText, UploadCloud, Send } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -11,13 +11,15 @@ import Input from '../components/ui/Input'
 import CategoryOptions from '../components/ui/CategoryOptions'
 import Modal from '../components/ui/Modal'
 import type { Item } from '../types/database'
+import { matchesSearch } from '../lib/search'
+import ModalActions from '../components/ui/ModalActions'
 
 // ─── Catalog search ────────────────────────────────────────────
 function ItemSearch({ items, onSelect, placeholder }: { items: Item[]; onSelect: (item: Item) => void; placeholder: string }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const filtered = query.length > 0
-    ? items.filter(i => i.name.toLowerCase().includes(query.toLowerCase()) || i.item_number.includes(query))
+    ? items.filter(i => matchesSearch(query, [i.item_number, i.name, i.long_description]))
     : items
   return (
     <div className="relative">
@@ -52,7 +54,7 @@ function SearchCombobox({ items, value, onChange, label, required, placeholder, 
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const selected = items.find(i => i.id === value)
-  const filtered = query.length > 0 ? items.filter(i => i.name.toLowerCase().includes(query.toLowerCase())) : items
+  const filtered = query.length > 0 ? items.filter(i => matchesSearch(query, [i.name, i.sub])) : items
   return (
     <div className="flex flex-col gap-1">
       <label className="text-sm font-medium text-gray-700">{label}{required && ' *'}</label>
@@ -289,7 +291,7 @@ export default function RequestFormPage() {
     setSaving(true)
     const reqId = await persist()
     setSaving(false)
-    if (reqId) { toast.success(t.common.saved); navigate(`/requests/${reqId}`) }
+    if (reqId) { toast.success(t.common.saved); navigate('/requests') }
   }
 
   async function doSubmit() {
@@ -306,7 +308,7 @@ export default function RequestFormPage() {
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
 
   return (
-    <div className="p-4 lg:p-6 max-w-6xl mx-auto">
+    <div className="p-4 lg:p-6 max-w-6xl mx-auto form-skin">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -314,7 +316,7 @@ export default function RequestFormPage() {
           <h1 className="text-2xl font-bold text-gray-900">{isNew ? s.new : s.edit}</h1>
         </div>
         <div className="hidden lg:flex items-center gap-2">
-          <Button variant="secondary" onClick={() => navigate(-1)} disabled={saving}>{t.common.cancel}</Button>
+          <Button variant="secondary" onClick={() => navigate(-1)} disabled={saving}>{id ? s.cancelEdit : t.common.cancel}</Button>
           {reqStatus === 'draft' && <Button variant="secondary" onClick={saveDraft} loading={saving}>{s.saveDraft}</Button>}
           <Button onClick={() => { setSubmitNote(""); setSubmitOpen(true) }} loading={saving}>{s.submit}</Button>
         </div>
@@ -451,21 +453,21 @@ export default function RequestFormPage() {
       </div>
 
       <div className="hidden lg:flex justify-end gap-2">
-        <Button variant="secondary" onClick={() => navigate(-1)} disabled={saving}>{t.common.cancel}</Button>
+        <Button variant="secondary" onClick={() => navigate(-1)} disabled={saving}>{id ? s.cancelEdit : t.common.cancel}</Button>
         {reqStatus === 'draft' && <Button variant="secondary" onClick={saveDraft} loading={saving}>{s.saveDraft}</Button>}
         <Button onClick={() => { setSubmitNote(""); setSubmitOpen(true) }} loading={saving}>{s.submit}</Button>
       </div>
 
-      <Modal open={submitOpen} onClose={() => setSubmitOpen(false)} title={s.submitTitle} size="sm">
+      <Modal open={submitOpen} onClose={() => setSubmitOpen(false)} title={s.submitTitle} size="sm" icon={Send}>
         <div className="flex flex-col gap-1 mb-4">
           <label className="text-sm font-medium text-gray-700">{s.submitComment}</label>
           <textarea value={submitNote} onChange={e => setSubmitNote(e.target.value)} rows={3}
             className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none" />
         </div>
-        <div className="flex gap-3 justify-end">
+        <ModalActions className="justify-end">
           <Button variant="secondary" onClick={() => setSubmitOpen(false)}>{t.common.cancel}</Button>
           <Button loading={saving} onClick={() => { setSubmitOpen(false); doSubmit() }}>{s.submit}</Button>
-        </div>
+        </ModalActions>
       </Modal>
     </div>
   )

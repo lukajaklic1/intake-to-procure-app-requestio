@@ -20,7 +20,7 @@ function Section({ title, description, footer, saving, onSave, children }: {
 }) {
   const { t } = useLanguage()
   return (
-    <div className="bg-white rounded-lg border border-field overflow-hidden">
+    <div className="bg-white rounded-lg border border-field overflow-hidden form-skin">
       <div className="px-6 py-5">
         <h2 className="text-lg font-semibold text-ink">{title}</h2>
         {description && <p className="text-sm text-ink2 mt-1.5">{description}</p>}
@@ -162,6 +162,16 @@ export default function SettingsPage() {
         {isAdmin && (
           <Section title={s.approvalsSettings} description={s.approvalsSettingsHint} saving={saving === 'approvals'}
             onSave={() => save('approvals', ['approver_id', 'approval_second_over', 'second_approver_id', 'team_edit_requests'])}>
+            <div className="flex flex-col gap-1 mb-4 sm:max-w-[calc(50%-0.5rem)]">
+              <label className="text-sm font-medium text-ink2">{s.approver}</label>
+              <select value={form.approver_id ?? ''}
+                onChange={e => setForm(f => ({ ...f, approver_id: e.target.value || null }))}
+                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus bg-white">
+                <option value="">{s.selectApprover}</option>
+                {members.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
+              </select>
+              <p className="text-xs text-muted">{s.approverHint}</p>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input id="approval_second_over" label={s.secondApprovalOver} type="number"
                 value={form.approval_second_over?.toString() ?? ''}

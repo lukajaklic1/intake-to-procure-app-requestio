@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Search, Eye, Pencil, Trash2, FileText, X } from 'lucide-react'
+import { Plus, Search, Eye, Pencil, FileText, X, Building2, MapPin, Tag, CalendarClock, Coins, CircleDot, ClipboardList } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -14,6 +14,9 @@ import FilterSelect from '../components/ui/FilterSelect'
 import { categoryOptions, categoryAndChildren } from '../lib/categories'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import { format, subMonths, startOfMonth } from 'date-fns'
+import GridHead from '../components/ui/GridHead'
+import RowMenu from '../components/ui/RowMenu'
+import { matchesSearch } from '../lib/search'
 
 // Distinct line categories of a document: "Food", or "Food +2" when mixed.
 function catLabel(lines: { categories: { name: string } | null }[] | null | undefined) {
@@ -147,8 +150,9 @@ export default function PurchaseOrdersPage() {
   useEffect(() => { setPage(1) }, [search, status, dateRange, supplierId, categoryId, departmentId, creatorId])
 
   const filtered = pos.filter(po => {
-    const q = search.toLowerCase()
-    if (search && !po.po_number.toLowerCase().includes(q) && !(po.suppliers?.name ?? '').toLowerCase().includes(q)) return false
+    const creator = members.find(m => m.id === po.created_by)
+    if (!matchesSearch(search, [po.po_number, po.suppliers?.name, po.locations?.name, po.request_id ? reqNums[po.request_id] : null,
+      creator ? `${creator.first_name} ${creator.last_name}` : null, ...(po.po_line_items ?? []).map(l => l.categories?.name)])) return false
     if (status !== 'all' && po.status !== status) return false
     if (dateFrom && po.created_at < dateFrom) return false
     if (supplierId && po.supplier_id !== supplierId) return false
@@ -172,7 +176,7 @@ export default function PurchaseOrdersPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
             <input value={search} onChange={e => setSearch(e.target.value)}
               placeholder={s.poNumber + " / " + s.supplier}
-              className="w-full pl-9 pr-3 h-8 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
+              className="w-full pl-9 pr-3 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
           </div>
 
           {/* Status */}
@@ -224,18 +228,12 @@ export default function PurchaseOrdersPage() {
       </PageToolbar>
 
       {/* Table */}
-      <div className="data-card table-bleed bg-white rounded-lg border border-field overflow-hidden">
+      <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]">
-            <thead className="bg-surface border-b border-field">
-              <tr>
-                {[s.poNumber, s.supplier, s.location, s.category, s.deliveryDate, s.total, t.common.status, s.requestCol, ''].map((h, i) => (
-                  <th key={i} className="text-left px-4 py-3 text-sm font-medium text-ink2">{h}</th>
-                ))}
-              </tr>
-            </thead>
+            <GridHead cols={[[s.poNumber, FileText], [s.supplier, Building2], [s.location, MapPin], [s.category, Tag], [s.deliveryDate, CalendarClock], [s.total, Coins], [t.common.status, CircleDot], [s.requestCol, ClipboardList], ['']]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
                 <TableEmptyState icon={FileText} colSpan={10} title={hasActiveFilters ? t.common.empty.noResults.title : t.common.empty.purchaseOrders.title} subtitle={hasActiveFilters ? t.common.empty.noResults.text : t.common.empty.purchaseOrders.text} />
@@ -269,21 +267,10 @@ export default function PurchaseOrdersPage() {
                       : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 justify-end">
-                      {po.status === 'draft' ? (
-                        <>
-                          <Link to={`/purchase-orders/${po.id}/edit`} onClick={e => e.stopPropagation()} className="p-1.5 text-gray-400 hover:text-accent hover:bg-accent-light rounded-lg transition-colors" title={t.common.editEntity}>
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Link>
-                          <button onClick={e => { e.stopPropagation(); setConfirmDelete(po) }} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title={t.common.deleteEntity}>
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </>
-                      ) : (
-                        <Link to={`/purchase-orders/${po.id}`} onClick={e => e.stopPropagation()} className="p-1.5 text-gray-400 hover:text-accent hover:bg-accent-light rounded-lg transition-colors" title={t.common.view}>
-                          <Eye className="w-3.5 h-3.5" />
-                        </Link>
-                      )}
+                    <div className="flex justify-end" onClick={e => e.stopPropagation()}>
+                      <RowMenu items={po.status === 'draft'
+                        ? [{ label: t.common.editEntity, icon: Pencil, onClick: () => navigate(`/purchase-orders/${po.id}/edit`) }]
+                        : [{ label: t.common.view, icon: Eye, onClick: () => navigate(`/purchase-orders/${po.id}`) }]} />
                     </div>
                   </td>
                 </tr>
@@ -294,13 +281,9 @@ export default function PurchaseOrdersPage() {
         <Pagination total={filtered.length} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={handlePageSizeChange} />
       </div>
 
-      <ConfirmDialog
-        open={!!confirmDelete} onClose={() => setConfirmDelete(null)}
+      <ConfirmDialog open={!!confirmDelete} onClose={() => setConfirmDelete(null)}
         onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
-        title={t.common.deleteEntity} danger loading={actionLoading}
-        message={`${t.common.deleteEntity} ${confirmDelete?.po_number}? ${t.common.cannotUndo}`}
-        confirmLabel={t.common.deleteEntity}
-      />
+        title={t.po.deleteTitle} message={t.po.deleteQuestion} name={confirmDelete?.po_number ?? ''} danger loading={actionLoading} confirmLabel={t.common.deleteEntity} />
     </div>
   )
 }

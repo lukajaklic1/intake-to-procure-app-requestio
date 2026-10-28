@@ -7,9 +7,11 @@ import { useAuth } from '../hooks/useAuth'
 import { useLanguage } from '../hooks/useLanguage'
 import { toast } from '../components/ui/Toast'
 import Button from '../components/ui/Button'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Input from '../components/ui/Input'
 import CategoryOptions from '../components/ui/CategoryOptions'
 import type { Supplier, Category, Location, Department, Item } from '../types/database'
+import { matchesSearch } from '../lib/search'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -54,7 +56,7 @@ function ItemSearch({ items, onSelect, placeholder }: { items: Item[]; onSelect:
   const [open, setOpen] = useState(false)
 
   const filtered = query.length > 0
-    ? items.filter(i => i.name.toLowerCase().includes(query.toLowerCase()) || i.item_number.includes(query))
+    ? items.filter(i => matchesSearch(query, [i.item_number, i.name, i.long_description]))
     : items
 
   return (
@@ -103,7 +105,7 @@ function SupplierSearch({ suppliers, value, onChange, label, disabled, placehold
   const selected = suppliers.find(s => s.id === value)
 
   const filtered = query.length > 0
-    ? suppliers.filter(s => s.name.toLowerCase().includes(query.toLowerCase()))
+    ? suppliers.filter(s => matchesSearch(query, [s.supplier_number, s.name, s.vat_number]))
     : suppliers
 
   return (
@@ -169,6 +171,8 @@ export default function POFormPage() {
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [poStatus, setPoStatus] = useState<string>('draft')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [poNumber, setPoNumber] = useState<string | null>(null)
 
   const [header, setHeader] = useState<POHeader>(EMPTY_HEADER)
@@ -354,6 +358,14 @@ export default function POFormPage() {
     setNewFiles(f => [...f, ...arr])
   }
 
+  async function deleteDraft() {
+    setDeleting(true)
+    const { error } = await supabase.from('purchase_orders').delete().eq('id', id!)
+    setDeleting(false); setConfirmDelete(false)
+    if (error) { toast.error(error.message); return }
+    toast.success(t.common.deleted); navigate('/purchase-orders')
+  }
+
   async function save(targetStatus = poStatus) {
     if (!validate() || !company || !session) return
     setSaving(true)
@@ -447,7 +459,7 @@ export default function POFormPage() {
   const title = isNew ? t.po.newPO : `${t.common.edit} ${poNumber}`
 
   return (
-    <div className="p-4 lg:p-6 max-w-6xl mx-auto pb-28 lg:pb-6">
+    <div className="p-4 lg:p-6 max-w-6xl mx-auto pb-28 lg:pb-6 form-skin">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -464,6 +476,9 @@ export default function POFormPage() {
         {/* Desktop buttons */}
         {!isReadOnly && (
           <div className="hidden lg:flex items-center gap-2">
+            {!isNew && poStatus === 'draft' && (
+              <Button variant="secondary" onClick={() => setConfirmDelete(true)} disabled={saving} className="gap-1.5 text-red-600"><Trash2 className="w-3.5 h-3.5" />{t.po.deleteDraft}</Button>
+            )}
             <Button variant="secondary" onClick={() => navigate(-1)} disabled={saving}>{t.common.cancel}</Button>
             {(poStatus === 'draft' || isNew) && (
               <Button variant="secondary" onClick={() => save('draft')} loading={saving}>
@@ -774,6 +789,8 @@ export default function POFormPage() {
           </Button>
         </div>
       )}
+      <ConfirmDialog open={confirmDelete} onClose={() => setConfirmDelete(false)} onConfirm={deleteDraft}
+        title={t.po.deleteTitle} message={t.po.deleteQuestion} name={poNumber ?? ''} danger loading={deleting} confirmLabel={t.common.deleteEntity} />
     </div>
   )
 }

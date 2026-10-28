@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, ReceiptText } from 'lucide-react'
+import { Plus, Search, ReceiptText, Building2, FileText, CalendarClock, Coins, Scale, CircleDot } from 'lucide-react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
@@ -13,6 +13,8 @@ import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import { INVOICE_BADGE, MATCH_BADGE, dueState, type InvoiceStatus } from '../lib/invoices'
 import { daysUntil } from '../lib/contracts'
+import GridHead from '../components/ui/GridHead'
+import { matchesSearch } from '../lib/search'
 
 interface Row {
   id: string; invoice_number: string; supplier_invoice_number: string; supplier_id: string; po_id: string | null
@@ -58,7 +60,7 @@ export default function InvoicesPage() {
 
   const q = search.toLowerCase()
   const filtered = useMemo(() => rows.filter(r => {
-    if (q && !r.supplier_invoice_number.toLowerCase().includes(q) && !r.invoice_number.toLowerCase().includes(q) && !(r.suppliers?.name ?? '').toLowerCase().includes(q) && !(r.purchase_orders?.po_number ?? '').toLowerCase().includes(q)) return false
+    if (!matchesSearch(search, [r.supplier_invoice_number, r.invoice_number, r.suppliers?.name, r.purchase_orders?.po_number])) return false
     if (statusFilter !== 'all' && r.status !== statusFilter) return false
     if (supplierFilter !== 'all' && r.supplier_id !== supplierFilter) return false
     if (matchFilter !== 'all' && r.match_status !== matchFilter) return false
@@ -81,7 +83,7 @@ export default function InvoicesPage() {
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
-            className="w-full pl-9 pr-4 h-8 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
+            className="w-full pl-9 pr-4 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
         </div>
         <FilterSelect label={s.status} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="all">{t.filters.allM}</option>
@@ -103,18 +105,12 @@ export default function InvoicesPage() {
         </FilterSelect>
       </PageToolbar>
 
-      <div className="data-card table-bleed bg-white rounded-lg border border-field overflow-hidden">
+      <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[980px]">
-            <thead className="bg-surface border-b border-field">
-              <tr>
-                {[s.invoiceNo, s.supplier, s.po, s.invoiceDate, s.dueDate, s.amount, s.match, s.status].map((h, i) => (
-                  <th key={i} className={`px-4 py-3 text-sm font-medium text-ink2 whitespace-nowrap ${i === 5 ? 'text-right' : 'text-left'}`}>{h}</th>
-                ))}
-              </tr>
-            </thead>
+            <GridHead cols={[[s.invoiceNo, ReceiptText], [s.supplier, Building2], [s.po, FileText], [s.invoiceDate, CalendarClock], [s.dueDate, CalendarClock], [s.amount, Coins, 'right'], [s.match, Scale], [s.status, CircleDot]]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
                 <TableEmptyState icon={ReceiptText} colSpan={8}
@@ -136,7 +132,7 @@ export default function InvoicesPage() {
                       {ds === 'overdue' && <p className="text-xs text-danger mt-0.5">{s.overdue}</p>}
                       {ds === 'soon' && <p className="text-xs text-warn mt-0.5">{s.dueSoon}</p>}
                     </td>
-                    <td className="px-4 py-3 text-right text-ink tabular-nums whitespace-nowrap">{money(Number(r.total_amount))}</td>
+                    <td className="px-4 py-3 text-right text-ink whitespace-nowrap">{money(Number(r.total_amount))}</td>
                     <td className="px-4 py-3"><span className={`badge ${MATCH_BADGE[r.match_status] ?? 'badge-neutral'}`}>{s.matchSt[r.match_status as keyof typeof s.matchSt] ?? r.match_status}</span></td>
                     <td className="px-4 py-3"><span className={`badge ${INVOICE_BADGE[r.status]}`}>{s.st[r.status]}</span></td>
                   </tr>

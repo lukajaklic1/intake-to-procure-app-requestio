@@ -59,6 +59,12 @@ body {
   padding-top: 0.875rem;
   padding-bottom: 0.875rem;
 }
+/* Body text in the 14px range all uses the weight of the main column (medium). Small notes stay regular.
+   :where() keeps this at zero specificity so an explicit font-* class on a cell still wins. */
+:where(.table-bleed, .table-clean) tbody td { font-weight: 500; }
+:where(.table-bleed, .table-clean) tbody :where(.text-xs, .text-[11px]) { font-weight: 400; }
+.table-grid .cell-chip { font-weight: 500; }
+
 .table-bleed th:first-child,
 .table-bleed td:first-child { padding-left: var(--page-px); }
 .table-bleed th:last-child,
@@ -68,6 +74,52 @@ body {
   background: var(--color-page);
 }
 .table-bleed [data-pagination] { padding-inline: var(--page-px); }
+
+/* ── Grid variant (Attio record lists) ───────────────────────────────────
+   Add `table-grid` next to `table-bleed`: white header with an icon before each label,
+   compact rows and hairlines between rows (no vertical lines). */
+.table-grid thead { background: var(--color-surface); }
+.table-grid thead th {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-ink2);
+  height: 38px;
+  padding: 0.25rem 0.75rem;
+}
+.table-grid tbody td:not([data-empty]) {
+  height: 38px;
+  padding: 0.25rem 0.75rem;
+}
+.table-grid thead th:first-child,
+.table-grid tbody td:first-child { padding-left: 0.75rem; }
+.table-grid thead th:last-child,
+.table-grid tbody td:last-child { padding-right: 0.75rem; }
+.table-grid .cell-chip-link {
+  background: var(--color-page);
+  border-color: color-mix(in srgb, var(--color-primary) 35%, white);
+  color: var(--color-primary);
+}
+.table-grid a.cell-chip-link:hover { background: var(--badge-info-bg); }
+.table-grid .cell-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  height: 22px;
+  border: 1px solid var(--color-line);
+  border-radius: 0.375rem;
+  font-size: 12.5px;
+  color: var(--color-ink);
+  background: var(--color-page);
+  white-space: nowrap;
+}
+
+/* Initials circles (PersonCell) */
+.badge.avatar-yellow { background: var(--avatar-yellow-bg); border-color: var(--avatar-yellow-border); color: var(--avatar-yellow-text); }
+.badge.avatar-orange { background: var(--avatar-orange-bg); border-color: var(--avatar-orange-border); color: var(--avatar-orange-text); }
+.badge.avatar-purple { background: var(--avatar-purple-bg); border-color: var(--avatar-purple-border); color: var(--avatar-purple-text); }
+.badge.avatar-pink   { background: var(--avatar-pink-bg);   border-color: var(--avatar-pink-border);   color: var(--avatar-pink-text); }
+.badge.avatar-blue   { background: var(--avatar-blue-bg);   border-color: var(--avatar-blue-border);   color: var(--avatar-blue-text); }
+.badge.avatar-cyan   { background: var(--avatar-cyan-bg);   border-color: var(--avatar-cyan-border);   color: var(--avatar-cyan-text); }
 
 /* ── Badges ─────────────────────────────────────────────────────────────
    <span className="badge badge-success">. Colors come from theme.css. */
@@ -92,3 +144,66 @@ body {
 /* Bleed tables end with a hairline under the last row; the footer (when shown) sits below it. */
 .table-bleed tbody tr:last-child td:not([data-empty]):not([data-nobottom]) { border-bottom: 1px solid var(--color-line); }
 .table-bleed [data-pagination] { border-top-width: 0; }
+
+/* ── Form fields (popups and full-page forms) ───────────────────────────
+   `.modal-body` is the body of every popup, `.form-skin` wraps the full-page forms: small grey labels,
+   soft regular-weight values, rounded fields, one checkbox style. The individual forms don't need their own classes. */
+:is(.modal-body, .form-skin) label:not(:has(input[type="checkbox"], input[type="radio"])) {
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.25rem;
+  color: var(--color-ink2);
+}
+:is(.modal-body, .form-skin) :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="file"], [type="hidden"], [class*="border-red"]) {
+  min-height: 2.25rem;
+  border-radius: 0.625rem;
+  border-color: var(--color-field);
+  background-color: var(--color-page);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--color-ink);
+  transition: background-color 120ms, border-color 120ms;
+}
+:is(.modal-body, .form-skin) textarea:not([class*="border-red"]) { padding-top: 0.5rem; padding-bottom: 0.5rem; line-height: 1.375rem; }
+:is(.modal-body, .form-skin) :is(input, textarea)::placeholder { color: var(--color-placeholder); font-weight: 400; opacity: 1; }
+:is(.modal-body, .form-skin) :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="file"], [class*="border-red"]):hover:not(:disabled) { background-color: var(--color-surface); }
+:is(.modal-body, .form-skin) :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="file"], [class*="border-red"]):focus {
+  background-color: var(--color-page);
+  border-color: var(--color-field-focus);
+  outline: none;
+}
+:is(.modal-body, .form-skin) :is(input, select, textarea):disabled { background-color: var(--color-surface); color: var(--color-ink2); cursor: not-allowed; }
+
+:is(.modal-body, .form-skin) input[type="checkbox"] {
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  border-radius: 0.3rem;
+  border: 1px solid #c4c6cc;
+  background-color: #fff;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 0.75rem;
+  cursor: pointer;
+  transition: background-color 120ms, border-color 120ms;
+}
+:is(.modal-body, .form-skin) input[type="checkbox"]:hover { border-color: var(--color-icon); }
+:is(.modal-body, .form-skin) input[type="checkbox"]:checked {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E");
+}
+:is(.modal-body, .form-skin) input[type="checkbox"]:focus-visible { outline: 2px solid color-mix(in srgb, var(--color-primary) 40%, transparent); outline-offset: 2px; }
+
+/* Popup entrance: slides up as a bottom sheet on phones, fades in as a dialog from sm up */
+@keyframes modal-in-sheet { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes modal-in-dialog { from { transform: translateY(8px) scale(0.985); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.animate-modal { animation: modal-in-sheet 180ms ease-out; }
+.animate-fade { animation: fade-in 150ms ease-out; }
+@media (min-width: 640px) { .animate-modal { animation-name: modal-in-dialog; } }
+@media (prefers-reduced-motion: reduce) { .animate-modal, .animate-fade { animation: none; } }
+
+/* Slim scrollbars for popups and dropdown lists */
+.modal-body, [data-select-menu] [role="listbox"] { scrollbar-width: thin; scrollbar-color: #d4d6da transparent; }
