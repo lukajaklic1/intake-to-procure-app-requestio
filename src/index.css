@@ -81,7 +81,7 @@ body {
 .table-grid thead { background: var(--color-surface); }
 .table-grid thead th {
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 500;
   color: var(--color-ink2);
   height: 38px;
   padding: 0.25rem 0.75rem;

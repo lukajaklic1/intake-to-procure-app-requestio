@@ -278,7 +278,7 @@ export default function CatalogPage() {
   const pathOf = (categoryId: string | null) => {
     const c = allCategories.find(x => x.id === categoryId)
     const parent = c?.parent_id ? allCategories.find(x => x.id === c.parent_id) : undefined
-    return parent ? { top: parent.name, sub: c!.name } : { top: c?.name ?? '—', sub: '—' }
+    return parent ? { top: parent.name, sub: c!.name } : { top: c?.name ?? '-', sub: '-' }
   }
 
   const hasSubcategories = allCategories.some(c => c.parent_id)
@@ -333,7 +333,7 @@ export default function CatalogPage() {
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
-            <GridHead cols={[[s.itemNumber, IdCard], [t.common.name, Package], [s.defaultUnit, Ruler], [s.defaultUnitPrice, Coins], [t.common.status, CircleDot], ['']]} />
+            <GridHead cols={[[s.itemNumber, IdCard], [s.nameCol, Package], [s.defaultUnit, Ruler], [s.defaultUnitPrice, Coins], [t.common.status, CircleDot], ['']]} />
             <tbody className="divide-y divide-field">
               {sections.length === 0 ? (
                 <TableEmptyState icon={filtering ? Package : Tag} colSpan={6}
@@ -381,8 +381,8 @@ export default function CatalogPage() {
                             <p className="font-medium text-gray-900">{item.name}</p>
                             {item.long_description && <p className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{item.long_description}</p>}
                           </td>
-                          <td className="px-4 py-3 text-ink2">{item.default_unit ?? '—'}</td>
-                          <td className="px-4 py-3 text-ink2">{item.default_unit_price != null ? `${item.default_unit_price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '—'}</td>
+                          <td className="px-4 py-3 text-ink2">{item.default_unit ?? '-'}</td>
+                          <td className="px-4 py-3 text-ink2">{item.default_unit_price != null ? `${item.default_unit_price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '-'}</td>
                           <td className="px-4 py-3">
                             <span className={`badge ${item.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>{item.status === 'active' ? t.common.active : t.common.inactive}</span>
                           </td>
@@ -409,7 +409,7 @@ export default function CatalogPage() {
             <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
           ) : (
             <div className="overflow-x-auto"><table className="w-full text-sm min-w-[820px]">
-              <GridHead cols={[[s.itemNumber, IdCard], [t.common.name, Package], [t.categories.title, Tag], [t.categories.subcategory, Layers], [s.defaultUnit, Ruler], [s.defaultUnitPrice, Coins], [t.common.status, CircleDot], ['']]} />
+              <GridHead cols={[[s.itemNumber, IdCard], [s.nameCol, Package], [t.categories.title, Tag], [t.categories.subcategory, Layers], [s.defaultUnit, Ruler], [s.defaultUnitPrice, Coins], [t.common.status, CircleDot], ['']]} />
               <tbody className="divide-y divide-field">
                 {flatItems.length === 0 ? (
                   <TableEmptyState icon={Package} colSpan={8}
@@ -426,8 +426,8 @@ export default function CatalogPage() {
                       </td>
                       <td className="px-4 py-3 text-ink2">{path.top}</td>
                       <td className="px-4 py-3 text-ink2">{path.sub}</td>
-                      <td className="px-4 py-3 text-ink2">{item.default_unit ?? '—'}</td>
-                      <td className="px-4 py-3 text-ink2">{item.default_unit_price != null ? `${item.default_unit_price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '—'}</td>
+                      <td className="px-4 py-3 text-ink2">{item.default_unit ?? '-'}</td>
+                      <td className="px-4 py-3 text-ink2">{item.default_unit_price != null ? `${item.default_unit_price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '-'}</td>
                       <td className="px-4 py-3">
                         <span className={`badge ${item.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>{item.status === 'active' ? t.common.active : t.common.inactive}</span>
                       </td>
@@ -519,13 +519,13 @@ export default function CatalogPage() {
           {editing.id && (
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700">{s.itemNumber}</label>
-              <div className="px-3 py-2 bg-gray-50 border border-field rounded-lg hover:border-field-hover text-sm text-gray-500">
+              <div className="h-9 flex items-center px-3 bg-surface border border-field rounded-[0.625rem] text-sm text-ink2">
                 {editing.item_number}
               </div>
             </div>
           )}
 
-          <Input id="i-name" placeholder={t.common.ph.itemName} label={t.common.name + " *"}
+          <Input id="i-name" placeholder={t.common.ph.itemName} label={s.nameLabel + ' *'}
             value={editing.name ?? ''} error={req.errors.name}
             onChange={e => { req.clear('name'); setEditing(f => ({ ...f, name: e.target.value })) }}
           />

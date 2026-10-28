@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Upload, Plus, Search, Pencil, MapPin, Building, Globe, CircleDot } from 'lucide-react'
+import { Upload, Plus, Search, Pencil, MapPin, Home, Building, Globe, CircleDot, CalendarClock } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { toast } from '../components/ui/Toast'
@@ -138,19 +138,21 @@ export default function LocationsPage() {
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]">
-            <GridHead cols={[[t.common.name, MapPin], [t.common.city, Building], [t.common.country, Globe], [t.common.status, CircleDot], ['']]} />
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[860px]">
+            <GridHead cols={[[s.nameCol, MapPin], [s.addressCol, Home], [s.placeCol, Building], [t.common.country, Globe], [t.common.status, CircleDot], [t.common.created, CalendarClock], ['']]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={MapPin} colSpan={5} title={search ? t.common.empty.noResults.title : t.common.empty.locations.title} subtitle={search ? t.common.empty.noResults.text : t.common.empty.locations.text} />
+                <TableEmptyState icon={MapPin} colSpan={7} title={search ? t.common.empty.noResults.title : t.common.empty.locations.title} subtitle={search ? t.common.empty.noResults.text : t.common.empty.locations.text} />
               ) : paginated.map(l => (
                 <tr key={l.id} className="hover:bg-surface transition-colors">
                   <td className="px-4 py-3 font-medium text-ink">{l.name}</td>
-                  <td className="px-4 py-3 text-ink2">{l.address_city ?? '—'}</td>
-                  <td className="px-4 py-3 text-ink2">{localizeCountry(l.address_country, lang) || '—'}</td>
+                  <td className="px-4 py-3 text-ink2">{l.address_street || '-'}</td>
+                  <td className="px-4 py-3 text-ink2 whitespace-nowrap">{[l.address_postal_code, l.address_city].filter(Boolean).join(' ') || '-'}</td>
+                  <td className="px-4 py-3 text-ink2">{localizeCountry(l.address_country, lang) || '-'}</td>
                   <td className="px-4 py-3">
                     <span className={`badge ${l.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>{l.status === 'active' ? t.common.activeF : t.common.inactiveF}</span>
                   </td>
+                  <td className="px-4 py-3 text-ink2 whitespace-nowrap">{new Date(l.created_at).toLocaleDateString('de-DE')}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end"><RowMenu items={[{ label: t.common.editEntity, icon: Pencil, onClick: () => openEdit(l) }]} /></div>
                   </td>

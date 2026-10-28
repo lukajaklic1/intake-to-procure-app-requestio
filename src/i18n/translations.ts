@@ -31,6 +31,8 @@ export const translations = {
 
     // Common
     sort: {
+      codeAsc: 'Code: ascending',
+      codeDesc: 'Code: descending',
       nameAsc: 'Name A-Z',
       nameDesc: 'Name Z-A',
       numberAsc: 'Number: ascending',
@@ -102,6 +104,7 @@ export const translations = {
       postalRequired: 'Postal code is required',
       fieldRequired: 'This field is required',
       ph: {
+        departmentCode: '4100',
         companyName: 'Planina d.o.o.',
         vat: 'SI12345678',
         contact: 'John Smith',
@@ -179,6 +182,7 @@ export const translations = {
         title: 'Import from Excel',
         intro: 'Download the template, fill it in Excel and upload it. Rows whose name already exists will not be imported.',
         statusDupFile: 'Duplicate in file',
+        introNameCode: 'Download the template, fill it in Excel and upload it. Rows whose name or code already exists will not be imported.',
         introNameVat: 'Download the template, fill it in Excel and upload it. Rows whose name or VAT number already exists will not be imported.',
         downloadTemplate: 'Download template',
         chooseFile: 'Choose Excel file',
@@ -601,6 +605,8 @@ export const translations = {
 
     // Items
     items: {
+      nameCol: 'Name',
+      nameLabel: 'Item name',
       deleteTitle: 'Delete item',
       deleteQuestion: 'Are you sure you want to delete the item {name}? This action cannot be undone.',
       deleteBlockedMsg: 'This item cannot be deleted because it has been used in one or more documents.',
@@ -672,6 +678,9 @@ export const translations = {
 
     // Locations
     locations: {
+      nameCol: 'Name',
+      addressCol: 'Address',
+      placeCol: 'Postal code and city',
       deleteTitle: 'Delete location',
       deleteQuestion: 'Are you sure you want to delete the location {name}? This action cannot be undone.',
       deleteBlockedMsg: 'This location cannot be deleted because it has been used in one or more documents.',
@@ -689,6 +698,12 @@ export const translations = {
 
     // Departments
     departments: {
+      showInUsers: 'Show in Users',
+      codeLabel: 'Department code',
+      nameCol: 'Name',
+      code: 'Code',
+      usersCol: 'Users',
+      docsCol: 'Documents',
       deleteTitle: 'Delete department',
       deleteQuestion: 'Are you sure you want to delete the department {name}? This action cannot be undone.',
       deleteBlockedMsg: 'This department cannot be deleted because it has been used in one or more documents.',
@@ -1046,6 +1061,8 @@ export const translations = {
 
     // Common
     sort: {
+      codeAsc: 'Šifra: naraščajoče',
+      codeDesc: 'Šifra: padajoče',
       nameAsc: 'Ime A-Ž',
       nameDesc: 'Ime Ž-A',
       numberAsc: 'Številka: naraščajoče',
@@ -1117,6 +1134,7 @@ export const translations = {
       postalRequired: 'Poštna številka je obvezna',
       fieldRequired: 'To polje je obvezno',
       ph: {
+        departmentCode: '4100',
         companyName: 'Planina d.o.o.',
         vat: 'SI12345678',
         contact: 'Janez Novak',
@@ -1126,7 +1144,7 @@ export const translations = {
         email: 'ime@podjetje.si',
         phone: '+386 40 123 456',
         paymentTerms: '30 dni',
-        locationName: 'Hotel Jezero – glavni vhod',
+        locationName: 'Hotel Jezero, glavni vhod',
         departmentName: 'Kuhinja',
         itemName: 'Univerzalno čistilo 5 L',
         itemDesc: 'Dodatne podrobnosti o artiklu',
@@ -1194,6 +1212,7 @@ export const translations = {
         title: 'Uvoz iz Excela',
         intro: 'Prenesite predlogo, jo izpolnite v Excelu in naložite. Vrstice, katerih ime že obstaja, ne bodo naložene.',
         statusDupFile: 'Podvojeno v datoteki',
+        introNameCode: 'Prenesite predlogo, jo izpolnite v Excelu in naložite. Vrstice, katerih ime ali šifra že obstaja, ne bodo naložene.',
         introNameVat: 'Prenesite predlogo, jo izpolnite v Excelu in naložite. Vrstice, katerih ime ali davčna številka že obstaja, ne bodo naložene.',
         downloadTemplate: 'Prenesi predlogo',
         chooseFile: 'Izberi Excel datoteko',
@@ -1616,6 +1635,8 @@ export const translations = {
 
     // Items
     items: {
+      nameCol: 'Naziv',
+      nameLabel: 'Naziv artikla',
       deleteTitle: 'Brisanje artikla',
       deleteQuestion: 'Ali ste prepričani, da želite izbrisati artikel {name}? Tega dejanja ni mogoče razveljaviti.',
       deleteBlockedMsg: 'Izbranega artikla ni mogoče izbrisati, ker je bil uporabljen na enem ali več drugih dokumentih.',
@@ -1687,6 +1708,9 @@ export const translations = {
 
     // Locations
     locations: {
+      nameCol: 'Naziv',
+      addressCol: 'Naslov',
+      placeCol: 'Kraj',
       deleteTitle: 'Brisanje lokacije',
       deleteQuestion: 'Ali ste prepričani, da želite izbrisati lokacijo {name}? Tega dejanja ni mogoče razveljaviti.',
       deleteBlockedMsg: 'Izbrane lokacije ni mogoče izbrisati, ker je bila uporabljena na enem ali več drugih dokumentih.',
@@ -1698,12 +1722,18 @@ export const translations = {
       noMatch: 'Nobena lokacija ne ustreza',
       noData: 'Ni lokacij.',
       createFirst: 'Dodajte prvo lokacijo dobave →',
-      locationName: 'Ime lokacije',
+      locationName: 'Naziv lokacije',
       statusHelp: 'Neaktivne lokacije niso prikazane v naročilih.',
     },
 
     // Departments
     departments: {
+      showInUsers: 'Prikaži v Uporabnikih',
+      codeLabel: 'Šifra oddelka',
+      nameCol: 'Naziv',
+      code: 'Šifra',
+      usersCol: 'Uporabniki',
+      docsCol: 'Dokumenti',
       deleteTitle: 'Brisanje oddelka',
       deleteQuestion: 'Ali ste prepričani, da želite izbrisati oddelek {name}? Tega dejanja ni mogoče razveljaviti.',
       deleteBlockedMsg: 'Izbranega oddelka ni mogoče izbrisati, ker je bil uporabljen na enem ali več drugih dokumentih.',
@@ -1715,7 +1745,7 @@ export const translations = {
       noMatch: 'Noben oddelek ne ustreza',
       noData: 'Ni oddelkov.',
       createFirst: 'Dodajte prvi oddelek →',
-      departmentName: 'Ime oddelka',
+      departmentName: 'Naziv oddelka',
       statusHelp: 'Neaktivni oddelki niso prikazani v naročilih.',
     },
 

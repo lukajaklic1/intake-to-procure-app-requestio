@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, Pencil, Users, Mail, X, User, Briefcase, Shield, CircleDot, UserPlus } from 'lucide-react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
+import FilterSelect from '../components/ui/FilterSelect'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -78,6 +79,8 @@ export default function UsersPage() {
   const s = t.settings
   const [users, setUsers] = useState<AppUser[]>([])
   const [sort, setSort] = useState('nameAsc')
+  const [searchParams] = useSearchParams()
+  const [deptFilter, setDeptFilter] = useState(searchParams.get('department') ?? 'all')
   const [permsByUser, setPermsByUser] = useState<Record<string, PermMap>>({})
   const [invites, setInvites] = useState<UserInvitation[]>([])
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
@@ -227,12 +230,14 @@ export default function UsersPage() {
     load()
   }
 
-  useHeaderCounts(dataLoading ? [] : [{ value: users.length + invites.length }])
+  const shownUsers = users.filter(u => deptFilter === 'all' || u.department_id === deptFilter)
+  const shownInvites = invites.filter(i => deptFilter === 'all' || i.department_id === deptFilter)
+  useHeaderCounts(dataLoading ? [] : [{ value: shownUsers.length + shownInvites.length }])
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
   if (!isAdmin) return <Navigate to="/dashboard" replace />
 
-  const totalRows = users.length + invites.length
+  const totalRows = shownUsers.length + shownInvites.length
   const startIdx = (page - 1) * pageSize
   const endIdx = startIdx + pageSize
   const sortDefs: SortDef<(typeof users)[number]>[] = [
@@ -241,14 +246,18 @@ export default function UsersPage() {
     { value: 'newest', label: t.sort.newest, cmp: rev(date(u => u.created_at)) },
     { value: 'oldest', label: t.sort.oldest, cmp: date(u => u.created_at) },
   ]
-  const visibleUsers = applySort(users, sortDefs, sort).slice(Math.max(0, startIdx), Math.max(0, Math.min(users.length, endIdx)))
-  const visibleInvites = invites.slice(Math.max(0, startIdx - users.length), Math.max(0, endIdx - users.length))
+  const visibleUsers = applySort(shownUsers, sortDefs, sort).slice(Math.max(0, startIdx), Math.max(0, Math.min(shownUsers.length, endIdx)))
+  const visibleInvites = shownInvites.slice(Math.max(0, startIdx - shownUsers.length), Math.max(0, endIdx - shownUsers.length))
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   return (
     <div className="p-4 lg:p-6">
       <PageToolbar attached actions={<Button onClick={openInvite} className="gap-2"><Plus className="w-4 h-4" />{s.addUser}</Button>}>
         <SortFilter defs={sortDefs} value={sort} onChange={v => { setSort(v); setPage(1) }} />
+        <FilterSelect label={t.filters.labels.department} value={deptFilter} onChange={e => { setDeptFilter(e.target.value); setPage(1) }}>
+          <option value="all">{t.common.allM}</option>
+          {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </FilterSelect>
       </PageToolbar>
 
       <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">

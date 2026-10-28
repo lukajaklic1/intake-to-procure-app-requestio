@@ -102,6 +102,7 @@ export interface Location {
 export interface Department {
   id: string
   company_id: string
+  code: string | null
   name: string
   status: 'active' | 'inactive'
   created_at: string
