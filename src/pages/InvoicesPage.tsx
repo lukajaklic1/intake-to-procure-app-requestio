@@ -15,9 +15,11 @@ import { INVOICE_BADGE, MATCH_BADGE, dueState, type InvoiceStatus } from '../lib
 import { daysUntil } from '../lib/contracts'
 import GridHead from '../components/ui/GridHead'
 import { matchesSearch } from '../lib/search'
+import SortFilter from '../components/ui/SortFilter'
+import { applySort, text, num, date, dateLast, rev, type SortDef } from '../lib/sort'
 
 interface Row {
-  id: string; invoice_number: string; supplier_invoice_number: string; supplier_id: string; po_id: string | null
+  id: string; created_at: string; invoice_number: string; supplier_invoice_number: string; supplier_id: string; po_id: string | null
   invoice_date: string; due_date: string | null; total_amount: number; status: InvoiceStatus; match_status: string
   suppliers: { name: string } | null; purchase_orders: { po_number: string } | null
 }
@@ -37,6 +39,8 @@ export default function InvoicesPage() {
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('invoiceDesc')
+  useEffect(() => { setPage(1) }, [sort])
   const [statusFilter, setStatusFilter] = useState('all')
   const [supplierFilter, setSupplierFilter] = useState('all')
   const [matchFilter, setMatchFilter] = useState('all')
@@ -47,9 +51,9 @@ export default function InvoicesPage() {
   useEffect(() => {
     if (!company) return
     ;(async () => {
-      setLoading(true)
+      // spinner only on the first load: later reloads refresh the data in place
       const [{ data }, { data: sup }] = await Promise.all([
-        supabase.from('invoices').select('id, invoice_number, supplier_invoice_number, supplier_id, po_id, invoice_date, due_date, total_amount, status, match_status, suppliers(name), purchase_orders(po_number)').eq('company_id', company.id).order('invoice_date', { ascending: false }),
+        supabase.from('invoices').select('id, created_at, invoice_number, supplier_invoice_number, supplier_id, po_id, invoice_date, due_date, total_amount, status, match_status, suppliers(name), purchase_orders(po_number)').eq('company_id', company.id).order('invoice_date', { ascending: false }),
         supabase.from('suppliers').select('id, name').eq('company_id', company.id).order('name'),
       ])
       setRows((data as unknown as Row[]) ?? [])
@@ -59,6 +63,16 @@ export default function InvoicesPage() {
   }, [company])
 
   const q = search.toLowerCase()
+  const sortDefs: SortDef<(typeof rows)[number]>[] = [
+    { value: 'invoiceDesc', label: t.sort.invoiceDateDesc, cmp: rev(date(r => r.invoice_date)) },
+    { value: 'invoiceAsc', label: t.sort.invoiceDateAsc, cmp: date(r => r.invoice_date) },
+    { value: 'newest', label: t.sort.newest, cmp: rev(date(r => r.created_at)) },
+    { value: 'oldest', label: t.sort.oldest, cmp: date(r => r.created_at) },
+    { value: 'amountDesc', label: t.sort.amountDesc, cmp: rev(num(r => r.total_amount)) },
+    { value: 'amountAsc', label: t.sort.amountAsc, cmp: num(r => r.total_amount) },
+    { value: 'dueDate', label: t.sort.dueDate, cmp: dateLast(r => r.due_date) },
+    { value: 'supplier', label: t.sort.supplierAsc, cmp: text(r => r.suppliers?.name) },
+  ]
   const filtered = useMemo(() => rows.filter(r => {
     if (!matchesSearch(search, [r.supplier_invoice_number, r.invoice_number, r.suppliers?.name, r.purchase_orders?.po_number])) return false
     if (statusFilter !== 'all' && r.status !== statusFilter) return false
@@ -73,7 +87,7 @@ export default function InvoicesPage() {
   }), [rows, q, statusFilter, supplierFilter, matchFilter, dueFilter])
 
   useEffect(() => { setPage(1) }, [search, statusFilter, supplierFilter, matchFilter, dueFilter])
-  const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const paged = applySort(filtered, sortDefs, sort).slice((page - 1) * pageSize, page * pageSize)
   const filtering = q !== '' || statusFilter !== 'all' || supplierFilter !== 'all' || matchFilter !== 'all' || dueFilter !== 'all'
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
 
@@ -85,6 +99,7 @@ export default function InvoicesPage() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
             className="w-full pl-9 pr-4 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
         </div>
+        <SortFilter defs={sortDefs} value={sort} onChange={setSort} />
         <FilterSelect label={s.status} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="all">{t.filters.allM}</option>
           {(['draft', 'in_review', 'approved', 'rejected', 'paid'] as InvoiceStatus[]).map(v => <option key={v} value={v}>{s.st[v]}</option>)}

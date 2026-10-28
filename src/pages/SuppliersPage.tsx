@@ -24,6 +24,11 @@ import { dbError } from '../lib/dbError'
 import { USAGE, loadUsage, usageFor, recheckUsage, isUsed, usageMessage, type UsageMaps } from '../lib/usage'
 import { matchesSearch } from '../lib/search'
 import StatusSelect from '../components/ui/StatusSelect'
+import Select from '../components/ui/Select'
+import { incotermOptions } from '../lib/incoterms'
+
+/** Duplicate keys of a supplier: its name and (when set) its VAT number, ignoring case and spaces. */
+const dupKeys = (name: string, vat?: string | null) => [`n:${name.trim().toLowerCase()}`, ...(vat?.trim() ? [`v:${vat.replace(/\s+/g, '').toUpperCase()}`] : [])]
 
 const EMPTY: Partial<Supplier> = { name: '', contact_name: '', email: '', phone: '', vat_number: '', address_street: '', address_city: '', address_postal_code: '', address_country: '', payment_terms: '', incoterm: '', status: 'active' }
 
@@ -37,6 +42,7 @@ export default function SuppliersPage() {
   const req = useRequired(t.common.fieldRequired)
   const [importOpen, setImportOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [sort, setSort] = useState<'name-asc' | 'name-desc' | 'number-asc' | 'number-desc' | 'created-desc' | 'created-asc'>('name-asc')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Partial<Supplier>>(EMPTY)
   const [page, setPage] = useState(1)
@@ -50,7 +56,7 @@ export default function SuppliersPage() {
 
   async function load() {
     if (!company) return
-    setLoading(true)
+    // spinner only on the first load: later reloads refresh the data in place
     const [{ data }, usageMaps] = await Promise.all([
       supabase.from('suppliers').select('*').eq('company_id', company.id).order('name'),
       loadUsage(company.id, USAGE.supplier),
@@ -104,14 +110,19 @@ export default function SuppliersPage() {
     toast.success(t.common.deleted); load()
   }
 
-  useEffect(() => { setPage(1) }, [search, statusFilter])
+  useEffect(() => { setPage(1) }, [search, statusFilter, sort])
 
   const filtered = suppliers.filter(s => {
     const matchSearch = matchesSearch(search, [s.supplier_number, s.name, s.vat_number, s.contact_name, s.email, s.phone, s.payment_terms])
     const matchStatus = statusFilter === 'all' || s.status === statusFilter
     return matchSearch && matchStatus
   })
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const sorted = [...filtered].sort((a, b) => {
+    const dir = sort.endsWith('desc') ? -1 : 1
+    if (sort.startsWith('created')) return dir * a.created_at.localeCompare(b.created_at)
+    return dir * (sort.startsWith('number') ? Number(a.supplier_number) - Number(b.supplier_number) : a.name.localeCompare(b.name, 'sl', { sensitivity: 'base' }))
+  })
+  const paginated = sorted.slice((page - 1) * pageSize, page * pageSize)
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
@@ -124,6 +135,14 @@ export default function SuppliersPage() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
             className="w-full pl-9 pr-4 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
         </div>
+        <FilterSelect label={t.filters.labels.sort} value={sort} defaultValue="name-asc" onChange={e => setSort(e.target.value as typeof sort)}>
+          <option value="name-asc">{s.sortNameAsc}</option>
+          <option value="name-desc">{s.sortNameDesc}</option>
+          <option value="number-asc">{s.sortNumberAsc}</option>
+          <option value="number-desc">{s.sortNumberDesc}</option>
+          <option value="created-desc">{t.sort.newest}</option>
+          <option value="created-asc">{t.sort.oldest}</option>
+        </FilterSelect>
         <FilterSelect label={t.filters.labels.status} value={statusFilter} onChange={e => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}>
           {(['all', 'active', 'inactive'] as const).map(v => <option key={v} value={v}>{v === 'all' ? t.common.allM : v === 'active' ? t.common.activeM : t.common.inactiveM}</option>)}
         </FilterSelect>
@@ -188,8 +207,9 @@ export default function SuppliersPage() {
           { key: 'paymentTerms', label: t.common.import.cols.paymentTerms, example: '30 dni' },
           { key: 'incoterm', label: t.common.import.cols.incoterm, example: 'DAP' },
         ]}
-        existing={new Set(suppliers.map(x => x.name.toLowerCase()))}
-        keyOf={row => row.name.toLowerCase()}
+        duplicateRule="nameVat" keyLabels={{ n: t.common.name.toLowerCase(), v: s.vatNumber.toLowerCase() }}
+        existing={new Set(suppliers.flatMap(x => dupKeys(x.name, x.vat_number)))}
+        keyOf={row => dupKeys(row.name, row.vat)}
         validate={row => row.email && !/^\S+@\S+\.\S+$/.test(row.email) ? t.common.import.invalidEmail + ': ' + row.email : null}
         onImport={async rows => {
           const { error } = await supabase.from('suppliers').insert(rows.map(r => ({
@@ -215,7 +235,7 @@ export default function SuppliersPage() {
           <Input id="s-email" placeholder={t.common.ph.email} label={t.common.email} type="email" {...field('email')} />
           <Input id="s-phone" placeholder={t.common.ph.phone} label={t.common.phone} {...field('phone')} />
           <Input id="s-terms" label={s.paymentTerms} placeholder={t.common.ph.paymentTerms} {...field('payment_terms')} />
-          <Input id="s-incoterm" label={s.incoterm} placeholder="CPT, FOB, EXW" {...field('incoterm')} />
+          <Select id="s-incoterm" label={s.incoterm} value={editing.incoterm ?? ''} onChange={v => setEditing(f => ({ ...f, incoterm: v }))} options={incotermOptions(editing.incoterm)} />
 
           {/* Status toggle — only shown when editing */}
           {editing.id && (

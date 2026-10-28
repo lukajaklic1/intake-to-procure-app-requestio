@@ -30,6 +30,31 @@ export const translations = {
     },
 
     // Common
+    sort: {
+      nameAsc: 'Name A-Z',
+      nameDesc: 'Name Z-A',
+      numberAsc: 'Number: ascending',
+      numberDesc: 'Number: descending',
+      newest: 'Created: descending',
+      oldest: 'Created: ascending',
+      amountDesc: 'Amount: descending',
+      amountAsc: 'Amount: ascending',
+      neededBy: 'Needed by: earliest',
+      delivery: 'Delivery: earliest',
+      dueDate: 'Due date: earliest',
+      endDate: 'End: earliest',
+      supplierAsc: 'Supplier A-Z',
+      cityAsc: 'City A-Z',
+      titleAsc: 'Title A-Z',
+      valueDesc: 'Value: descending',
+      valueAsc: 'Value: ascending',
+      priceAsc: 'Price: ascending',
+      priceDesc: 'Price: descending',
+      invoiceDateDesc: 'Invoice date: descending',
+      invoiceDateAsc: 'Invoice date: ascending',
+      receivedDesc: 'Received date: descending',
+      receivedAsc: 'Received date: ascending',
+    },
     common: {
       deleteDocTitle: 'Delete document',
       deleteDocQuestion: 'Are you sure you want to delete the document {name}? This action cannot be undone.',
@@ -152,7 +177,9 @@ export const translations = {
         unknownCategory: 'Category does not exist',
         unknownSubcategory: 'Subcategory does not exist in that category',
         title: 'Import from Excel',
-        intro: 'Download the template, fill it in Excel and upload it. Rows that already exist are skipped.',
+        intro: 'Download the template, fill it in Excel and upload it. Rows whose name already exists will not be imported.',
+        statusDupFile: 'Duplicate in file',
+        introNameVat: 'Download the template, fill it in Excel and upload it. Rows whose name or VAT number already exists will not be imported.',
         downloadTemplate: 'Download template',
         chooseFile: 'Choose Excel file',
         columns: 'Columns',
@@ -275,10 +302,11 @@ export const translations = {
       allStatuses: 'All statuses',
       allM: 'All',
       allF: 'All',
-      labels: { period: 'Period', supplier: 'Supplier', category: 'Category', subcategory: 'Subcategory', expires: 'Expires', department: 'Department', status: 'Status', requester: 'Requested by', poStatus: 'Order status', approver: 'Approver' },
+      labels: { sort: 'Sort', period: 'Period', supplier: 'Supplier', category: 'Category', subcategory: 'Subcategory', expires: 'Expires', department: 'Department', status: 'Status', requester: 'Requested by', poStatus: 'Order status', approver: 'Approver' },
     },
 
     contracts: {
+      deleteBlockedMsg: 'This contract cannot be deleted because purchase orders are linked to it. Terminate it instead.',
       terminateTitle: 'Terminate contract',
       terminateQuestion: 'Are you sure you want to terminate the contract {name}? You can reactivate it later.',
       deleteTitle: 'Delete contract',
@@ -541,6 +569,10 @@ export const translations = {
 
     // Suppliers
     suppliers: {
+      sortNameAsc: 'Name A-Z',
+      sortNameDesc: 'Name Z-A',
+      sortNumberAsc: 'Number: ascending',
+      sortNumberDesc: 'Number: descending',
       deleteTitle: 'Delete supplier',
       deleteQuestion: 'Are you sure you want to delete the supplier {name}? This action cannot be undone.',
       deleteBlockedMsg: 'This supplier cannot be deleted because it has been used in one or more documents.',
@@ -1013,6 +1045,31 @@ export const translations = {
     },
 
     // Common
+    sort: {
+      nameAsc: 'Ime A-Ž',
+      nameDesc: 'Ime Ž-A',
+      numberAsc: 'Številka: naraščajoče',
+      numberDesc: 'Številka: padajoče',
+      newest: 'Ustvarjeno: padajoče',
+      oldest: 'Ustvarjeno: naraščajoče',
+      amountDesc: 'Znesek: padajoče',
+      amountAsc: 'Znesek: naraščajoče',
+      neededBy: 'Potrebno do: najprej',
+      delivery: 'Dobava: najprej',
+      dueDate: 'Zapadlost: najprej',
+      endDate: 'Konec: najprej',
+      supplierAsc: 'Dobavitelj A-Ž',
+      cityAsc: 'Mesto A-Ž',
+      titleAsc: 'Naslov A-Ž',
+      valueDesc: 'Vrednost: padajoče',
+      valueAsc: 'Vrednost: naraščajoče',
+      priceAsc: 'Cena: naraščajoče',
+      priceDesc: 'Cena: padajoče',
+      invoiceDateDesc: 'Datum računa: padajoče',
+      invoiceDateAsc: 'Datum računa: naraščajoče',
+      receivedDesc: 'Datum prevzema: padajoče',
+      receivedAsc: 'Datum prevzema: naraščajoče',
+    },
     common: {
       deleteDocTitle: 'Brisanje dokumenta',
       deleteDocQuestion: 'Ali ste prepričani, da želite izbrisati dokument {name}? Tega dejanja ni mogoče razveljaviti.',
@@ -1135,7 +1192,9 @@ export const translations = {
         unknownCategory: 'Kategorija ne obstaja',
         unknownSubcategory: 'Podkategorija v tej kategoriji ne obstaja',
         title: 'Uvoz iz Excela',
-        intro: 'Prenesite predlogo, jo izpolnite v Excelu in naložite. Vrstice, ki že obstajajo, se preskočijo.',
+        intro: 'Prenesite predlogo, jo izpolnite v Excelu in naložite. Vrstice, katerih ime že obstaja, ne bodo naložene.',
+        statusDupFile: 'Podvojeno v datoteki',
+        introNameVat: 'Prenesite predlogo, jo izpolnite v Excelu in naložite. Vrstice, katerih ime ali davčna številka že obstaja, ne bodo naložene.',
         downloadTemplate: 'Prenesi predlogo',
         chooseFile: 'Izberi Excel datoteko',
         columns: 'Stolpci',
@@ -1258,10 +1317,11 @@ export const translations = {
       allStatuses: 'Vsi statusi',
       allM: 'Vsi',
       allF: 'Vse',
-      labels: { period: 'Obdobje', supplier: 'Dobavitelj', category: 'Kategorija', subcategory: 'Podkategorija', expires: 'Poteče', department: 'Oddelek', status: 'Status', requester: 'Kreator', poStatus: 'Status naročila', approver: 'Potrjevalec' },
+      labels: { sort: 'Razvrsti', period: 'Obdobje', supplier: 'Dobavitelj', category: 'Kategorija', subcategory: 'Podkategorija', expires: 'Poteče', department: 'Oddelek', status: 'Status', requester: 'Kreator', poStatus: 'Status naročila', approver: 'Potrjevalec' },
     },
 
     contracts: {
+      deleteBlockedMsg: 'Izbrane pogodbe ni mogoče izbrisati, ker so z njo povezana naročila. Raje jo prekinite.',
       terminateTitle: 'Prekinitev pogodbe',
       terminateQuestion: 'Ali ste prepričani, da želite prekiniti pogodbo {name}? Pogodbo lahko pozneje znova aktivirate.',
       deleteTitle: 'Brisanje pogodbe',
@@ -1524,6 +1584,10 @@ export const translations = {
 
     // Suppliers
     suppliers: {
+      sortNameAsc: 'Ime A-Ž',
+      sortNameDesc: 'Ime Ž-A',
+      sortNumberAsc: 'Številka: naraščajoče',
+      sortNumberDesc: 'Številka: padajoče',
       deleteTitle: 'Brisanje dobavitelja',
       deleteQuestion: 'Ali ste prepričani, da želite izbrisati dobavitelja {name}? Tega dejanja ni mogoče razveljaviti.',
       deleteBlockedMsg: 'Izbranega dobavitelja ni mogoče izbrisati, ker je bil uporabljen na enem ali več drugih dokumentih.',

@@ -328,7 +328,7 @@ export default function ContractDetailPage() {
       )}
 
       <ContractFormModal open={editOpen} onClose={() => setEditOpen(false)} contract={contract} suppliers={suppliers} people={people} onSaved={load}
-        onDelete={() => setConfirm('delete')} deleteBlocked={orders.length > 0 ? s.cannotDeleteLinked : null} />
+        onDelete={() => setConfirm('delete')} deleteBlocked={orders.length > 0 ? s.deleteBlockedMsg : null} />
       <ConfirmDialog open={confirm === 'terminate'} onClose={() => setConfirm(null)} onConfirm={() => setStatus('terminated')}
         title={s.terminateTitle} message={s.terminateQuestion} name={`${contract.contract_number} · ${contract.title}`} danger confirmLabel={s.terminate} />
       <ConfirmDialog open={confirm === 'delete'} onClose={() => setConfirm(null)} onConfirm={deleteContract}

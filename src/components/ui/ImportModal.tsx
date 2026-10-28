@@ -26,8 +26,12 @@ interface ImportModalProps {
   templateName: string
   /** Lower-cased duplicate keys that already exist in the database. */
   existing: Set<string>
-  /** Duplicate key of a row (lower-cased), e.g. its name. */
-  keyOf: (row: ImportRow) => string
+  /** Duplicate key(s) of a row (lower-cased), e.g. its name. A row counts as a duplicate when ANY of its keys already exists. */
+  keyOf: (row: ImportRow) => string | string[]
+  /** Wording of the rule in the intro text: by name only (default) or by name or VAT number. */
+  duplicateRule?: 'name' | 'nameVat'
+  /** Names the field behind a key prefix ("v:" -> "VAT number"), so a skipped row can say why. */
+  keyLabels?: Record<string, string>
   /** Extra per-row check; return an error message or null. */
   validate?: (row: ImportRow) => string | null
   onImport: (rows: ImportRow[]) => Promise<void>
@@ -47,7 +51,7 @@ const EMPTY: Parsed = { valid: [], duplicates: 0, errors: [], preview: [] }
 const cell = (v: unknown) => (v == null ? '' : String(v).trim())
 
 /** Excel (.xlsx) import: download a template, upload a filled one, review, import. */
-export default function ImportModal({ open, onClose, title, columns, templateName, existing, keyOf, validate, onImport }: ImportModalProps) {
+export default function ImportModal({ open, onClose, title, columns, templateName, existing, keyOf, duplicateRule = 'name', keyLabels, validate, onImport }: ImportModalProps) {
   const { t } = useLanguage()
   const s = t.common.import
   const fileRef = useRef<HTMLInputElement>(null)
@@ -86,9 +90,14 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
         if (empty) { const message = `${s.missingValue}: ${empty.label}`; out.errors.push({ line, message }); out.preview.push({ line, data: row, status: 'error', message }); return }
         const err = validate?.(row)
         if (err) { out.errors.push({ line, message: err }); out.preview.push({ line, data: row, status: 'error', message: err }); return }
-        const key = keyOf(row)
-        if (seen.has(key)) { out.duplicates++; out.preview.push({ line, data: row, status: 'exists' }); return }
-        seen.add(key)
+        const keys = [keyOf(row)].flat()
+        const hit = keys.find(k => seen.has(k))
+        if (hit) {
+          const field = keyLabels?.[hit.split(':')[0]]
+          const message = existing.has(hit) ? (field ? `${s.statusExists}: ${field}` : s.statusExists) : (field ? `${s.statusDupFile}: ${field}` : s.statusDupFile)
+          out.duplicates++; out.preview.push({ line, data: row, status: 'exists', message }); return
+        }
+        keys.forEach(k => seen.add(k))
         out.valid.push(row)
         out.preview.push({ line, data: row, status: 'new' })
       })
@@ -114,7 +123,7 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
 
   return (
     <Modal open={open} onClose={close} title={title} size="lg" icon={Upload}>
-      <p className="text-sm text-ink2 mb-4">{s.intro}</p>
+      <p className="text-sm text-ink2 mb-4">{duplicateRule === 'nameVat' ? s.introNameVat : s.intro}</p>
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <Button variant="secondary" onClick={downloadTemplate} className="gap-2"><Download className="w-4 h-4" />{s.downloadTemplate}</Button>
@@ -122,10 +131,6 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
         <Button onClick={() => fileRef.current?.click()} className="gap-2"><FileSpreadsheet className="w-4 h-4" />{s.chooseFile}</Button>
         {fileName && <span className="text-sm text-ink2 truncate max-w-[220px]">{fileName}</span>}
       </div>
-
-      <p className="text-xs text-gray-400 mb-4">
-        {s.columns}: {columns.map(c => c.label + (c.required ? ' *' : '')).join(' · ')}
-      </p>
 
       {parsed && (
         <div className="rounded-xl border border-line p-4 mb-4 text-sm flex flex-col gap-2">
@@ -151,13 +156,13 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
               </tr>
             </thead>
             <tbody className="divide-y divide-field">
-              {parsed.preview.map(p => (
+              {parsed.preview.map((p, n) => (
                 <tr key={p.line} className={p.status === 'new' ? '' : 'bg-surface'}>
-                  <td className="px-3 py-2 text-xs text-gray-400">{p.line}</td>
+                  <td className="px-3 py-2 text-xs text-gray-400">{n + 1}</td>
                   {columns.map(c => <td key={c.key} className={`px-3 py-2 max-w-[180px] truncate ${p.status === 'new' ? 'text-ink' : 'text-muted'}`} title={p.data[c.key]}>{p.data[c.key] || '—'}</td>)}
                   <td className="px-3 py-2 whitespace-nowrap">
                     {p.status === 'new' && <span className="badge badge-success">{s.statusNew}</span>}
-                    {p.status === 'exists' && <span className="badge badge-neutral">{s.statusExists}</span>}
+                    {p.status === 'exists' && <span className="badge badge-neutral">{p.message ?? s.statusExists}</span>}
                     {p.status === 'error' && <span className="badge badge-danger" title={p.message}>{p.message ?? s.statusError}</span>}
                   </td>
                 </tr>

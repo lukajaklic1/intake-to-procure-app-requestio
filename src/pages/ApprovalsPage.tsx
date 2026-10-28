@@ -13,6 +13,8 @@ import { format, subMonths, startOfMonth } from 'date-fns'
 import PersonCell from '../components/ui/PersonCell'
 import GridHead, { type GridCol } from '../components/ui/GridHead'
 import { matchesSearch } from '../lib/search'
+import SortFilter from '../components/ui/SortFilter'
+import { applySort, num, date, dateLast, rev, type SortDef } from '../lib/sort'
 
 interface Row {
   id: string
@@ -47,6 +49,8 @@ export default function ApprovalsPage() {
   const [loading, setLoading] = useState(true)
 
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('newest')
+  useEffect(() => { setPage(1) }, [sort])
   const [dateRange, setDateRange] = useState('all')
   const [approverId, setApproverId] = useState('')
   const [members, setMembers] = useState<{ id: string; first_name: string; last_name: string }[]>([])
@@ -65,7 +69,7 @@ export default function ApprovalsPage() {
 
   async function load() {
     if (!company || !profile) return
-    setLoading(true)
+    // spinner only on the first load: later reloads refresh the data in place
     let query = supabase
       .from('requests')
       .select('id, request_number, title, total_estimate, created_at, needed_by_date, created_by, approver_id, locations(name)')
@@ -90,6 +94,13 @@ export default function ApprovalsPage() {
   const hasActiveFilters = search || dateRange !== 'all' || approverId
   const dateFrom = getDateFrom(dateRange)
 
+  const sortDefs: SortDef<(typeof rows)[number]>[] = [
+    { value: 'newest', label: t.sort.newest, cmp: rev(date(r => r.created_at)) },
+    { value: 'oldest', label: t.sort.oldest, cmp: date(r => r.created_at) },
+    { value: 'amountDesc', label: t.sort.amountDesc, cmp: rev(num(r => r.total_estimate)) },
+    { value: 'amountAsc', label: t.sort.amountAsc, cmp: num(r => r.total_estimate) },
+    { value: 'neededBy', label: t.sort.neededBy, cmp: dateLast(r => r.needed_by_date) },
+  ]
   const filtered = rows.filter(r => {
     if (!matchesSearch(search, [r.request_number, r.title, r.locations?.name, names[r.created_by], r.approver_id ? names[r.approver_id] : null])) return false
     if (dateFrom && r.created_at < dateFrom) return false
@@ -98,7 +109,7 @@ export default function ApprovalsPage() {
   })
 
   useEffect(() => { setPage(1) }, [search, dateRange, approverId])
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const paginated = applySort(filtered, sortDefs, sort).slice((page - 1) * pageSize, page * pageSize)
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
@@ -112,7 +123,8 @@ export default function ApprovalsPage() {
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder={s.requestNumber + ' / ' + a.requestedBy}
                 className="w-full pl-9 pr-3 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
             </div>
-            <FilterSelect label={t.filters.labels.period} value={dateRange} onChange={e => setDateRange(e.target.value)}>
+            <SortFilter defs={sortDefs} value={sort} onChange={setSort} />
+        <FilterSelect label={t.filters.labels.period} value={dateRange} onChange={e => setDateRange(e.target.value)}>
               <option value="all">{t.filters.allTime}</option>
               <option value="1m">{t.filters.lastMonth}</option>
               <option value="3m">{t.filters.last3Months}</option>

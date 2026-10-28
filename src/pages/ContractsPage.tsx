@@ -21,6 +21,8 @@ import PersonCell from '../components/ui/PersonCell'
 import GridHead from '../components/ui/GridHead'
 import RowMenu from '../components/ui/RowMenu'
 import { matchesSearch } from '../lib/search'
+import SortFilter from '../components/ui/SortFilter'
+import { applySort, text, num, date, dateLast, rev, type SortDef } from '../lib/sort'
 
 interface Row extends Contract { suppliers: { name: string; payment_terms: string | null } | null }
 interface Person { id: string; first_name: string; last_name: string }
@@ -43,6 +45,8 @@ export default function ContractsPage() {
   const [people, setPeople] = useState<Person[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('newest')
+  useEffect(() => { setPage(1) }, [sort])
   const [statusFilter, setStatusFilter] = useState('all')
   const [supplierFilter, setSupplierFilter] = useState('all')
   const [expiresFilter, setExpiresFilter] = useState('all')
@@ -57,7 +61,7 @@ export default function ContractsPage() {
 
   async function load() {
     if (!company) return
-    setLoading(true)
+    // spinner only on the first load: later reloads refresh the data in place
     const [{ data: c }, { data: sup }, { data: us }, { data: pos }] = await Promise.all([
       supabase.from('contracts').select('*, suppliers(name, payment_terms)').eq('company_id', company.id).order('created_at', { ascending: false }),
       supabase.from('suppliers').select('id, name, payment_terms').eq('company_id', company.id).eq('status', 'active').order('name'),
@@ -88,6 +92,15 @@ export default function ContractsPage() {
   }
 
   const q = search.toLowerCase()
+  const sortDefs: SortDef<(typeof rows)[number]>[] = [
+    { value: 'newest', label: t.sort.newest, cmp: rev(date(c => c.created_at)) },
+    { value: 'oldest', label: t.sort.oldest, cmp: date(c => c.created_at) },
+    { value: 'endDate', label: t.sort.endDate, cmp: dateLast(c => c.end_date) },
+    { value: 'valueDesc', label: t.sort.valueDesc, cmp: rev(num(c => c.total_value)) },
+    { value: 'valueAsc', label: t.sort.valueAsc, cmp: num(c => c.total_value) },
+    { value: 'title', label: t.sort.titleAsc, cmp: text(c => c.title) },
+    { value: 'supplier', label: t.sort.supplierAsc, cmp: text(c => c.suppliers?.name) },
+  ]
   const filtered = useMemo(() => rows.filter(c => {
     const st = effectiveStatus(c)
     if (!matchesSearch(search, [c.title, c.contract_number, c.suppliers?.name, personName(c.owner_id)])) return false
@@ -102,7 +115,7 @@ export default function ContractsPage() {
   }), [rows, q, statusFilter, supplierFilter, expiresFilter])
 
   useEffect(() => { setPage(1) }, [search, statusFilter, supplierFilter, expiresFilter])
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const paginated = applySort(filtered, sortDefs, sort).slice((page - 1) * pageSize, page * pageSize)
   const filtering = q !== '' || statusFilter !== 'all' || supplierFilter !== 'all' || expiresFilter !== 'all'
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
 
@@ -141,6 +154,7 @@ export default function ContractsPage() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
             className="w-full pl-9 pr-4 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
         </div>
+        <SortFilter defs={sortDefs} value={sort} onChange={setSort} />
         <FilterSelect label={s.status} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="all">{t.filters.allM}</option>
           {(['draft', 'active', 'expired', 'terminated'] as EffectiveStatus[]).map(v => <option key={v} value={v}>{s.st[v]}</option>)}
@@ -205,7 +219,7 @@ export default function ContractsPage() {
 
       <ContractFormModal open={modalOpen} onClose={() => setModalOpen(false)} contract={editing} suppliers={suppliers} people={people} onSaved={load}
         onDelete={editing ? () => setConfirmDelete(editing) : undefined}
-        deleteBlocked={editing && (orderCount.get(editing.id) ?? 0) > 0 ? s.cannotDeleteLinked : null} />
+        deleteBlocked={editing && (orderCount.get(editing.id) ?? 0) > 0 ? s.deleteBlockedMsg : null} />
 
       <ConfirmDialog open={!!confirmDelete} onClose={() => setConfirmDelete(null)}
         onConfirm={() => confirmDelete && handleDelete(confirmDelete)}

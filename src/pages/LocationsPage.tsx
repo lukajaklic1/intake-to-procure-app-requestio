@@ -25,6 +25,8 @@ import GridHead from '../components/ui/GridHead'
 import { matchesSearch } from '../lib/search'
 import StatusSelect from '../components/ui/StatusSelect'
 import { localizeCountry } from '../lib/countries'
+import SortFilter from '../components/ui/SortFilter'
+import { applySort, text, date, rev, type SortDef } from '../lib/sort'
 
 const EMPTY: Partial<Location> = { name: '', address_street: '', address_city: '', address_postal_code: '', address_country: '', status: 'active' }
 
@@ -35,6 +37,8 @@ export default function LocationsPage() {
   const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('nameAsc')
+  useEffect(() => { setPage(1) }, [sort])
   const req = useRequired(t.common.fieldRequired)
   const [importOpen, setImportOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
@@ -51,7 +55,7 @@ export default function LocationsPage() {
 
   async function load() {
     if (!company) return
-    setLoading(true)
+    // spinner only on the first load: later reloads refresh the data in place
     const [{ data }, usageMaps] = await Promise.all([
       supabase.from('locations').select('*').eq('company_id', company.id).order('name'),
       loadUsage(company.id, USAGE.location),
@@ -99,13 +103,19 @@ export default function LocationsPage() {
     toast.success(t.common.deleted); load()
   }
 
+  const sortDefs: SortDef<(typeof locations)[number]>[] = [
+    { value: 'nameAsc', label: t.sort.nameAsc, cmp: text(l => l.name) },
+    { value: 'nameDesc', label: t.sort.nameDesc, cmp: rev(text(l => l.name)) },
+    { value: 'city', label: t.sort.cityAsc, cmp: text(l => l.address_city) },
+    { value: 'newest', label: t.sort.newest, cmp: rev(date(l => l.created_at)) },
+  ]
   const filtered = locations.filter(l => {
     return matchesSearch(search, [l.name, l.address_street, l.address_postal_code, l.address_city, l.address_country, localizeCountry(l.address_country, lang)])
       && (statusFilter === 'all' || l.status === statusFilter)
   })
 
   useEffect(() => { setPage(1) }, [search, statusFilter])
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const paginated = applySort(filtered, sortDefs, sort).slice((page - 1) * pageSize, page * pageSize)
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
@@ -118,6 +128,7 @@ export default function LocationsPage() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
             className="w-full pl-9 pr-4 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
         </div>
+        <SortFilter defs={sortDefs} value={sort} onChange={setSort} />
         <FilterSelect label={t.filters.labels.status} value={statusFilter} onChange={e => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}>
           {(['all', 'active', 'inactive'] as const).map(v => <option key={v} value={v}>{v === 'all' ? t.common.all : v === 'active' ? t.common.activeFPl : t.common.inactiveFPl}</option>)}
         </FilterSelect>
@@ -176,8 +187,8 @@ export default function LocationsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2"><Input id="l-name" placeholder={t.common.ph.locationName} label={s.locationName + " *"} {...field('name')} /></div>
           <div className="sm:col-span-2"><Input id="l-street" placeholder={t.common.ph.street} label={t.common.streetAddress + ' *'} {...field('address_street')} /></div>
-          <Input id="l-city" placeholder={t.common.ph.city} label={t.common.city + ' *'} {...field('address_city')} />
           <Input id="l-postal" placeholder={t.common.ph.postal} label={t.common.postalCode + ' *'} {...field('address_postal_code')} />
+          <Input id="l-city" placeholder={t.common.ph.city} label={t.common.city + ' *'} {...field('address_city')} />
           <div className="sm:col-span-2"><CountrySelect id="l-country" label={t.common.country} required value={editing.address_country ?? ''} onChange={v => { req.clear('address_country'); setEditing(f => ({ ...f, address_country: v })) }} error={req.errors.address_country} /></div>
 
           {editing.id && (

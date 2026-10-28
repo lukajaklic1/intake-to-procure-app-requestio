@@ -23,6 +23,8 @@ import { USAGE, loadUsage, usageFor, recheckUsage, isUsed, usageMessage, type Us
 import GridHead from '../components/ui/GridHead'
 import { matchesSearch } from '../lib/search'
 import StatusSelect from '../components/ui/StatusSelect'
+import SortFilter from '../components/ui/SortFilter'
+import { applySort, text, date, rev, type SortDef } from '../lib/sort'
 
 export default function DepartmentsPage() {
   const { company } = useCompany()
@@ -31,6 +33,8 @@ export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<Department[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('nameAsc')
+  useEffect(() => { setPage(1) }, [sort])
   const req = useRequired(t.common.fieldRequired)
   const [importOpen, setImportOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
@@ -47,7 +51,7 @@ export default function DepartmentsPage() {
 
   async function load() {
     if (!company) return
-    setLoading(true)
+    // spinner only on the first load: later reloads refresh the data in place
     const [{ data }, usageMaps] = await Promise.all([
       supabase.from('departments').select('*').eq('company_id', company.id).order('name'),
       loadUsage(company.id, USAGE.department),
@@ -89,10 +93,16 @@ export default function DepartmentsPage() {
     toast.success(t.common.deleted); load()
   }
 
+  const sortDefs: SortDef<(typeof departments)[number]>[] = [
+    { value: 'nameAsc', label: t.sort.nameAsc, cmp: text(d => d.name) },
+    { value: 'nameDesc', label: t.sort.nameDesc, cmp: rev(text(d => d.name)) },
+    { value: 'newest', label: t.sort.newest, cmp: rev(date(d => d.created_at)) },
+    { value: 'oldest', label: t.sort.oldest, cmp: date(d => d.created_at) },
+  ]
   const filtered = departments.filter(d => matchesSearch(search, [d.name]) && (statusFilter === 'all' || d.status === statusFilter))
 
   useEffect(() => { setPage(1) }, [search, statusFilter])
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const paginated = applySort(filtered, sortDefs, sort).slice((page - 1) * pageSize, page * pageSize)
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
@@ -105,6 +115,7 @@ export default function DepartmentsPage() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
             className="w-full pl-9 pr-4 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
         </div>
+        <SortFilter defs={sortDefs} value={sort} onChange={setSort} />
         <FilterSelect label={t.filters.labels.status} value={statusFilter} onChange={e => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}>
           {(['all', 'active', 'inactive'] as const).map(v => <option key={v} value={v}>{v === 'all' ? t.common.allM : v === 'active' ? t.common.activeM : t.common.inactiveM}</option>)}
         </FilterSelect>

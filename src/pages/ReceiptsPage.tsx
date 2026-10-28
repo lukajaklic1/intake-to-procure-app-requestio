@@ -15,6 +15,8 @@ import PersonCell from '../components/ui/PersonCell'
 import GridHead from '../components/ui/GridHead'
 import RowMenu from '../components/ui/RowMenu'
 import { matchesSearch } from '../lib/search'
+import SortFilter from '../components/ui/SortFilter'
+import { applySort, text, num, date, rev, type SortDef } from '../lib/sort'
 
 const RS_BADGE: Record<string, string> = {
   none: 'badge-neutral',
@@ -32,6 +34,7 @@ interface QueueRow {
 
 interface ReceiptRow {
   id: string
+  created_at: string
   receipt_number: string
   received_date: string
   received_by: string
@@ -61,6 +64,10 @@ export default function ReceiptsPage() {
   const [loading, setLoading] = useState(true)
 
   const [search, setSearch] = useState('')
+  const [sortH, setSortH] = useState('receivedDesc')
+  const [sortQ, setSortQ] = useState('numberDesc')
+  useEffect(() => { setHistPage(1) }, [sortH])
+  useEffect(() => { setQueuePage(1) }, [sortQ])
   const [dateRange, setDateRange] = useState('all')
   const [queuePage, setQueuePage] = useState(1)
   const [queuePageSize, setQueuePageSize] = useState(20)
@@ -71,14 +78,14 @@ export default function ReceiptsPage() {
 
   async function load() {
     if (!company) return
-    setLoading(true)
+    // spinner only on the first load: later reloads refresh the data in place
     const [{ data: q }, { data: r }] = await Promise.all([
       supabase.from('purchase_orders')
         .select('id, po_number, total_amount, received_status, suppliers(name)')
         .eq('company_id', company.id).eq('status', 'sent').neq('received_status', 'full')
         .order('created_at', { ascending: false }),
       supabase.from('receipts')
-        .select('id, receipt_number, received_date, received_by, supplier_receipt_no, purchase_orders(po_number, suppliers(name))')
+        .select('id, receipt_number, received_date, created_at, received_by, supplier_receipt_no, purchase_orders(po_number, suppliers(name))')
         .eq('company_id', company.id).order('received_date', { ascending: false }),
     ])
     setQueue((q as unknown as QueueRow[]) ?? [])
@@ -102,11 +109,25 @@ export default function ReceiptsPage() {
     return true
   })
   const hasFilters = search || dateRange !== 'all'
+  const histDefs: SortDef<ReceiptRow>[] = [
+    { value: 'receivedDesc', label: t.sort.receivedDesc, cmp: rev(date(r => r.received_date)) },
+    { value: 'receivedAsc', label: t.sort.receivedAsc, cmp: date(r => r.received_date) },
+    { value: 'newest', label: t.sort.newest, cmp: rev(date(r => r.created_at)) },
+    { value: 'oldest', label: t.sort.oldest, cmp: date(r => r.created_at) },
+    { value: 'supplier', label: t.sort.supplierAsc, cmp: text(r => r.purchase_orders?.suppliers?.name) },
+  ]
+  const queueDefs: SortDef<QueueRow>[] = [
+    { value: 'numberDesc', label: t.sort.numberDesc, cmp: rev(text(r => r.po_number)) },
+    { value: 'numberAsc', label: t.sort.numberAsc, cmp: text(r => r.po_number) },
+    { value: 'amountDesc', label: t.sort.amountDesc, cmp: rev(num(r => r.total_amount)) },
+    { value: 'amountAsc', label: t.sort.amountAsc, cmp: num(r => r.total_amount) },
+    { value: 'supplier', label: t.sort.supplierAsc, cmp: text(r => r.suppliers?.name) },
+  ]
   const filteredQueue = queue.filter(r => matchesSearch(search, [r.po_number, r.suppliers?.name]))
   useEffect(() => { setQueuePage(1) }, [search])
-  const paginatedQueue = filteredQueue.slice((queuePage - 1) * queuePageSize, queuePage * queuePageSize)
+  const paginatedQueue = applySort(filteredQueue, queueDefs, sortQ).slice((queuePage - 1) * queuePageSize, queuePage * queuePageSize)
   function handleQueuePageSizeChange(n: number) { setQueuePageSize(n); setQueuePage(1) }
-  const paginatedReceipts = filteredReceipts.slice((histPage - 1) * histPageSize, histPage * histPageSize)
+  const paginatedReceipts = applySort(filteredReceipts, histDefs, sortH).slice((histPage - 1) * histPageSize, histPage * histPageSize)
   function handleHistPageSizeChange(n: number) { setHistPageSize(n); setHistPage(1) }
 
   useHeaderTabs(loading ? [] : [
@@ -117,12 +138,14 @@ export default function ReceiptsPage() {
   return (
     <div className="p-4 lg:p-6">
       <PageToolbar attached>
+        {tab === 'queue' && <SortFilter defs={queueDefs} value={sortQ} onChange={setSortQ} />}
         {tab === 'history' && (<>
               <div className="relative min-w-40 flex-1 max-w-[220px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder={s.receiptNumber + ' / ' + t.po.poNumber}
                   className="w-full pl-9 pr-3 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
               </div>
+              <SortFilter defs={histDefs} value={sortH} onChange={setSortH} />
               <FilterSelect label={t.filters.labels.period} value={dateRange} onChange={e => setDateRange(e.target.value)}>
                 <option value="all">{t.filters.allTime}</option>
                 <option value="1m">{t.filters.lastMonth}</option>

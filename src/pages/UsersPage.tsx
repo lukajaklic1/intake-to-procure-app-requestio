@@ -20,6 +20,8 @@ import RowMenu from '../components/ui/RowMenu'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import ModalActions from '../components/ui/ModalActions'
 import Select from '../components/ui/Select'
+import SortFilter from '../components/ui/SortFilter'
+import { applySort, text, date, rev, type SortDef } from '../lib/sort'
 
 const MODULES: UserPermission['module'][] = ['requests', 'purchase_orders', 'receipts', 'invoices', 'budgets', 'reports']
 const ACTIONS: ('view' | 'create' | 'approve' | 'pay')[] = ['view', 'create', 'approve', 'pay']
@@ -75,6 +77,7 @@ export default function UsersPage() {
   const { t } = useLanguage()
   const s = t.settings
   const [users, setUsers] = useState<AppUser[]>([])
+  const [sort, setSort] = useState('nameAsc')
   const [permsByUser, setPermsByUser] = useState<Record<string, PermMap>>({})
   const [invites, setInvites] = useState<UserInvitation[]>([])
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
@@ -108,7 +111,7 @@ export default function UsersPage() {
 
   async function load() {
     if (!company) return
-    setDataLoading(true)
+    // spinner only on the first load: later reloads refresh the data in place
     const [{ data: usersData }, { data: permsData }, { data: invitesData }, { data: depsData }] = await Promise.all([
       supabase.from('users').select('*').eq('company_id', company.id).order('first_name'),
       supabase.from('user_permissions').select('*'),
@@ -232,13 +235,21 @@ export default function UsersPage() {
   const totalRows = users.length + invites.length
   const startIdx = (page - 1) * pageSize
   const endIdx = startIdx + pageSize
-  const visibleUsers = users.slice(Math.max(0, startIdx), Math.max(0, Math.min(users.length, endIdx)))
+  const sortDefs: SortDef<(typeof users)[number]>[] = [
+    { value: 'nameAsc', label: t.sort.nameAsc, cmp: text(u => `${u.first_name} ${u.last_name}`) },
+    { value: 'nameDesc', label: t.sort.nameDesc, cmp: rev(text(u => `${u.first_name} ${u.last_name}`)) },
+    { value: 'newest', label: t.sort.newest, cmp: rev(date(u => u.created_at)) },
+    { value: 'oldest', label: t.sort.oldest, cmp: date(u => u.created_at) },
+  ]
+  const visibleUsers = applySort(users, sortDefs, sort).slice(Math.max(0, startIdx), Math.max(0, Math.min(users.length, endIdx)))
   const visibleInvites = invites.slice(Math.max(0, startIdx - users.length), Math.max(0, endIdx - users.length))
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<Button onClick={openInvite} className="gap-2"><Plus className="w-4 h-4" />{s.addUser}</Button>} />
+      <PageToolbar attached actions={<Button onClick={openInvite} className="gap-2"><Plus className="w-4 h-4" />{s.addUser}</Button>}>
+        <SortFilter defs={sortDefs} value={sort} onChange={v => { setSort(v); setPage(1) }} />
+      </PageToolbar>
 
       <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
         {dataLoading ? (

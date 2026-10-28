@@ -31,7 +31,7 @@ export default function ReceiptDetailPage() {
   useEffect(() => { load() }, [id])
 
   async function load() {
-    setLoading(true)
+    // spinner only on the first load: later reloads refresh the data in place
     const { data } = await supabase.from('receipts')
       .select('id, receipt_number, received_date, received_by, supplier_receipt_no, note, po_id, purchase_orders(po_number, suppliers(name))')
       .eq('id', id!).single()

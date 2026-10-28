@@ -25,6 +25,8 @@ import GridHead from '../components/ui/GridHead'
 import { matchesSearch } from '../lib/search'
 import StatusSelect from '../components/ui/StatusSelect'
 import Select from '../components/ui/Select'
+import SortFilter from '../components/ui/SortFilter'
+import { applySort, text, num, date, rev, type SortDef } from '../lib/sort'
 
 interface ItemWithCategory extends Item {
   categories: { name: string } | null
@@ -45,6 +47,8 @@ export default function CatalogPage() {
   const [confirmDeleteCat, setConfirmDeleteCat] = useState<Category | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('numberAsc')
+  useEffect(() => { setPage(1) }, [sort])
   const req = useRequired(t.common.fieldRequired)
   const catReq = useRequired(t.common.fieldRequired)
   const [importOpen, setImportOpen] = useState(false)
@@ -83,7 +87,7 @@ export default function CatalogPage() {
 
   async function load() {
     if (!company) return
-    setLoading(true)
+    // spinner only on the first load: later reloads refresh the data in place
     const [{ data }, usageMaps] = await Promise.all([
       supabase.from('items').select('*, categories(name)').eq('company_id', company.id).order('item_number'),
       loadUsage(company.id, USAGE.item),
@@ -223,7 +227,17 @@ export default function CatalogPage() {
     const c = allCategories.find(x => x.id === id)
     return [c?.name, c?.parent_id ? allCategories.find(x => x.id === c.parent_id)?.name : null]
   }
-  const filteredItems = items.filter(i =>
+  const sortDefs: SortDef<(typeof items)[number]>[] = [
+    { value: 'numberAsc', label: t.sort.numberAsc, cmp: num(i => i.item_number) },
+    { value: 'numberDesc', label: t.sort.numberDesc, cmp: rev(num(i => i.item_number)) },
+    { value: 'nameAsc', label: t.sort.nameAsc, cmp: text(i => i.name) },
+    { value: 'nameDesc', label: t.sort.nameDesc, cmp: rev(text(i => i.name)) },
+    { value: 'priceAsc', label: t.sort.priceAsc, cmp: num(i => i.default_unit_price) },
+    { value: 'priceDesc', label: t.sort.priceDesc, cmp: rev(num(i => i.default_unit_price)) },
+    { value: 'newest', label: t.sort.newest, cmp: rev(date(i => i.created_at)) },
+    { value: 'oldest', label: t.sort.oldest, cmp: date(i => i.created_at) },
+  ]
+  const filteredItems = applySort(items, sortDefs, sort).filter(i =>
     matchesSearch(search, [i.item_number, i.name, i.long_description, i.default_unit, ...categoryNames(i.category_id)])
     && (statusFilter === 'all' || i.status === statusFilter))
 
@@ -299,6 +313,7 @@ export default function CatalogPage() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
             className="w-full pl-9 pr-4 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
         </div>
+        <SortFilter defs={sortDefs} value={sort} onChange={setSort} />
         <FilterSelect label={t.filters.labels.category} value={categoryFilter} onChange={e => { setCategoryFilter(e.target.value); setSubFilter('all') }}>
           <option value="all">{t.filters.allF}</option>
           {tree.map(n => <option key={n.category.id} value={n.category.id}>{n.category.name}</option>)}

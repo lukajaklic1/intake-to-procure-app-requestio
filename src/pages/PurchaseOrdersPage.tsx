@@ -17,6 +17,8 @@ import { format, subMonths, startOfMonth } from 'date-fns'
 import GridHead from '../components/ui/GridHead'
 import RowMenu from '../components/ui/RowMenu'
 import { matchesSearch } from '../lib/search'
+import SortFilter from '../components/ui/SortFilter'
+import { applySort, text, num, date, dateLast, rev, type SortDef } from '../lib/sort'
 
 // Distinct line categories of a document: "Food", or "Food +2" when mixed.
 function catLabel(lines: { categories: { name: string } | null }[] | null | undefined) {
@@ -73,6 +75,8 @@ export default function PurchaseOrdersPage() {
 
   // Filters
   const [search, setSearch]           = useState('')
+  const [sort, setSort] = useState('newest')
+  useEffect(() => { setPage(1) }, [sort])
   const [status, setStatus]           = useState('all')
   const [dateRange, setDateRange]     = useState('all')
   const [supplierId, setSupplierId]   = useState('')
@@ -110,7 +114,7 @@ export default function PurchaseOrdersPage() {
 
   async function load() {
     if (!company) return
-    setLoading(true)
+    // spinner only on the first load: later reloads refresh the data in place
     const { data } = await supabase
       .from('purchase_orders')
       .select('id, po_number, status, received_status, total_amount, created_at, created_by, expected_delivery_date, supplier_id, department_id, request_id, suppliers(name), po_line_items(category_id, categories(name)), locations(name)')
@@ -149,6 +153,14 @@ export default function PurchaseOrdersPage() {
   // Reset page on any filter change
   useEffect(() => { setPage(1) }, [search, status, dateRange, supplierId, categoryId, departmentId, creatorId])
 
+  const sortDefs: SortDef<(typeof pos)[number]>[] = [
+    { value: 'newest', label: t.sort.newest, cmp: rev(date(p => p.created_at)) },
+    { value: 'oldest', label: t.sort.oldest, cmp: date(p => p.created_at) },
+    { value: 'amountDesc', label: t.sort.amountDesc, cmp: rev(num(p => p.total_amount)) },
+    { value: 'amountAsc', label: t.sort.amountAsc, cmp: num(p => p.total_amount) },
+    { value: 'delivery', label: t.sort.delivery, cmp: dateLast(p => p.expected_delivery_date) },
+    { value: 'supplier', label: t.sort.supplierAsc, cmp: text(p => p.suppliers?.name) },
+  ]
   const filtered = pos.filter(po => {
     const creator = members.find(m => m.id === po.created_by)
     if (!matchesSearch(search, [po.po_number, po.suppliers?.name, po.locations?.name, po.request_id ? reqNums[po.request_id] : null,
@@ -162,7 +174,7 @@ export default function PurchaseOrdersPage() {
     return true
   })
 
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const paginated = applySort(filtered, sortDefs, sort).slice((page - 1) * pageSize, page * pageSize)
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
@@ -180,7 +192,8 @@ export default function PurchaseOrdersPage() {
           </div>
 
           {/* Status */}
-          <FilterSelect label={t.filters.labels.status} value={status} onChange={e => setStatus(e.target.value)}>
+          <SortFilter defs={sortDefs} value={sort} onChange={setSort} />
+        <FilterSelect label={t.filters.labels.status} value={status} onChange={e => setStatus(e.target.value)}>
             <option value="all">{t.filters.allM}</option>
             {['draft','issued','sent','closed','cancelled'].map(s => (
               <option key={s} value={s}>{t.status[s as keyof typeof t.status]}</option>

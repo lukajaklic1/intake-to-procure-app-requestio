@@ -17,6 +17,8 @@ import PersonCell from '../components/ui/PersonCell'
 import GridHead from '../components/ui/GridHead'
 import RowMenu from '../components/ui/RowMenu'
 import { matchesSearch } from '../lib/search'
+import SortFilter from '../components/ui/SortFilter'
+import { applySort, text, num, date, dateLast, rev, type SortDef } from '../lib/sort'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-neutral',
@@ -79,6 +81,8 @@ export default function RequestsPage() {
 
   // Filters
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('newest')
+  useEffect(() => { setPage(1) }, [sort])
   const [status, setStatus] = useState('all')
   const [dateRange, setDateRange] = useState('all')
   const [supplierId, setSupplierId] = useState('')
@@ -110,7 +114,7 @@ export default function RequestsPage() {
 
   async function load() {
     if (!company || !profile) return
-    setLoading(true)
+    // spinner only on the first load: later reloads refresh the data in place
     let query = supabase
       .from('requests')
       .select('id, request_number, title, status, total_estimate, created_at, created_by, approver_id, po_id, needed_by_date, supplier_id, supplier_name, department_id, request_line_items(category_id, categories(name)), suppliers(name), locations(name)')
@@ -146,6 +150,14 @@ export default function RequestsPage() {
   const dateFrom = getDateFrom(dateRange)
   useEffect(() => { setPage(1) }, [search, status, dateRange, supplierId, categoryId, departmentId, poFilter, creatorId])
 
+  const sortDefs: SortDef<(typeof rows)[number]>[] = [
+    { value: 'newest', label: t.sort.newest, cmp: rev(date(r => r.created_at)) },
+    { value: 'oldest', label: t.sort.oldest, cmp: date(r => r.created_at) },
+    { value: 'amountDesc', label: t.sort.amountDesc, cmp: rev(num(r => r.total_estimate)) },
+    { value: 'amountAsc', label: t.sort.amountAsc, cmp: num(r => r.total_estimate) },
+    { value: 'neededBy', label: t.sort.neededBy, cmp: dateLast(r => r.needed_by_date) },
+    { value: 'supplier', label: t.sort.supplierAsc, cmp: text(r => r.suppliers?.name ?? r.supplier_name) },
+  ]
   const filtered = rows.filter(r => {
     if (!matchesSearch(search, [r.request_number, r.title, r.suppliers?.name ?? r.supplier_name, r.locations?.name, names[r.created_by], ...r.request_line_items.map(l => l.categories?.name)])) return false
     if (status !== 'all' && r.status !== status) return false
@@ -159,7 +171,7 @@ export default function RequestsPage() {
     return true
   })
 
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const paginated = applySort(filtered, sortDefs, sort).slice((page - 1) * pageSize, page * pageSize)
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
@@ -172,7 +184,8 @@ export default function RequestsPage() {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder={s.requestNumber + ' / ' + s.supplier}
               className="w-full pl-9 pr-3 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
           </div>
-          <FilterSelect label={t.filters.labels.status} value={status} onChange={e => setStatus(e.target.value)}>
+          <SortFilter defs={sortDefs} value={sort} onChange={setSort} />
+        <FilterSelect label={t.filters.labels.status} value={status} onChange={e => setStatus(e.target.value)}>
             <option value="all">{t.filters.allM}</option>
             {STATUSES.map(st => <option key={st} value={st}>{s.st[st]}</option>)}
           </FilterSelect>

@@ -56,7 +56,7 @@ export default function RequestDetailPage() {
   useEffect(() => { if (company) load() }, [company, id])
 
   async function load() {
-    setLoading(true)
+    // spinner only on the first load: later reloads refresh the data in place
     const { data } = await supabase
       .from('requests')
       .select('*, suppliers(name), locations(name), departments(name)')

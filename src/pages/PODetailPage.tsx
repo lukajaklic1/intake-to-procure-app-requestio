@@ -79,7 +79,7 @@ export default function PODetailPage() {
   useEffect(() => { if (id) load() }, [id])
 
   async function load() {
-    setLoading(true)
+    // spinner only on the first load: later reloads refresh the data in place
     const { data } = await supabase
       .from('purchase_orders')
       .select('*, contracts(id, title, contract_number), suppliers(name,email,address_street,address_city,address_postal_code,address_country,vat_number), locations(name,address_street,address_city,address_postal_code), departments(name)')
