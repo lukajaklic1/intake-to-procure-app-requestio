@@ -1,4 +1,4 @@
-const TONES = ['avatar-yellow', 'avatar-orange', 'avatar-purple', 'avatar-pink', 'avatar-blue', 'avatar-cyan']
+const TONES = ['avatar-yellow', 'avatar-lime', 'avatar-violet', 'avatar-magenta', 'avatar-rose', 'avatar-blue']
 
 export const initials = (name: string) =>
   name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')

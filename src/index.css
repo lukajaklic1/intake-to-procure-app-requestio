@@ -114,12 +114,12 @@ body {
 }
 
 /* Initials circles (PersonCell) */
-.badge.avatar-yellow { background: var(--avatar-yellow-bg); border-color: var(--avatar-yellow-border); color: var(--avatar-yellow-text); }
-.badge.avatar-orange { background: var(--avatar-orange-bg); border-color: var(--avatar-orange-border); color: var(--avatar-orange-text); }
-.badge.avatar-purple { background: var(--avatar-purple-bg); border-color: var(--avatar-purple-border); color: var(--avatar-purple-text); }
-.badge.avatar-pink   { background: var(--avatar-pink-bg);   border-color: var(--avatar-pink-border);   color: var(--avatar-pink-text); }
-.badge.avatar-blue   { background: var(--avatar-blue-bg);   border-color: var(--avatar-blue-border);   color: var(--avatar-blue-text); }
-.badge.avatar-cyan   { background: var(--avatar-cyan-bg);   border-color: var(--avatar-cyan-border);   color: var(--avatar-cyan-text); }
+.badge.avatar-yellow  { background: var(--avatar-yellow-bg);  border-color: var(--avatar-yellow-border);  color: var(--avatar-yellow-text); }
+.badge.avatar-lime    { background: var(--avatar-lime-bg);    border-color: var(--avatar-lime-border);    color: var(--avatar-lime-text); }
+.badge.avatar-violet  { background: var(--avatar-violet-bg);  border-color: var(--avatar-violet-border);  color: var(--avatar-violet-text); }
+.badge.avatar-magenta { background: var(--avatar-magenta-bg); border-color: var(--avatar-magenta-border); color: var(--avatar-magenta-text); }
+.badge.avatar-rose    { background: var(--avatar-rose-bg);    border-color: var(--avatar-rose-border);    color: var(--avatar-rose-text); }
+.badge.avatar-blue    { background: var(--avatar-blue-bg);    border-color: var(--avatar-blue-border);    color: var(--avatar-blue-text); }
 
 /* ── Badges ─────────────────────────────────────────────────────────────
    <span className="badge badge-success">. Colors come from theme.css. */
@@ -139,6 +139,7 @@ body {
 .badge-neutral { background: var(--badge-neutral-bg); border-color: var(--badge-neutral-border); color: var(--badge-neutral-text); }
 .badge-info { background: var(--badge-info-bg); border-color: var(--badge-info-border); color: var(--badge-info-text); }
 .badge-danger { background: var(--badge-danger-bg); border-color: var(--badge-danger-border); color: var(--badge-danger-text); }
+.badge-orange { background: var(--badge-orange-bg); border-color: var(--badge-orange-border); color: var(--badge-orange-text); }
 .badge-purple { background: var(--badge-purple-bg); border-color: var(--badge-purple-border); color: var(--badge-purple-text); }
 
 /* Bleed tables end with a hairline under the last row; the footer (when shown) sits below it. */

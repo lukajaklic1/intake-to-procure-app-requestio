@@ -18,7 +18,9 @@ import GridHead from '../components/ui/GridHead'
 import RowMenu from '../components/ui/RowMenu'
 import { matchesSearch } from '../lib/search'
 import SortFilter from '../components/ui/SortFilter'
-import { applySort, text, num, date, dateLast, rev, type SortDef } from '../lib/sort'
+import { applySort, text, num, date, dateLast, rev, docNumber, type SortDef } from '../lib/sort'
+import ExportButton from '../components/ui/ExportButton'
+import type { ExportColumn } from '../lib/exportExcel'
 
 // Distinct line categories of a document: "Food", or "Food +2" when mixed.
 function catLabel(lines: { categories: { name: string } | null }[] | null | undefined) {
@@ -156,6 +158,8 @@ export default function PurchaseOrdersPage() {
   const sortDefs: SortDef<(typeof pos)[number]>[] = [
     { value: 'newest', label: t.sort.newest, cmp: rev(date(p => p.created_at)) },
     { value: 'oldest', label: t.sort.oldest, cmp: date(p => p.created_at) },
+    { value: 'numberAsc', label: t.sort.numberAsc, cmp: docNumber(p => p.po_number) },
+    { value: 'numberDesc', label: t.sort.numberDesc, cmp: rev(docNumber(p => p.po_number)) },
     { value: 'amountDesc', label: t.sort.amountDesc, cmp: rev(num(p => p.total_amount)) },
     { value: 'amountAsc', label: t.sort.amountAsc, cmp: num(p => p.total_amount) },
     { value: 'delivery', label: t.sort.delivery, cmp: dateLast(p => p.expected_delivery_date) },
@@ -174,14 +178,26 @@ export default function PurchaseOrdersPage() {
     return true
   })
 
-  const paginated = applySort(filtered, sortDefs, sort).slice((page - 1) * pageSize, page * pageSize)
+  const sortedRows = applySort(filtered, sortDefs, sort)
+  const exportCols: ExportColumn<PO>[] = [
+    { header: s.poNumber, get: p => p.po_number, kind: 'text', width: 14 },
+    { header: s.supplier, get: p => p.suppliers?.name, kind: 'text', width: 32 },
+    { header: s.location, get: p => p.locations?.name, kind: 'text', width: 26 },
+    { header: s.category, get: p => catLabel(p.po_line_items), kind: 'text', width: 24 },
+    { header: s.deliveryDate, get: p => p.expected_delivery_date, kind: 'date', width: 14 },
+    { header: s.total, get: p => p.total_amount, kind: 'money', width: 14 },
+    { header: t.common.status, get: p => t.status[p.status as keyof typeof t.status] ?? p.status, kind: 'text', width: 16 },
+    { header: s.requestCol, get: p => (p.request_id ? reqNums[p.request_id] : null), kind: 'text', width: 14 },
+    { header: t.common.created, get: p => p.created_at, kind: 'date', width: 14 },
+  ]
+  const paginated = sortedRows.slice((page - 1) * pageSize, page * pageSize)
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<Button onClick={() => navigate('/purchase-orders/new')} className="gap-2"> <Plus className="w-4 h-4" />{s.new} </Button>}>
+      <PageToolbar attached actions={<><ExportButton fileName="narocila" columns={exportCols} rows={sortedRows} /><Button onClick={() => navigate('/purchase-orders/new')} className="gap-2"> <Plus className="w-4 h-4" />{s.new} </Button></>}>
 
           {/* Search */}
           <div className="relative min-w-40 flex-1 max-w-[220px]">

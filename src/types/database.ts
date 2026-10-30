@@ -341,6 +341,7 @@ export type ContractStatus = 'draft' | 'active' | 'terminated'
 export interface Contract {
   id: string
   company_id: string
+  notice_given_at: string | null
   contract_number: string
   title: string
   supplier_id: string

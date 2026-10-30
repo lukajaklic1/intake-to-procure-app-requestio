@@ -23,6 +23,8 @@ import ModalActions from '../components/ui/ModalActions'
 import Select from '../components/ui/Select'
 import SortFilter from '../components/ui/SortFilter'
 import { applySort, text, date, rev, type SortDef } from '../lib/sort'
+import ExportButton from '../components/ui/ExportButton'
+import type { ExportColumn } from '../lib/exportExcel'
 
 const MODULES: UserPermission['module'][] = ['requests', 'purchase_orders', 'receipts', 'invoices', 'budgets', 'reports']
 const ACTIONS: ('view' | 'create' | 'approve' | 'pay')[] = ['view', 'create', 'approve', 'pay']
@@ -246,13 +248,22 @@ export default function UsersPage() {
     { value: 'newest', label: t.sort.newest, cmp: rev(date(u => u.created_at)) },
     { value: 'oldest', label: t.sort.oldest, cmp: date(u => u.created_at) },
   ]
-  const visibleUsers = applySort(shownUsers, sortDefs, sort).slice(Math.max(0, startIdx), Math.max(0, Math.min(shownUsers.length, endIdx)))
+  const sortedUsers = applySort(shownUsers, sortDefs, sort)
+  const exportCols: ExportColumn<AppUser>[] = [
+    { header: t.common.name, get: u => `${u.first_name} ${u.last_name}`, kind: 'text', width: 28 },
+    { header: t.common.email, get: u => u.email, kind: 'text', width: 34 },
+    { header: s.department, get: u => deptName(u.department_id), kind: 'text', width: 22 },
+    { header: s.jobTitle, get: u => u.job_title, kind: 'text', width: 22 },
+    { header: s.role, get: u => (u.is_admin ? s.admin : s.member), kind: 'text', width: 14 },
+    { header: t.common.status, get: () => t.common.active, kind: 'text', width: 12 },
+  ]
+  const visibleUsers = sortedUsers.slice(Math.max(0, startIdx), Math.max(0, Math.min(shownUsers.length, endIdx)))
   const visibleInvites = shownInvites.slice(Math.max(0, startIdx - shownUsers.length), Math.max(0, endIdx - shownUsers.length))
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<Button onClick={openInvite} className="gap-2"><Plus className="w-4 h-4" />{s.addUser}</Button>}>
+      <PageToolbar attached actions={<><ExportButton fileName="uporabniki" columns={exportCols} rows={sortedUsers} /><Button onClick={openInvite} className="gap-2"><Plus className="w-4 h-4" />{s.addUser}</Button></>}>
         <SortFilter defs={sortDefs} value={sort} onChange={v => { setSort(v); setPage(1) }} />
         <FilterSelect label={t.filters.labels.department} value={deptFilter} onChange={e => { setDeptFilter(e.target.value); setPage(1) }}>
           <option value="all">{t.common.allM}</option>

@@ -14,7 +14,9 @@ import PersonCell from '../components/ui/PersonCell'
 import GridHead, { type GridCol } from '../components/ui/GridHead'
 import { matchesSearch } from '../lib/search'
 import SortFilter from '../components/ui/SortFilter'
-import { applySort, num, date, dateLast, rev, type SortDef } from '../lib/sort'
+import { applySort, num, date, dateLast, rev, docNumber, type SortDef } from '../lib/sort'
+import ExportButton from '../components/ui/ExportButton'
+import type { ExportColumn } from '../lib/exportExcel'
 
 interface Row {
   id: string
@@ -97,6 +99,8 @@ export default function ApprovalsPage() {
   const sortDefs: SortDef<(typeof rows)[number]>[] = [
     { value: 'newest', label: t.sort.newest, cmp: rev(date(r => r.created_at)) },
     { value: 'oldest', label: t.sort.oldest, cmp: date(r => r.created_at) },
+    { value: 'numberAsc', label: t.sort.numberAsc, cmp: docNumber(r => r.request_number) },
+    { value: 'numberDesc', label: t.sort.numberDesc, cmp: rev(docNumber(r => r.request_number)) },
     { value: 'amountDesc', label: t.sort.amountDesc, cmp: rev(num(r => r.total_estimate)) },
     { value: 'amountAsc', label: t.sort.amountAsc, cmp: num(r => r.total_estimate) },
     { value: 'neededBy', label: t.sort.neededBy, cmp: dateLast(r => r.needed_by_date) },
@@ -109,7 +113,18 @@ export default function ApprovalsPage() {
   })
 
   useEffect(() => { setPage(1) }, [search, dateRange, approverId])
-  const paginated = applySort(filtered, sortDefs, sort).slice((page - 1) * pageSize, page * pageSize)
+  const sortedRows = applySort(filtered, sortDefs, sort)
+  const exportCols: ExportColumn<Row>[] = [
+    { header: s.requestNumber, get: r => r.request_number, kind: 'text', width: 14 },
+    { header: s.requestTitle, get: r => r.title, kind: 'text', width: 40 },
+    { header: s.location, get: r => r.locations?.name, kind: 'text', width: 26 },
+    { header: a.requestedBy, get: r => names[r.created_by], kind: 'text', width: 22 },
+    { header: s.approver, get: r => (r.approver_id ? names[r.approver_id] : null), kind: 'text', width: 22 },
+    { header: s.neededBy, get: r => r.needed_by_date, kind: 'date', width: 14 },
+    { header: s.estTotalCol, get: r => r.total_estimate, kind: 'money', width: 14 },
+    { header: t.common.created, get: r => r.created_at, kind: 'date', width: 14 },
+  ]
+  const paginated = sortedRows.slice((page - 1) * pageSize, page * pageSize)
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
@@ -117,7 +132,7 @@ export default function ApprovalsPage() {
   return (
     <div className="p-4 lg:p-6">
       {rows.length > 0 && (
-      <PageToolbar attached>
+      <PageToolbar attached actions={<ExportButton fileName="odobritve" columns={exportCols} rows={sortedRows} />}>
             <div className="relative min-w-40 flex-1 max-w-[220px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder={s.requestNumber + ' / ' + a.requestedBy}

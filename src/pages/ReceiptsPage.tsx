@@ -16,7 +16,9 @@ import GridHead from '../components/ui/GridHead'
 import RowMenu from '../components/ui/RowMenu'
 import { matchesSearch } from '../lib/search'
 import SortFilter from '../components/ui/SortFilter'
-import { applySort, text, num, date, rev, type SortDef } from '../lib/sort'
+import { applySort, text, num, date, rev, docNumber, type SortDef } from '../lib/sort'
+import ExportButton from '../components/ui/ExportButton'
+import type { ExportColumn } from '../lib/exportExcel'
 
 const RS_BADGE: Record<string, string> = {
   none: 'badge-neutral',
@@ -114,6 +116,8 @@ export default function ReceiptsPage() {
     { value: 'receivedAsc', label: t.sort.receivedAsc, cmp: date(r => r.received_date) },
     { value: 'newest', label: t.sort.newest, cmp: rev(date(r => r.created_at)) },
     { value: 'oldest', label: t.sort.oldest, cmp: date(r => r.created_at) },
+    { value: 'numberAsc', label: t.sort.numberAsc, cmp: docNumber(r => r.receipt_number) },
+    { value: 'numberDesc', label: t.sort.numberDesc, cmp: rev(docNumber(r => r.receipt_number)) },
     { value: 'supplier', label: t.sort.supplierAsc, cmp: text(r => r.purchase_orders?.suppliers?.name) },
   ]
   const queueDefs: SortDef<QueueRow>[] = [
@@ -122,6 +126,16 @@ export default function ReceiptsPage() {
     { value: 'amountDesc', label: t.sort.amountDesc, cmp: rev(num(r => r.total_amount)) },
     { value: 'amountAsc', label: t.sort.amountAsc, cmp: num(r => r.total_amount) },
     { value: 'supplier', label: t.sort.supplierAsc, cmp: text(r => r.suppliers?.name) },
+  ]
+  const histCols: ExportColumn<ReceiptRow>[] = [
+    { header: s.receiptNumber, get: r => r.receipt_number, width: 14 }, { header: s.supplierReceiptNo ?? 'Dobavnica', get: r => r.supplier_receipt_no, width: 18 },
+    { header: t.po.title, get: r => r.purchase_orders?.po_number, width: 14 }, { header: t.po.supplier, get: r => r.purchase_orders?.suppliers?.name, width: 32 },
+    { header: s.receivedDate, get: r => r.received_date, kind: 'date', width: 14 }, { header: s.receivedBy, get: r => names[r.received_by], width: 22 },
+    { header: t.common.created, get: r => r.created_at, kind: 'date', width: 14 },
+  ]
+  const queueCols: ExportColumn<QueueRow>[] = [
+    { header: t.po.poNumber, get: r => r.po_number, width: 14 }, { header: t.po.supplier, get: r => r.suppliers?.name, width: 32 },
+    { header: t.po.total, get: r => r.total_amount, kind: 'money', width: 14 }, { header: t.common.status, get: r => (r.received_status === 'partial' ? s.rsPartial : s.rsNone), width: 16 },
   ]
   const filteredQueue = queue.filter(r => matchesSearch(search, [r.po_number, r.suppliers?.name]))
   useEffect(() => { setQueuePage(1) }, [search])
@@ -137,7 +151,7 @@ export default function ReceiptsPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached>
+      <PageToolbar attached actions={tab === 'queue' ? <ExportButton fileName="za-prevzem" columns={queueCols} rows={applySort(filteredQueue, queueDefs, sortQ)} /> : <ExportButton fileName="prevzemi" columns={histCols} rows={applySort(filteredReceipts, histDefs, sortH)} />}>
         {tab === 'queue' && <SortFilter defs={queueDefs} value={sortQ} onChange={setSortQ} />}
         {tab === 'history' && (<>
               <div className="relative min-w-40 flex-1 max-w-[220px]">

@@ -27,6 +27,8 @@ import { matchesSearch } from '../lib/search'
 import StatusSelect from '../components/ui/StatusSelect'
 import SortFilter from '../components/ui/SortFilter'
 import { applySort, text, date, rev, type SortDef } from '../lib/sort'
+import ExportButton from '../components/ui/ExportButton'
+import type { ExportColumn } from '../lib/exportExcel'
 
 /** Duplicate keys of a department: its name and (when set) its code, ignoring case. */
 const depKeys = (name: string, code?: string | null) => [`n:${name.trim().toLowerCase()}`, ...(code?.trim() ? [`c:${code.trim().toUpperCase()}`] : [])]
@@ -113,14 +115,22 @@ export default function DepartmentsPage() {
   const filtered = departments.filter(d => matchesSearch(search, [d.name, d.code]) && (statusFilter === 'all' || d.status === statusFilter))
 
   useEffect(() => { setPage(1) }, [search, statusFilter])
-  const paginated = applySort(filtered, sortDefs, sort).slice((page - 1) * pageSize, page * pageSize)
+  const sortedRows = applySort(filtered, sortDefs, sort)
+  const exportCols: ExportColumn<Department>[] = [
+    { header: s.code, get: x => x.code, kind: 'text', width: 12 },
+    { header: s.nameCol, get: x => x.name, kind: 'text', width: 32 },
+    { header: s.usersCol, get: x => members.filter(m => m.department_id === x.id).map(m => m.name).join(', '), kind: 'text', width: 44 },
+    { header: t.common.status, get: x => (x.status === 'active' ? t.common.active : t.common.inactive), kind: 'text', width: 12 },
+    { header: t.common.created, get: x => x.created_at, kind: 'date', width: 14 },
+  ]
+  const paginated = sortedRows.slice((page - 1) * pageSize, page * pageSize)
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}</Button><Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
+      <PageToolbar attached actions={<><ExportButton fileName="oddelki" columns={exportCols} rows={sortedRows} /><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}</Button><Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}

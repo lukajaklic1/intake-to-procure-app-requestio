@@ -21,12 +21,15 @@ import { useRequired } from '../lib/useRequired'
 import { dbError } from '../lib/dbError'
 import { USAGE, loadUsage, usageFor, recheckUsage, isUsed, usageMessage, type UsageMaps } from '../lib/usage'
 import { buildCategoryTree } from '../lib/categories'
+import { unitOptions } from '../lib/units'
 import GridHead from '../components/ui/GridHead'
 import { matchesSearch } from '../lib/search'
 import StatusSelect from '../components/ui/StatusSelect'
 import Select from '../components/ui/Select'
 import SortFilter from '../components/ui/SortFilter'
 import { applySort, text, num, date, rev, type SortDef } from '../lib/sort'
+import ExportButton from '../components/ui/ExportButton'
+import type { ExportColumn } from '../lib/exportExcel'
 
 interface ItemWithCategory extends Item {
   categories: { name: string } | null
@@ -36,7 +39,7 @@ const EMPTY: Partial<Item> = { name: '', long_description: '', category_id: unde
 
 export default function CatalogPage() {
   const { company } = useCompany()
-  const { t, lang } = useLanguage()
+  const { t } = useLanguage()
   const s = t.items
   const [items, setItems] = useState<ItemWithCategory[]>([])
   const [allCategories, setAllCategories] = useState<Category[]>([])
@@ -227,11 +230,20 @@ export default function CatalogPage() {
     const c = allCategories.find(x => x.id === id)
     return [c?.name, c?.parent_id ? allCategories.find(x => x.id === c.parent_id)?.name : null]
   }
+  const topName = (i: ItemWithCategory) => categoryNames(i.category_id)[1] ?? categoryNames(i.category_id)[0] ?? ''
+  const subName = (i: ItemWithCategory) => (categoryNames(i.category_id)[1] ? categoryNames(i.category_id)[0] : '') ?? ''
+  // by category (then subcategory, then name), or by subcategory (then category, then name)
+  const byCategory = (a: ItemWithCategory, b: ItemWithCategory) => text(topName)(a, b) || text(subName)(a, b) || text<ItemWithCategory>(i => i.name)(a, b)
+  const bySubcategory = (a: ItemWithCategory, b: ItemWithCategory) => text(subName)(a, b) || text(topName)(a, b) || text<ItemWithCategory>(i => i.name)(a, b)
   const sortDefs: SortDef<(typeof items)[number]>[] = [
     { value: 'numberAsc', label: t.sort.numberAsc, cmp: num(i => i.item_number) },
     { value: 'numberDesc', label: t.sort.numberDesc, cmp: rev(num(i => i.item_number)) },
     { value: 'nameAsc', label: t.sort.nameAsc, cmp: text(i => i.name) },
     { value: 'nameDesc', label: t.sort.nameDesc, cmp: rev(text(i => i.name)) },
+    { value: 'categoryAsc', label: t.sort.categoryAsc, cmp: byCategory },
+    { value: 'categoryDesc', label: t.sort.categoryDesc, cmp: rev(byCategory) },
+    { value: 'subcategoryAsc', label: t.sort.subcategoryAsc, cmp: bySubcategory },
+    { value: 'subcategoryDesc', label: t.sort.subcategoryDesc, cmp: rev(bySubcategory) },
     { value: 'priceAsc', label: t.sort.priceAsc, cmp: num(i => i.default_unit_price) },
     { value: 'priceDesc', label: t.sort.priceDesc, cmp: rev(num(i => i.default_unit_price)) },
     { value: 'newest', label: t.sort.newest, cmp: rev(date(i => i.created_at)) },
@@ -295,9 +307,16 @@ export default function CatalogPage() {
     { id: 'all', label: t.categories.viewAll, count: filteredItems.length, active: view === 'all', icon: List },
   ], id => setView(id === 'all' ? 'all' : 'tree'))
 
+  const exportCols: ExportColumn<ItemWithCategory>[] = [
+    { header: s.itemNumber, get: i => i.item_number, width: 12 }, { header: s.nameCol, get: i => i.name, width: 36 }, { header: s.longDescription, get: i => i.long_description, width: 40 },
+    { header: t.categories.single, get: i => pathOf(i.category_id).top, width: 22 }, { header: t.categories.subcategory, get: i => pathOf(i.category_id).sub, width: 26 },
+    { header: s.defaultUnit, get: i => i.default_unit, width: 12 }, { header: s.defaultUnitPrice, get: i => i.default_unit_price, kind: 'money', width: 14 },
+    { header: t.common.status, get: i => (i.status === 'active' ? t.common.active : t.common.inactive), width: 12 }, { header: t.common.created, get: i => i.created_at, kind: 'date', width: 14 },
+  ]
+
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<>{view === 'tree' && <Button variant="secondary" onClick={toggleAll} disabled={sections.length === 0} className="!px-0 w-8 h-8" title={allCollapsed ? t.common.expandAll : t.common.collapseAll} aria-label={allCollapsed ? t.common.expandAll : t.common.collapseAll}>{allCollapsed ? <ListChevronsUpDown className="w-4 h-4 text-icon" /> : <ListChevronsDownUp className="w-4 h-4 text-icon" />}</Button>}<div ref={importMenuRef} className="relative">
+      <PageToolbar attached actions={<><ExportButton fileName="artikli" columns={exportCols} rows={flatItems} />{view === 'tree' && <Button variant="secondary" onClick={toggleAll} disabled={sections.length === 0} className="!px-0 w-8 h-8" title={allCollapsed ? t.common.expandAll : t.common.collapseAll} aria-label={allCollapsed ? t.common.expandAll : t.common.collapseAll}>{allCollapsed ? <ListChevronsUpDown className="w-4 h-4 text-icon" /> : <ListChevronsDownUp className="w-4 h-4 text-icon" />}</Button>}<div ref={importMenuRef} className="relative">
           <Button variant="secondary" onClick={() => setImportMenuOpen(o => !o)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}<ChevronDown className="w-3.5 h-3.5 text-gray-400" /></Button>
           {importMenuOpen && (
             <div className="absolute right-0 top-full mt-1.5 z-40 min-w-[220px] bg-white border border-line rounded-xl shadow-[0_8px_30px_rgba(16,17,18,0.12)] p-1.5 flex flex-col gap-0.5">
@@ -376,10 +395,12 @@ export default function CatalogPage() {
                     {showItems && g.rows.map(item => {
                       return (
                         <tr key={item.id} className="hover:bg-surface transition-colors">
-                          <td className="px-4 py-3 text-xs text-gray-500 font-medium" style={g.level === 1 ? { paddingLeft: 'calc(var(--page-px) + 3rem)' } : undefined}>{item.item_number}</td>
+                          <td className="px-4 py-3 text-ink2 whitespace-nowrap" style={g.level === 1 ? { paddingLeft: 'calc(var(--page-px) + 3rem)' } : undefined}>{item.item_number}</td>
                           <td className="px-4 py-3">
-                            <p className="font-medium text-gray-900">{item.name}</p>
-                            {item.long_description && <p className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{item.long_description}</p>}
+                            <div className="flex items-baseline gap-2 min-w-0">
+                              <span className="font-medium text-ink whitespace-nowrap">{item.name}</span>
+                              {item.long_description && <span className="text-xs text-gray-400 truncate max-w-[260px]">{item.long_description}</span>}
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-ink2">{item.default_unit ?? '-'}</td>
                           <td className="px-4 py-3 text-ink2">{item.default_unit_price != null ? `${item.default_unit_price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '-'}</td>
@@ -409,7 +430,7 @@ export default function CatalogPage() {
             <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
           ) : (
             <div className="overflow-x-auto"><table className="w-full text-sm min-w-[820px]">
-              <GridHead cols={[[s.itemNumber, IdCard], [s.nameCol, Package], [t.categories.title, Tag], [t.categories.subcategory, Layers], [s.defaultUnit, Ruler], [s.defaultUnitPrice, Coins], [t.common.status, CircleDot], ['']]} />
+              <GridHead cols={[[s.itemNumber, IdCard], [s.nameCol, Package], [t.categories.single, Tag], [t.categories.subcategory, Layers], [s.defaultUnit, Ruler], [s.defaultUnitPrice, Coins], [t.common.status, CircleDot], ['']]} />
               <tbody className="divide-y divide-field">
                 {flatItems.length === 0 ? (
                   <TableEmptyState icon={Package} colSpan={8}
@@ -419,10 +440,12 @@ export default function CatalogPage() {
                   const path = pathOf(item.category_id)
                   return (
                     <tr key={item.id} className="hover:bg-surface transition-colors">
-                      <td className="px-4 py-3 text-xs text-gray-500 font-medium">{item.item_number}</td>
+                      <td className="px-4 py-3 text-ink2 whitespace-nowrap">{item.item_number}</td>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-gray-900">{item.name}</p>
-                        {item.long_description && <p className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{item.long_description}</p>}
+                        <div className="flex items-baseline gap-2 min-w-0">
+                          <span className="font-medium text-ink whitespace-nowrap">{item.name}</span>
+                          {item.long_description && <span className="text-xs text-gray-400 truncate max-w-[260px]">{item.long_description}</span>}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-ink2">{path.top}</td>
                       <td className="px-4 py-3 text-ink2">{path.sub}</td>
@@ -515,44 +538,40 @@ export default function CatalogPage() {
 
       <Modal open={modalOpen} onClose={closeModal} title={editing.id ? s.edit : s.new} size="md" icon={Package}>
         <div className="flex flex-col gap-4">
-          {/* Item number — read-only when editing */}
-          {editing.id && (
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">{s.itemNumber}</label>
-              <div className="h-9 flex items-center px-3 bg-surface border border-field rounded-[0.625rem] text-sm text-ink2">
-                {editing.item_number}
-              </div>
-            </div>
-          )}
-
-          <Input id="i-name" placeholder={t.common.ph.itemName} label={s.nameLabel + ' *'}
-            value={editing.name ?? ''} error={req.errors.name}
-            onChange={e => { req.clear('name'); setEditing(f => ({ ...f, name: e.target.value })) }}
-          />
-
-          <div className="flex flex-col gap-1">
-            <label htmlFor="i-desc" className="text-sm font-medium text-gray-700">{s.longDescription}</label>
-            <textarea
-              id="i-desc" placeholder={t.common.ph.itemDesc}
-              rows={3}
-              value={editing.long_description ?? ''}
-              onChange={e => setEditing(f => ({ ...f, long_description: e.target.value }))}
-              className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none"
-            />
-          </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Select id="i-cat" label={t.categories.title} required value={catSel} error={req.errors.cat}
+            {/* Item number: assigned automatically, shown (read-only) when editing */}
+            {editing.id && <Input id="i-number" label={s.itemNumber} value={editing.item_number ?? ''} disabled readOnly />}
+            {editing.id && (
+              <StatusSelect active={editing.status === 'active'} activeLabel={t.common.statusActive} inactiveLabel={t.common.statusInactive}
+                onChange={on => setEditing(f => ({ ...f, status: on ? 'active' : 'inactive' }))} />
+            )}
+
+            <div className="sm:col-span-2">
+              <Input id="i-name" placeholder={t.common.ph.itemName} label={s.nameLabel + ' *'}
+                value={editing.name ?? ''} error={req.errors.name}
+                onChange={e => { req.clear('name'); setEditing(f => ({ ...f, name: e.target.value })) }}
+              />
+            </div>
+
+            <div className="sm:col-span-2 flex flex-col gap-1">
+              <label htmlFor="i-desc" className="text-sm font-medium text-gray-700">{s.longDescription}</label>
+              <textarea
+                id="i-desc" placeholder={t.common.ph.itemDesc}
+                rows={3}
+                value={editing.long_description ?? ''}
+                onChange={e => setEditing(f => ({ ...f, long_description: e.target.value }))}
+                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none"
+              />
+            </div>
+
+            <Select id="i-cat" label={t.categories.single} required value={catSel} error={req.errors.cat}
               options={tree.filter(n => n.category.status === 'active' || n.category.id === catSel).map(n => ({ value: n.category.id, label: n.category.name }))}
               onChange={v => { req.clear('cat'); req.clear('sub'); setCatSel(v); setSubSel('') }} />
             <Select id="i-sub" label={t.categories.subcategory} required value={subSel} disabled={!catSel} error={req.errors.sub}
               options={(tree.find(n => n.category.id === catSel)?.children ?? []).filter(x => x.status === 'active' || x.id === subSel).map(x => ({ value: x.id, label: x.name }))}
               onChange={v => { req.clear('sub'); setSubSel(v) }} />
-            <Input id="i-unit" label={s.defaultUnit}
-              placeholder={lang === 'sl' ? 'kos, kg, m' : 'pcs, kg, m'}
-              value={editing.default_unit ?? ''}
-              onChange={e => setEditing(f => ({ ...f, default_unit: e.target.value }))}
-            />
+            <Select id="i-unit" label={s.defaultUnit} value={editing.default_unit ?? ''} options={unitOptions(editing.default_unit)}
+              onChange={v => setEditing(f => ({ ...f, default_unit: v }))} />
             <Input id="i-price" label={s.defaultUnitPrice}
               placeholder="0,00"
               value={priceStr}
@@ -566,11 +585,6 @@ export default function CatalogPage() {
             />
           </div>
 
-          {/* Status toggle — only when editing */}
-          {editing.id && (
-          <StatusSelect active={editing.status === 'active'} activeLabel={t.common.statusActive} inactiveLabel={t.common.statusInactive}
-            onChange={on => setEditing(f => ({ ...f, status: on ? 'active' : 'inactive' }))} />
-        )}
         </div>
 
         <ModalFooter onCancel={closeModal} onSave={save} saving={saving} saveLabel={editing.id ? t.common.saveChanges : s.new}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, Pencil, Plus, Trash2, Upload, FileText, Download } from 'lucide-react'
+import { ChevronLeft, BellRing, Pencil, Plus, Trash2, Upload, FileText, Download } from 'lucide-react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
@@ -8,10 +8,13 @@ import { useLanguage } from '../hooks/useLanguage'
 import { toast } from '../components/ui/Toast'
 import { dbError } from '../lib/dbError'
 import Button from '../components/ui/Button'
+import Modal from '../components/ui/Modal'
+import ModalActions from '../components/ui/ModalActions'
+import Input from '../components/ui/Input'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import EmptyState from '../components/ui/EmptyState'
 import ContractFormModal, { type PersonLite, type SupplierLite } from '../components/contracts/ContractFormModal'
-import { daysUntil, effectiveStatus, noticeDate, STATUS_BADGE } from '../lib/contracts'
+import { daysUntil, deleteContractCompletely, effectiveStatus, noticeDate, STATUS_BADGE } from '../lib/contracts'
 import type { Contract, ContractAttachment } from '../types/database'
 
 type Full = Contract & { suppliers: { id: string; name: string } | null }
@@ -19,7 +22,7 @@ interface PriceRow { id: string; item_id: string; agreed_price: number; items: {
 interface OrderRow { id: string; po_number: string; status: string; total_amount: number | null; created_at: string }
 type Tab = 'overview' | 'prices' | 'documents' | 'orders'
 
-const fmtDate = (d: string | null) => (d ? format(new Date(d + 'T00:00:00'), 'dd.MM.yyyy') : '—')
+const fmtDate = (d: string | null) => (d ? format(new Date(d + 'T00:00:00'), 'dd.MM.yyyy') : '-')
 const PO_BADGE: Record<string, string> = { draft: 'badge-neutral', issued: 'badge-warn', sent: 'badge-info', closed: 'badge-success', cancelled: 'badge-danger' }
 
 export default function ContractDetailPage() {
@@ -36,7 +39,7 @@ export default function ContractDetailPage() {
   const [prices, setPrices] = useState<PriceRow[]>([])
   const [attachments, setAttachments] = useState<ContractAttachment[]>([])
   const [orders, setOrders] = useState<OrderRow[]>([])
-  const [owner, setOwner] = useState('—')
+  const [owner, setOwner] = useState('-')
   const [suppliers, setSuppliers] = useState<SupplierLite[]>([])
   const [people, setPeople] = useState<PersonLite[]>([])
   const [catalog, setCatalog] = useState<{ id: string; name: string; item_number: string; default_unit_price: number | null }[]>([])
@@ -44,6 +47,8 @@ export default function ContractDetailPage() {
   const [tab, setTab] = useState<Tab>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [confirm, setConfirm] = useState<'terminate' | 'delete' | null>(null)
+  const [noticeOpen, setNoticeOpen] = useState(false)
+  const [noticeOn, setNoticeOn] = useState(() => new Date().toISOString().slice(0, 10))
   const [removePriceRow, setRemovePriceRow] = useState<PriceRow | null>(null)
   const [removeDocRow, setRemoveDocRow] = useState<ContractAttachment | null>(null)
   const [newItem, setNewItem] = useState({ item_id: '', price: '' })
@@ -70,7 +75,7 @@ export default function ContractDetailPage() {
     setOrders((po as OrderRow[]) ?? [])
     setSuppliers(sup ?? []); setPeople(us ?? []); setCatalog(it ?? [])
     const o = (us ?? []).find(u => u.id === (c as Full).owner_id)
-    setOwner(o ? `${o.first_name} ${o.last_name}` : '—')
+    setOwner(o ? `${o.first_name} ${o.last_name}` : '-')
     setLoading(false)
   }
 
@@ -90,8 +95,14 @@ export default function ContractDetailPage() {
     if (error) { toast.error(dbError(error, t)); return }
     toast.success(t.common.saved); load()
   }
+  async function setNotice(date: string | null) {
+    const { error } = await supabase.from('contracts').update({ notice_given_at: date, updated_at: new Date().toISOString() }).eq('id', contract!.id)
+    setNoticeOpen(false)
+    if (error) { toast.error(dbError(error, t)); return }
+    toast.success(t.common.saved); load()
+  }
   async function deleteContract() {
-    const { error } = await supabase.from('contracts').delete().eq('id', contract!.id)
+    const error = await deleteContractCompletely(contract!.id)
     setConfirm(null)
     if (error) { toast.error(dbError(error, t)); return }
     toast.success(t.common.deleted); navigate('/contracts')
@@ -150,7 +161,7 @@ export default function ContractDetailPage() {
   ]
 
   const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div><p className="text-xs text-gray-400 mb-0.5">{label}</p><div className="text-sm text-ink">{children || '—'}</div></div>
+    <div><p className="text-xs text-gray-400 mb-0.5">{label}</p><div className="text-sm text-ink">{children || '-'}</div></div>
   )
 
   return (
@@ -169,23 +180,25 @@ export default function ContractDetailPage() {
           <div className="flex items-center gap-2">
             {contract.status === 'draft' && <Button onClick={() => setStatus('active')}>{s.activate}</Button>}
             {contract.status === 'terminated' && <Button variant="secondary" onClick={() => setStatus('active')}>{s.reactivate}</Button>}
+            {contract.status === 'active' && !contract.notice_given_at && st !== 'expired' && <Button variant="secondary" onClick={() => setNoticeOpen(true)} className="gap-2"><BellRing className="w-4 h-4" />{s.giveNotice}</Button>}
+            {contract.status === 'active' && contract.notice_given_at && <Button variant="secondary" onClick={() => setNotice(null)}>{s.cancelNotice}</Button>}
             {contract.status === 'active' && <Button variant="secondary" onClick={() => setConfirm('terminate')}>{s.terminate}</Button>}
             <Button variant="secondary" onClick={() => setEditOpen(true)} className="gap-2"><Pencil className="w-4 h-4" />{t.common.editEntity}</Button>
           </div>
         )}
       </div>
 
-      {(st === 'expired' || (st === 'active' && ((daysLeft != null && daysLeft <= 60) || (noticeIn != null && noticeIn >= 0 && noticeIn <= 30)))) && (
-        <div className={`rounded-lg border px-4 py-3 mb-5 text-sm ${st === 'expired' ? 'badge-danger !rounded-lg' : 'badge-warn !rounded-lg'} !whitespace-normal`}>
-          {st === 'expired' ? `${s.expiredOn}: ${fmtDate(contract.end_date)}` : `${s.expiresSoon}: ${fmtDate(contract.end_date)} (${daysLeft} ${s.daysLeft})`}
-          {nd && st === 'active' && noticeIn != null && noticeIn >= 0 && ` · ${s.noticeDue}: ${fmtDate(nd)}`}
+      {(st === 'expired' || st === 'in_notice' || ((st === 'active' || st === 'expiring') && ((daysLeft != null && daysLeft <= 60) || (noticeIn != null && noticeIn >= 0 && noticeIn <= 30)))) && (
+        <div className={`rounded-lg border px-4 py-3 mb-5 text-sm ${st === 'expired' ? 'badge-danger !rounded-lg' : st === 'in_notice' ? 'badge-orange !rounded-lg' : 'badge-warn !rounded-lg'} !whitespace-normal`}>
+          {st === 'expired' ? `${s.expiredOn}: ${fmtDate(contract.end_date)}` : st === 'in_notice' ? `${s.noticeGiven}: ${fmtDate(contract.notice_given_at)} · ${s.endDate}: ${fmtDate(contract.end_date)}` : `${s.expiresSoon}: ${fmtDate(contract.end_date)} (${daysLeft} ${s.daysLeft})`}
+          {nd && (st === 'active' || st === 'expiring') && noticeIn != null && noticeIn >= 0 && ` · ${s.noticeDue}: ${fmtDate(nd)}`}
         </div>
       )}
 
       <div className="flex items-center gap-1.5 mb-5">
         {tabs.map(x => (
           <button key={x.id} onClick={() => setTab(x.id)}
-            className={`inline-flex items-center gap-2 h-8 px-3 rounded-lg border text-sm transition-colors ${tab === x.id ? 'border-field bg-surface text-ink' : 'border-transparent text-ink2 hover:bg-hover'}`}>
+            className={`inline-flex items-center gap-2 h-8 px-3 rounded-lg border text-sm font-medium transition-colors ${tab === x.id ? 'border-field bg-surface text-ink' : 'border-transparent text-ink2 hover:bg-hover'}`}>
             {x.label}
             {x.count != null && <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-md bg-surface border border-field text-[11px] text-ink2">{x.count}</span>}
           </button>
@@ -198,8 +211,8 @@ export default function ContractDetailPage() {
             <Field label={s.supplier}>{contract.suppliers && <Link to="/suppliers" className="text-accent hover:underline">{contract.suppliers.name}</Link>}</Field>
             <Field label={s.startDate}>{fmtDate(contract.start_date)}</Field>
             <Field label={s.endDate}>{contract.end_date ? fmtDate(contract.end_date) : s.openEnded}</Field>
-            <Field label={s.noticeDays}>{contract.notice_days ? `${contract.notice_days} (${fmtDate(nd)})` : '—'}</Field>
-            <Field label={s.autoRenew}>{contract.auto_renew ? `${t.common.yes ?? 'Da'}${contract.renewal_months ? ` · ${contract.renewal_months} ${s.renewalMonths.toLowerCase()}` : ''}` : '—'}</Field>
+            <Field label={s.noticeDays}>{contract.notice_days ? `${contract.notice_days} (${fmtDate(nd)})` : '-'}</Field>
+            <Field label={s.autoRenew}>{contract.auto_renew ? `${t.common.yes ?? 'Da'}${contract.renewal_months ? ` · ${contract.renewal_months} ${s.renewalMonths.toLowerCase()}` : ''}` : '-'}</Field>
             <Field label={s.paymentTerms}>{contract.payment_terms}</Field>
             <Field label={s.owner}>{owner}</Field>
             {contract.description && <div className="col-span-2 sm:col-span-3"><Field label={s.description}><span className="whitespace-pre-wrap">{contract.description}</span></Field></div>}
@@ -258,8 +271,8 @@ export default function ContractDetailPage() {
                     <tr key={p.id}>
                       <td className="px-4 py-3 text-xs text-gray-500">{p.items?.item_number}</td>
                       <td className="px-4 py-3 font-medium text-ink">{p.items?.name}</td>
-                      <td className="px-4 py-3 text-ink2">{p.items?.default_unit ?? '—'}</td>
-                      <td className="px-4 py-3 text-right text-ink2">{cat != null ? money(cat) : '—'}</td>
+                      <td className="px-4 py-3 text-ink2">{p.items?.default_unit ?? '-'}</td>
+                      <td className="px-4 py-3 text-right text-ink2">{cat != null ? money(cat) : '-'}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex items-center gap-2">
                           {diff != null && diff !== 0 && <span className={`text-xs ${diff < 0 ? 'text-success' : 'text-danger'}`}>{diff > 0 ? '+' : ''}{diff}%</span>}
@@ -329,6 +342,14 @@ export default function ContractDetailPage() {
 
       <ContractFormModal open={editOpen} onClose={() => setEditOpen(false)} contract={contract} suppliers={suppliers} people={people} onSaved={load}
         onDelete={() => setConfirm('delete')} deleteBlocked={orders.length > 0 ? s.deleteBlockedMsg : null} />
+      <Modal open={noticeOpen} onClose={() => setNoticeOpen(false)} title={s.noticeTitle} size="sm" icon={BellRing}>
+        <Input id="c-notice-on" type="date" label={s.noticeDateLabel} value={noticeOn} onChange={e => setNoticeOn(e.target.value)} />
+        <ModalActions className="justify-end">
+          <Button variant="secondary" onClick={() => setNoticeOpen(false)}>{t.common.cancel}</Button>
+          <Button disabled={!noticeOn} onClick={() => setNotice(noticeOn)}>{s.giveNotice}</Button>
+        </ModalActions>
+      </Modal>
+
       <ConfirmDialog open={confirm === 'terminate'} onClose={() => setConfirm(null)} onConfirm={() => setStatus('terminated')}
         title={s.terminateTitle} message={s.terminateQuestion} name={`${contract.contract_number} · ${contract.title}`} danger confirmLabel={s.terminate} />
       <ConfirmDialog open={confirm === 'delete'} onClose={() => setConfirm(null)} onConfirm={deleteContract}

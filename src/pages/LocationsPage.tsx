@@ -27,6 +27,8 @@ import StatusSelect from '../components/ui/StatusSelect'
 import { localizeCountry } from '../lib/countries'
 import SortFilter from '../components/ui/SortFilter'
 import { applySort, text, date, rev, type SortDef } from '../lib/sort'
+import ExportButton from '../components/ui/ExportButton'
+import type { ExportColumn } from '../lib/exportExcel'
 
 const EMPTY: Partial<Location> = { name: '', address_street: '', address_city: '', address_postal_code: '', address_country: '', status: 'active' }
 
@@ -115,14 +117,24 @@ export default function LocationsPage() {
   })
 
   useEffect(() => { setPage(1) }, [search, statusFilter])
-  const paginated = applySort(filtered, sortDefs, sort).slice((page - 1) * pageSize, page * pageSize)
+  const sortedRows = applySort(filtered, sortDefs, sort)
+  const exportCols: ExportColumn<Location>[] = [
+    { header: s.nameCol, get: x => x.name, kind: 'text', width: 34 },
+    { header: t.common.streetAddress, get: x => x.address_street, kind: 'text', width: 28 },
+    { header: t.common.postalCode, get: x => x.address_postal_code, kind: 'text', width: 12 },
+    { header: t.common.city, get: x => x.address_city, kind: 'text', width: 20 },
+    { header: t.common.country, get: x => localizeCountry(x.address_country, lang), kind: 'text', width: 14 },
+    { header: t.common.status, get: x => (x.status === 'active' ? t.common.activeF : t.common.inactiveF), kind: 'text', width: 12 },
+    { header: t.common.created, get: x => x.created_at, kind: 'date', width: 14 },
+  ]
+  const paginated = sortedRows.slice((page - 1) * pageSize, page * pageSize)
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}</Button><Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
+      <PageToolbar attached actions={<><ExportButton fileName="lokacije" columns={exportCols} rows={sortedRows} /><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}</Button><Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}

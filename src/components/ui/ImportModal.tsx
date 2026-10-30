@@ -29,7 +29,7 @@ interface ImportModalProps {
   /** Duplicate key(s) of a row (lower-cased), e.g. its name. A row counts as a duplicate when ANY of its keys already exists. */
   keyOf: (row: ImportRow) => string | string[]
   /** Wording of the rule in the intro text: by name only (default) or by name or VAT number. */
-  duplicateRule?: 'name' | 'nameVat' | 'nameCode'
+  duplicateRule?: 'name' | 'nameVat' | 'nameCode' | 'contract'
   /** Names the field behind a key prefix ("v:" -> "VAT number"), so a skipped row can say why. */
   keyLabels?: Record<string, string>
   /** Extra per-row check; return an error message or null. */
@@ -123,7 +123,7 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
 
   return (
     <Modal open={open} onClose={close} title={title} size="lg" icon={Upload}>
-      <p className="text-sm text-ink2 mb-4">{duplicateRule === 'nameVat' ? s.introNameVat : duplicateRule === 'nameCode' ? s.introNameCode : s.intro}</p>
+      <p className="text-sm text-ink2 mb-4">{duplicateRule === 'nameVat' ? s.introNameVat : duplicateRule === 'nameCode' ? s.introNameCode : duplicateRule === 'contract' ? s.introContract : s.intro}</p>
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <Button variant="secondary" onClick={downloadTemplate} className="gap-2"><Download className="w-4 h-4" />{s.downloadTemplate}</Button>

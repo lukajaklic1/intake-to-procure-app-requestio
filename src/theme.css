@@ -57,13 +57,16 @@
   --badge-danger-bg:  #ffe3e3;  --badge-danger-border:  #ffc9c9;  --badge-danger-text:  #e03131;
   --badge-purple-bg:  #f3e8ff;  --badge-purple-border:  #e9d5ff;  --badge-purple-text:  #7c3aed;
 
-  /* Person avatars (initials circles): no red/green, those mean status */
-  --avatar-yellow-bg: #fdf1b8;  --avatar-yellow-border: #f3dc6b;  --avatar-yellow-text: #8a6500;
-  --avatar-orange-bg: #ffe4cc;  --avatar-orange-border: #f8c791;  --avatar-orange-text: #b45309;
-  --avatar-purple-bg: #efe6ff;  --avatar-purple-border: #dccbfb;  --avatar-purple-text: #6d3fd6;
-  --avatar-pink-bg:   #fde2f3;  --avatar-pink-border:   #f7c1e2;  --avatar-pink-text:   #b4278c;
-  --avatar-blue-bg:   #e1ecff;  --avatar-blue-border:   #c6dafb;  --avatar-blue-text:   #215bcf;
-  --avatar-cyan-bg:   #d9f1f8;  --avatar-cyan-border:   #b5e2ee;  --avatar-cyan-text:   #0e7490;
+  --badge-orange-bg:  #ffe4cc;  --badge-orange-border:  #f8c791;  --badge-orange-text:  #b45309;
+
+  /* Name badges (person initials circles): fixed palette defined by the user, used everywhere names get a colour.
+     Order per tone: border, background, text. */
+  --avatar-yellow-border:  #ffe59e;  --avatar-yellow-bg:  #fff3cc;  --avatar-yellow-text:  #874d00;
+  --avatar-lime-border:    #f4fbcb;  --avatar-lime-bg:    #f4fbcb;  --avatar-lime-text:    #536300;
+  --avatar-violet-border:  #e8ddfe;  --avatar-violet-bg:  #f5f0ff;  --avatar-violet-text:  #6238b5;
+  --avatar-magenta-border: #fad6ff;  --avatar-magenta-bg: #fdedff;  --avatar-magenta-text: #9c40c9;
+  --avatar-rose-border:    #fdddea;  --avatar-rose-bg:    #feecf3;  --avatar-rose-text:    #b81c5d;
+  --avatar-blue-border:    #d6e5ff;  --avatar-blue-bg:    #e5eeff;  --avatar-blue-text:    #215bc8;
 
   /* Company avatar */
   --color-company: #7c3aed;

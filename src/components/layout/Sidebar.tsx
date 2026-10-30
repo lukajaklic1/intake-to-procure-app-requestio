@@ -111,15 +111,12 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
                 const badge = key === 'approvals' ? pendingApprovals : key === 'myRequests' ? readyForPO : key === 'receipts' ? openReceipts : key === 'contracts' ? expiringContracts : key === 'invoices' ? invoicesToApprove : 0
                 return (
                   <NavLink key={to} to={to} onClick={handleNavClick} className={navLinkCls}>
-                    {({ isActive }) => (
+                    {() => (
                       <>
                         <Icon className="w-4 h-4 shrink-0 text-icon" strokeWidth={1.75} />
                         <span className="flex-1">{t.nav[key]}</span>
                         {badge > 0 && (
-                          <span className={cn(
-                            'min-w-[18px] h-[18px] px-1 rounded-full text-accent-hover text-[11px] font-medium flex items-center justify-center shrink-0',
-                            isActive ? 'bg-accent-active' : 'bg-accent-light',
-                          )}>
+                          <span className="min-w-4 h-4 px-1 rounded-full bg-primary text-white text-[11px] font-semibold leading-none flex items-center justify-center shrink-0">
                             {badge}
                           </span>
                         )}

@@ -16,7 +16,9 @@ import { daysUntil } from '../lib/contracts'
 import GridHead from '../components/ui/GridHead'
 import { matchesSearch } from '../lib/search'
 import SortFilter from '../components/ui/SortFilter'
-import { applySort, text, num, date, dateLast, rev, type SortDef } from '../lib/sort'
+import { applySort, text, num, date, dateLast, rev, docNumber, type SortDef } from '../lib/sort'
+import ExportButton from '../components/ui/ExportButton'
+import type { ExportColumn } from '../lib/exportExcel'
 
 interface Row {
   id: string; created_at: string; invoice_number: string; supplier_invoice_number: string; supplier_id: string; po_id: string | null
@@ -68,6 +70,8 @@ export default function InvoicesPage() {
     { value: 'invoiceAsc', label: t.sort.invoiceDateAsc, cmp: date(r => r.invoice_date) },
     { value: 'newest', label: t.sort.newest, cmp: rev(date(r => r.created_at)) },
     { value: 'oldest', label: t.sort.oldest, cmp: date(r => r.created_at) },
+    { value: 'numberAsc', label: t.sort.numberAsc, cmp: docNumber(r => r.invoice_number) },
+    { value: 'numberDesc', label: t.sort.numberDesc, cmp: rev(docNumber(r => r.invoice_number)) },
     { value: 'amountDesc', label: t.sort.amountDesc, cmp: rev(num(r => r.total_amount)) },
     { value: 'amountAsc', label: t.sort.amountAsc, cmp: num(r => r.total_amount) },
     { value: 'dueDate', label: t.sort.dueDate, cmp: dateLast(r => r.due_date) },
@@ -87,13 +91,26 @@ export default function InvoicesPage() {
   }), [rows, q, statusFilter, supplierFilter, matchFilter, dueFilter])
 
   useEffect(() => { setPage(1) }, [search, statusFilter, supplierFilter, matchFilter, dueFilter])
-  const paged = applySort(filtered, sortDefs, sort).slice((page - 1) * pageSize, page * pageSize)
+  const sortedRows = applySort(filtered, sortDefs, sort)
+  const exportCols: ExportColumn<Row>[] = [
+    { header: s.invoiceNo, get: r => r.supplier_invoice_number, kind: 'text', width: 18 },
+    { header: "Št.", get: r => r.invoice_number, kind: 'text', width: 12 },
+    { header: s.supplier, get: r => r.suppliers?.name, kind: 'text', width: 32 },
+    { header: s.po, get: r => r.purchase_orders?.po_number, kind: 'text', width: 14 },
+    { header: s.invoiceDate, get: r => r.invoice_date, kind: 'date', width: 14 },
+    { header: s.dueDate, get: r => r.due_date, kind: 'date', width: 14 },
+    { header: s.amount, get: r => r.total_amount, kind: 'money', width: 14 },
+    { header: s.match, get: r => s.matchSt[r.match_status as keyof typeof s.matchSt] ?? r.match_status, kind: 'text', width: 14 },
+    { header: s.status, get: r => s.st[r.status], kind: 'text', width: 14 },
+    { header: t.common.created, get: r => r.created_at, kind: 'date', width: 14 },
+  ]
+  const paged = sortedRows.slice((page - 1) * pageSize, page * pageSize)
   const filtering = q !== '' || statusFilter !== 'all' || supplierFilter !== 'all' || matchFilter !== 'all' || dueFilter !== 'all'
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={canCreate ? <Button onClick={() => navigate('/invoices/new')} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button> : undefined}>
+      <PageToolbar attached actions={<><ExportButton fileName="racuni" columns={exportCols} rows={sortedRows} />{canCreate && <Button onClick={() => navigate('/invoices/new')} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button>}</>}>
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}

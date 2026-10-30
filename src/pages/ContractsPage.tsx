@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Pencil, FileSignature, Building2, CircleDot, CalendarClock, Coins, User } from 'lucide-react'
+import { Upload, Plus, Search, Pencil, IdCard, FileSignature, Building2, CircleDot, CalendarClock, Coins, User } from 'lucide-react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
@@ -16,21 +16,38 @@ import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Contract } from '../types/database'
 import { useLanguage } from '../hooks/useLanguage'
 import { dbError } from '../lib/dbError'
-import { daysUntil, effectiveStatus, noticeDate, STATUS_BADGE, type EffectiveStatus } from '../lib/contracts'
+import { daysUntil, deleteContractCompletely, effectiveStatus, noticeDate, STATUS_BADGE, type EffectiveStatus } from '../lib/contracts'
 import PersonCell from '../components/ui/PersonCell'
 import GridHead from '../components/ui/GridHead'
 import RowMenu from '../components/ui/RowMenu'
 import { matchesSearch } from '../lib/search'
 import SortFilter from '../components/ui/SortFilter'
-import { applySort, text, num, date, dateLast, rev, type SortDef } from '../lib/sort'
+import { applySort, text, num, date, dateLast, rev, docNumber, type SortDef } from '../lib/sort'
+import ImportModal from '../components/ui/ImportModal'
+import ExportButton from '../components/ui/ExportButton'
+import type { ExportColumn } from '../lib/exportExcel'
 
 interface Row extends Contract { suppliers: { name: string; payment_terms: string | null } | null }
 interface Person { id: string; first_name: string; last_name: string }
 
+const contractKey = (supplier: string, title: string) => `${supplier.trim().toLowerCase()}›${title.trim().toLowerCase()}`
+/** dd.mm.yyyy, yyyy-mm-dd, or whatever Date understands -> yyyy-mm-dd (null when it isn't a date). */
+function parseDate(v: string): string | null {
+  const t = v.trim()
+  let m = t.match(/^(\d{1,2})\.\s?(\d{1,2})\.\s?(\d{4})$/)
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`
+  m = t.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`
+  const d = new Date(t)
+  return Number.isNaN(d.getTime()) ? null : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const toNumber = (v: string) => Number(v.replace(/\s/g, '').includes(',') ? v.replace(/\s/g, '').replace(/\./g, '').replace(',', '.') : v.replace(/\s/g, ''))
+const parseStatus = (v: string): 'draft' | 'active' | 'terminated' => /^(aktiv|veljav|active)/i.test(v.trim()) ? 'active' : /^(prekin|terminated)/i.test(v.trim()) ? 'terminated' : 'draft'
+
 const fmtDate = (d: string | null) => (d ? format(new Date(d + 'T00:00:00'), 'dd.MM.yyyy') : null)
 
 export default function ContractsPage() {
-  const { company, isAdmin, hasPerm } = useCompany()
+  const { company, profile, isAdmin, hasPerm } = useCompany()
   const { t } = useLanguage()
   const s = t.contracts
   const navigate = useNavigate()
@@ -45,6 +62,7 @@ export default function ContractsPage() {
   const [people, setPeople] = useState<Person[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [importOpen, setImportOpen] = useState(false)
   const [sort, setSort] = useState('newest')
   useEffect(() => { setPage(1) }, [sort])
   const [statusFilter, setStatusFilter] = useState('all')
@@ -85,16 +103,19 @@ export default function ContractsPage() {
   function openEdit(c: Row) { setEditing(c); setModalOpen(true) }
 
   async function handleDelete(c: Row) {
-    const { error } = await supabase.from('contracts').delete().eq('id', c.id)
+    const error = await deleteContractCompletely(c.id)
     setConfirmDelete(null)
     if (error) { toast.error(dbError(error, t)); return }
     toast.success(t.common.deleted); load()
   }
 
+  const personName = (id: string | null) => { const p = people.find(x => x.id === id); return p ? `${p.first_name} ${p.last_name}` : '-' }
   const q = search.toLowerCase()
   const sortDefs: SortDef<(typeof rows)[number]>[] = [
     { value: 'newest', label: t.sort.newest, cmp: rev(date(c => c.created_at)) },
     { value: 'oldest', label: t.sort.oldest, cmp: date(c => c.created_at) },
+    { value: 'numberAsc', label: t.sort.numberAsc, cmp: docNumber(c => c.contract_number) },
+    { value: 'numberDesc', label: t.sort.numberDesc, cmp: rev(docNumber(c => c.contract_number)) },
     { value: 'endDate', label: t.sort.endDate, cmp: dateLast(c => c.end_date) },
     { value: 'valueDesc', label: t.sort.valueDesc, cmp: rev(num(c => c.total_value)) },
     { value: 'valueAsc', label: t.sort.valueAsc, cmp: num(c => c.total_value) },
@@ -115,7 +136,22 @@ export default function ContractsPage() {
   }), [rows, q, statusFilter, supplierFilter, expiresFilter])
 
   useEffect(() => { setPage(1) }, [search, statusFilter, supplierFilter, expiresFilter])
-  const paginated = applySort(filtered, sortDefs, sort).slice((page - 1) * pageSize, page * pageSize)
+  const sortedRows = applySort(filtered, sortDefs, sort)
+  const exportCols: ExportColumn<Row>[] = [
+    { header: s.number, get: c => c.contract_number, kind: 'text', width: 12 },
+    { header: s.contractTitle, get: c => c.title, kind: 'text', width: 44 },
+    { header: s.supplier, get: c => c.suppliers?.name, kind: 'text', width: 34 },
+    { header: s.status, get: c => s.st[effectiveStatus(c)], kind: 'text', width: 14 },
+    { header: s.startDate, get: c => c.start_date, kind: 'date', width: 14 },
+    { header: s.endDate, get: c => c.end_date, kind: 'date', width: 16 },
+    { header: s.totalValue, get: c => c.total_value, kind: 'money', width: 16 },
+    { header: s.spent, get: c => spent.get(c.id) ?? 0, kind: 'money', width: 14 },
+    { header: s.noticeDays, get: c => c.notice_days, kind: 'number', width: 16 },
+    { header: s.autoRenew, get: c => (c.auto_renew ? t.common.yes ?? 'Da' : ''), kind: 'text', width: 18 },
+    { header: s.paymentTerms, get: c => c.payment_terms, kind: 'text', width: 16 },
+    { header: s.owner, get: c => personName(c.owner_id), kind: 'text', width: 20 },
+  ]
+  const paginated = sortedRows.slice((page - 1) * pageSize, page * pageSize)
   const filtering = q !== '' || statusFilter !== 'all' || supplierFilter !== 'all' || expiresFilter !== 'all'
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
 
@@ -124,8 +160,8 @@ export default function ContractsPage() {
     const d = daysUntil(c.end_date)
     return (
       <>
-        <p className="text-sm text-ink">{fmtDate(c.start_date)} – {c.end_date ? fmtDate(c.end_date) : s.openEnded}</p>
-        {st === 'active' && d != null && d >= 0 && d <= 90 && <p className="text-xs text-warn mt-0.5">{d} {s.daysLeft}</p>}
+        <p className="text-sm text-ink">{fmtDate(c.start_date)} - {c.end_date ? fmtDate(c.end_date) : s.openEnded}</p>
+        {(st === 'active' || st === 'expiring' || st === 'in_notice') && d != null && d >= 0 && d <= 90 && <p className="text-xs text-warn mt-0.5">{d} {s.daysLeft}</p>}
         {st === 'expired' && <p className="text-xs text-danger mt-0.5">{s.expiredOn}</p>}
       </>
     )
@@ -133,22 +169,21 @@ export default function ContractsPage() {
 
   function valueCell(c: Row) {
     const used = spent.get(c.id) ?? 0
-    if (c.total_value == null) return <span className="text-ink2">{used > 0 ? fmt(used) : '—'}</span>
+    if (c.total_value == null) return <span className="text-ink2">{used > 0 ? fmt(used) : '-'}</span>
     const pct = c.total_value > 0 ? Math.min(100, Math.round((used / c.total_value) * 100)) : 0
     const over = used > c.total_value
     return (
       <div className="min-w-[150px]">
-        <p className="text-sm text-ink">{fmt(used)} <span className="text-gray-400">/ {fmt(c.total_value)}</span></p>
+        <p className="text-sm text-ink">{fmt(used)} <span className="text-ink2">/ {fmt(c.total_value)}</span></p>
         <div className="h-1 rounded-full bg-selected mt-1.5 overflow-hidden"><div className={`h-full rounded-full ${over ? 'bg-danger' : pct >= 80 ? 'bg-warn' : 'bg-primary'}`} style={{ width: `${pct}%` }} /></div>
       </div>
     )
   }
 
-  const personName = (id: string | null) => { const p = people.find(x => x.id === id); return p ? `${p.first_name} ${p.last_name}` : '—' }
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={canEdit ? <Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button> : undefined}>
+      <PageToolbar attached actions={<><ExportButton fileName="pogodbe" columns={exportCols} rows={sortedRows} />{canEdit && <><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}</Button><Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}</>}>
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
@@ -157,7 +192,7 @@ export default function ContractsPage() {
         <SortFilter defs={sortDefs} value={sort} onChange={setSort} />
         <FilterSelect label={s.status} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="all">{t.filters.allM}</option>
-          {(['draft', 'active', 'expired', 'terminated'] as EffectiveStatus[]).map(v => <option key={v} value={v}>{s.st[v]}</option>)}
+          {(['draft', 'active', 'expiring', 'in_notice', 'expired', 'terminated'] as EffectiveStatus[]).map(v => <option key={v} value={v}>{s.st[v]}</option>)}
         </FilterSelect>
         <FilterSelect label={s.supplier} value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)}>
           <option value="all">{t.filters.allM}</option>
@@ -176,11 +211,11 @@ export default function ContractsPage() {
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[980px]">
-            <GridHead cols={[[s.contractTitle, FileSignature], [s.supplier, Building2], [s.status, CircleDot], [s.validity, CalendarClock], [`${s.spent} / ${s.totalValue}`, Coins], [s.owner, User], ['']]} />
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1040px]">
+            <GridHead cols={[[s.number, IdCard], [s.contractTitle, FileSignature], [s.supplier, Building2], [s.status, CircleDot], [s.validity, CalendarClock], [`${s.spent} / ${s.totalValue}`, Coins], [s.owner, User], ['']]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={FileSignature} colSpan={7}
+                <TableEmptyState icon={FileSignature} colSpan={8}
                   title={filtering ? t.common.empty.noResults.title : t.common.empty.contracts.title}
                   subtitle={filtering ? t.common.empty.noResults.text : t.common.empty.contracts.text} />
               ) : paginated.map(c => {
@@ -189,11 +224,11 @@ export default function ContractsPage() {
                 const noticeIn = daysUntil(nd)
                 return (
                   <tr key={c.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/contracts/${c.id}`)}>
+                    <td className="px-4 py-3 text-ink2 whitespace-nowrap">{c.contract_number}</td>
                     <td className="px-4 py-3 max-w-[300px]">
                       <p className="font-medium text-ink truncate" title={c.title}>{c.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{c.contract_number}</p>
                     </td>
-                    <td className="px-4 py-3 text-ink2 max-w-[200px] truncate">{c.suppliers?.name ?? '—'}</td>
+                    <td className="px-4 py-3 text-ink2 max-w-[200px] truncate">{c.suppliers?.name ?? '-'}</td>
                     <td className="px-4 py-3"><span className={`badge ${STATUS_BADGE[st]}`}>{s.st[st]}</span></td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {validity(c)}
@@ -216,6 +251,48 @@ export default function ContractsPage() {
         )}
         <Pagination total={filtered.length} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={n => { setPageSize(n); setPage(1) }} />
       </div>
+
+      <ImportModal open={importOpen} onClose={() => setImportOpen(false)} title={t.common.import.title}
+        templateName="contracts" duplicateRule="contract"
+        columns={[
+          { key: 'number', label: s.number, example: 'POG-0001' },
+          { key: 'title', label: s.contractTitle, required: true, example: 'Okvirna pogodba za dobavo mesa' },
+          { key: 'supplier', label: s.supplier, required: true, example: 'Mesarija Kranjc d.o.o.' },
+          { key: 'start', label: s.startDate, required: true, example: '01.01.2026' },
+          { key: 'end', label: s.endDate, example: '31.12.2026' },
+          { key: 'status', label: s.status, example: 'aktivna' },
+          { key: 'value', label: s.totalValue, example: '24000' },
+          { key: 'notice', label: s.noticeDays, example: '60' },
+          { key: 'autoRenew', label: s.autoRenew, example: 'da' },
+          { key: 'renewal', label: s.renewalMonths, example: '12' },
+          { key: 'terms', label: s.paymentTerms, example: '30 dni' },
+          { key: 'owner', label: s.owner, example: 'Janez Novak' },
+          { key: 'description', label: s.description, example: '' },
+        ]}
+        existing={new Set(rows.flatMap(c => [contractKey(c.suppliers?.name ?? '', c.title), `#${c.contract_number.toUpperCase()}`]))}
+        keyOf={row => [contractKey(row.supplier, row.title), ...(row.number ? [`#${row.number.trim().toUpperCase()}`] : [])]}
+        validate={row => {
+          if (!suppliers.some(x => x.name.toLowerCase() === row.supplier.toLowerCase())) return `${t.common.import.unknownSupplier}: ${row.supplier}`
+          const start = parseDate(row.start)
+          if (!start) return `${t.common.import.invalidDate}: ${row.start}`
+          if (row.end) { const end = parseDate(row.end); if (!end) return `${t.common.import.invalidDate}: ${row.end}`; if (end < start) return `${s.endDate} < ${s.startDate}` }
+          for (const v of [row.value, row.notice, row.renewal]) if (v && Number.isNaN(toNumber(v))) return `${t.common.import.invalidNumber}: ${v}`
+          return null
+        }}
+        onImport={async list => {
+          const sup = new Map(suppliers.map(x => [x.name.toLowerCase(), x.id]))
+          const own = new Map(people.map(p => [`${p.first_name} ${p.last_name}`.toLowerCase(), p.id]))
+          const { error } = await supabase.from('contracts').insert(list.map(r => ({
+            company_id: company!.id, created_by: profile?.id ?? null, ...(r.number ? { contract_number: r.number.trim() } : {}),
+            title: r.title, supplier_id: sup.get(r.supplier.toLowerCase())!, status: parseStatus(r.status),
+            start_date: parseDate(r.start)!, end_date: r.end ? parseDate(r.end) : null,
+            total_value: r.value ? toNumber(r.value) : null, notice_days: r.notice ? toNumber(r.notice) : null,
+            auto_renew: /^(da|yes|true|1)$/i.test(r.autoRenew), renewal_months: r.renewal ? toNumber(r.renewal) : null,
+            payment_terms: r.terms || null, owner_id: own.get(r.owner.toLowerCase()) ?? null, description: r.description || null,
+          })))
+          if (error) throw error
+          load()
+        }} />
 
       <ContractFormModal open={modalOpen} onClose={() => setModalOpen(false)} contract={editing} suppliers={suppliers} people={people} onSaved={load}
         onDelete={editing ? () => setConfirmDelete(editing) : undefined}

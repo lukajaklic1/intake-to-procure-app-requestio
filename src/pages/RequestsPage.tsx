@@ -18,7 +18,9 @@ import GridHead from '../components/ui/GridHead'
 import RowMenu from '../components/ui/RowMenu'
 import { matchesSearch } from '../lib/search'
 import SortFilter from '../components/ui/SortFilter'
-import { applySort, text, num, date, dateLast, rev, type SortDef } from '../lib/sort'
+import { applySort, text, num, date, dateLast, rev, docNumber, type SortDef } from '../lib/sort'
+import ExportButton from '../components/ui/ExportButton'
+import type { ExportColumn } from '../lib/exportExcel'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-neutral',
@@ -153,6 +155,8 @@ export default function RequestsPage() {
   const sortDefs: SortDef<(typeof rows)[number]>[] = [
     { value: 'newest', label: t.sort.newest, cmp: rev(date(r => r.created_at)) },
     { value: 'oldest', label: t.sort.oldest, cmp: date(r => r.created_at) },
+    { value: 'numberAsc', label: t.sort.numberAsc, cmp: docNumber(r => r.request_number) },
+    { value: 'numberDesc', label: t.sort.numberDesc, cmp: rev(docNumber(r => r.request_number)) },
     { value: 'amountDesc', label: t.sort.amountDesc, cmp: rev(num(r => r.total_estimate)) },
     { value: 'amountAsc', label: t.sort.amountAsc, cmp: num(r => r.total_estimate) },
     { value: 'neededBy', label: t.sort.neededBy, cmp: dateLast(r => r.needed_by_date) },
@@ -171,14 +175,26 @@ export default function RequestsPage() {
     return true
   })
 
-  const paginated = applySort(filtered, sortDefs, sort).slice((page - 1) * pageSize, page * pageSize)
+  const sortedRows = applySort(filtered, sortDefs, sort)
+  const exportCols: ExportColumn<Row>[] = [
+    { header: s.requestNumber, get: r => r.request_number, kind: 'text', width: 14 },
+    { header: s.requestTitle, get: r => r.title, kind: 'text', width: 40 },
+    { header: s.category, get: r => catLabel(r.request_line_items), kind: 'text', width: 24 },
+    { header: s.supplier, get: r => r.suppliers?.name ?? r.supplier_name, kind: 'text', width: 30 },
+    { header: s.neededBy, get: r => r.needed_by_date, kind: 'date', width: 14 },
+    { header: s.requestedBy, get: r => names[r.created_by], kind: 'text', width: 22 },
+    { header: s.estTotalCol, get: r => r.total_estimate, kind: 'money', width: 14 },
+    { header: t.common.status, get: r => s.st[r.status], kind: 'text', width: 14 },
+    { header: t.common.created, get: r => r.created_at, kind: 'date', width: 14 },
+  ]
+  const paginated = sortedRows.slice((page - 1) * pageSize, page * pageSize)
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<Button onClick={() => navigate('/requests/new')} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button>}>
+      <PageToolbar attached actions={<><ExportButton fileName="zahtevki" columns={exportCols} rows={sortedRows} /><Button onClick={() => navigate('/requests/new')} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
           <div className="relative min-w-40 flex-1 max-w-[220px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder={s.requestNumber + ' / ' + s.supplier}

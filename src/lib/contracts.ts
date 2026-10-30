@@ -1,6 +1,7 @@
 import type { Contract } from '../types/database'
+import { supabase } from './supabase'
 
-export type EffectiveStatus = 'draft' | 'active' | 'expired' | 'terminated'
+export type EffectiveStatus = 'draft' | 'active' | 'expiring' | 'in_notice' | 'expired' | 'terminated'
 
 /** Whole days from today until the given date (negative = in the past). */
 export function daysUntil(date: string | null | undefined): number | null {
@@ -10,11 +11,13 @@ export function daysUntil(date: string | null | undefined): number | null {
   return Math.round((end.getTime() - today.getTime()) / 86_400_000)
 }
 
-/** "Active" contracts whose end date has passed count as expired. */
-export function effectiveStatus(c: Pick<Contract, 'status' | 'end_date'>): EffectiveStatus {
+/** What the user sees: an "active" contract past its end date is expired, one ending (or reaching its notice date) within 60 days is "expiring". */
+export function effectiveStatus(c: Pick<Contract, 'status' | 'end_date' | 'notice_days' | 'notice_given_at'>): EffectiveStatus {
   if (c.status === 'active') {
     const d = daysUntil(c.end_date)
     if (d != null && d < 0) return 'expired'
+    if (c.notice_given_at) return 'in_notice'
+    if (needsAttention(c)) return 'expiring'
   }
   return c.status
 }
@@ -22,6 +25,8 @@ export function effectiveStatus(c: Pick<Contract, 'status' | 'end_date'>): Effec
 export const STATUS_BADGE: Record<EffectiveStatus, string> = {
   draft: 'badge-neutral',
   active: 'badge-success',
+  expiring: 'badge-warn',
+  in_notice: 'badge-orange',
   expired: 'badge-danger',
   terminated: 'badge-neutral',
 }
@@ -40,4 +45,15 @@ export function needsAttention(c: Pick<Contract, 'status' | 'end_date' | 'notice
   const end = daysUntil(c.end_date)
   const notice = daysUntil(noticeDate(c))
   return (end != null && end >= 0 && end <= days) || (notice != null && notice >= 0 && notice <= days)
+}
+
+/** Deletes a contract for good: the row (with its price list and document records) and then the uploaded files.
+ *  The files go only after the database accepted the deletion, so a blocked delete never loses a document. */
+export async function deleteContractCompletely(contractId: string): Promise<{ message: string } | null> {
+  const { data: files } = await supabase.from('contract_attachments').select('file_path').eq('contract_id', contractId)
+  const { error } = await supabase.from('contracts').delete().eq('id', contractId)
+  if (error) return error
+  const paths = (files ?? []).map(f => f.file_path)
+  if (paths.length) await supabase.storage.from('quotations').remove(paths)
+  return null
 }

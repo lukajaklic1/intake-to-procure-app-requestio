@@ -26,6 +26,9 @@ import { matchesSearch } from '../lib/search'
 import StatusSelect from '../components/ui/StatusSelect'
 import Select from '../components/ui/Select'
 import { incotermOptions } from '../lib/incoterms'
+import ExportButton from '../components/ui/ExportButton'
+import type { ExportColumn } from '../lib/exportExcel'
+import { localizeCountry } from '../lib/countries'
 
 /** Duplicate keys of a supplier: its name and (when set) its VAT number, ignoring case and spaces. */
 const dupKeys = (name: string, vat?: string | null) => [`n:${name.trim().toLowerCase()}`, ...(vat?.trim() ? [`v:${vat.replace(/\s+/g, '').toUpperCase()}`] : [])]
@@ -34,7 +37,7 @@ const EMPTY: Partial<Supplier> = { name: '', contact_name: '', email: '', phone:
 
 export default function SuppliersPage() {
   const { company } = useCompany()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const s = t.suppliers
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
@@ -122,6 +125,22 @@ export default function SuppliersPage() {
     if (sort.startsWith('created')) return dir * a.created_at.localeCompare(b.created_at)
     return dir * (sort.startsWith('number') ? Number(a.supplier_number) - Number(b.supplier_number) : a.name.localeCompare(b.name, 'sl', { sensitivity: 'base' }))
   })
+  const exportCols: ExportColumn<Supplier>[] = [
+    { header: s.number, get: x => x.supplier_number, kind: 'text', width: 10 },
+    { header: t.common.name, get: x => x.name, kind: 'text', width: 36 },
+    { header: s.vatNumber, get: x => x.vat_number, kind: 'text', width: 16 },
+    { header: s.contact, get: x => x.contact_name, kind: 'text', width: 22 },
+    { header: t.common.email, get: x => x.email, kind: 'text', width: 34 },
+    { header: t.common.phone, get: x => x.phone, kind: 'text', width: 18 },
+    { header: t.common.streetAddress, get: x => x.address_street, kind: 'text', width: 26 },
+    { header: t.common.postalCode, get: x => x.address_postal_code, kind: 'text', width: 12 },
+    { header: t.common.city, get: x => x.address_city, kind: 'text', width: 20 },
+    { header: t.common.country, get: x => localizeCountry(x.address_country, lang), kind: 'text', width: 14 },
+    { header: s.paymentTerms, get: x => x.payment_terms, kind: 'text', width: 16 },
+    { header: s.incoterm, get: x => x.incoterm, kind: 'text', width: 10 },
+    { header: t.common.status, get: x => (x.status === 'active' ? t.common.active : t.common.inactive), kind: 'text', width: 12 },
+    { header: t.common.created, get: x => x.created_at, kind: 'date', width: 14 },
+  ]
   const paginated = sorted.slice((page - 1) * pageSize, page * pageSize)
   function handlePageSizeChange(n: number) { setPageSize(n); setPage(1) }
 
@@ -129,7 +148,7 @@ export default function SuppliersPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}</Button><Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
+      <PageToolbar attached actions={<><ExportButton fileName="dobavitelji" columns={exportCols} rows={sorted} /><Button variant="secondary" onClick={() => setImportOpen(true)} className="gap-2"><Upload className="w-4 h-4" />{t.common.import.button}</Button><Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}

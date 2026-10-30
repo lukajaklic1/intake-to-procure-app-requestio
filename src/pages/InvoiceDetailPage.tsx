@@ -180,7 +180,7 @@ export default function InvoiceDetailPage() {
       <div className="flex items-center gap-1.5 mb-5">
         {tabs.map(x => (
           <button key={x.id} onClick={() => setTab(x.id)}
-            className={`inline-flex items-center gap-2 h-8 px-3 rounded-lg border text-sm transition-colors ${tab === x.id ? 'border-field bg-surface text-ink' : 'border-transparent text-ink2 hover:bg-hover'}`}>
+            className={`inline-flex items-center gap-2 h-8 px-3 rounded-lg border text-sm font-medium transition-colors ${tab === x.id ? 'border-field bg-surface text-ink' : 'border-transparent text-ink2 hover:bg-hover'}`}>
             {x.label}
             {x.count != null && <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-md bg-surface border border-field text-[11px] text-ink2">{x.count}</span>}
           </button>

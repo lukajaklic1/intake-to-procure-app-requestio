@@ -56,6 +56,10 @@ export const translations = {
       invoiceDateAsc: 'Invoice date: ascending',
       receivedDesc: 'Received date: descending',
       receivedAsc: 'Received date: ascending',
+      categoryAsc: 'Category A-Z',
+      categoryDesc: 'Category Z-A',
+      subcategoryAsc: 'Subcategory A-Z',
+      subcategoryDesc: 'Subcategory Z-A',
     },
     common: {
       deleteDocTitle: 'Delete document',
@@ -103,6 +107,7 @@ export const translations = {
       cityRequired: 'City is required',
       postalRequired: 'Postal code is required',
       fieldRequired: 'This field is required',
+      export: 'Export',
       ph: {
         departmentCode: '4100',
         companyName: 'Planina d.o.o.',
@@ -182,6 +187,9 @@ export const translations = {
         title: 'Import from Excel',
         intro: 'Download the template, fill it in Excel and upload it. Rows whose name already exists will not be imported.',
         statusDupFile: 'Duplicate in file',
+        introContract: 'Download the template, fill it in Excel and upload it. The supplier must already exist; the contract number is optional (otherwise it is assigned automatically). Rows with the same title for the same supplier or an existing number will not be imported.',
+        unknownSupplier: 'Unknown supplier',
+        invalidDate: 'Invalid date (use dd.mm.yyyy)',
         introNameCode: 'Download the template, fill it in Excel and upload it. Rows whose name or code already exists will not be imported.',
         introNameVat: 'Download the template, fill it in Excel and upload it. Rows whose name or VAT number already exists will not be imported.',
         downloadTemplate: 'Download template',
@@ -323,7 +331,12 @@ export const translations = {
       titlePlaceholder: 'Annual meat supply agreement',
       supplier: 'Supplier',
       status: 'Status',
-      st: { draft: 'Draft', active: 'Active', expired: 'Expired', terminated: 'Terminated' },
+      st: { draft: 'Draft', active: 'Active', expiring: 'Before expiry', in_notice: 'In notice period', expired: 'Expired', terminated: 'Terminated' },
+      giveNotice: 'Give notice',
+      cancelNotice: 'Withdraw notice',
+      noticeDateLabel: 'Date of notice',
+      noticeGiven: 'Notice given',
+      noticeTitle: 'Give notice on contract',
       startDate: 'Start date',
       endDate: 'End date',
       openEnded: 'Open-ended',
@@ -627,6 +640,7 @@ export const translations = {
 
     // Categories
     categories: {
+      single: 'Category',
       deleteSubTitle: 'Delete subcategory',
       deleteSubQuestion: 'Are you sure you want to delete the subcategory {name}? This action cannot be undone.',
       deleteTitle: 'Delete category',
@@ -1086,6 +1100,10 @@ export const translations = {
       invoiceDateAsc: 'Datum računa: naraščajoče',
       receivedDesc: 'Datum prevzema: padajoče',
       receivedAsc: 'Datum prevzema: naraščajoče',
+      categoryAsc: 'Kategorija A-Ž',
+      categoryDesc: 'Kategorija Ž-A',
+      subcategoryAsc: 'Podkategorija A-Ž',
+      subcategoryDesc: 'Podkategorija Ž-A',
     },
     common: {
       deleteDocTitle: 'Brisanje dokumenta',
@@ -1133,6 +1151,7 @@ export const translations = {
       cityRequired: 'Kraj je obvezen',
       postalRequired: 'Poštna številka je obvezna',
       fieldRequired: 'To polje je obvezno',
+      export: 'Izvozi',
       ph: {
         departmentCode: '4100',
         companyName: 'Planina d.o.o.',
@@ -1212,6 +1231,9 @@ export const translations = {
         title: 'Uvoz iz Excela',
         intro: 'Prenesite predlogo, jo izpolnite v Excelu in naložite. Vrstice, katerih ime že obstaja, ne bodo naložene.',
         statusDupFile: 'Podvojeno v datoteki',
+        introContract: 'Prenesite predlogo, jo izpolnite v Excelu in naložite. Dobavitelj mora že obstajati, številka pogodbe je neobvezna (sicer se dodeli samodejno). Vrstice z enakim naslovom pri istem dobavitelju ali že obstoječo številko ne bodo naložene.',
+        unknownSupplier: 'Neznan dobavitelj',
+        invalidDate: 'Neveljaven datum (uporabite dd.mm.llll)',
         introNameCode: 'Prenesite predlogo, jo izpolnite v Excelu in naložite. Vrstice, katerih ime ali šifra že obstaja, ne bodo naložene.',
         introNameVat: 'Prenesite predlogo, jo izpolnite v Excelu in naložite. Vrstice, katerih ime ali davčna številka že obstaja, ne bodo naložene.',
         downloadTemplate: 'Prenesi predlogo',
@@ -1353,7 +1375,12 @@ export const translations = {
       titlePlaceholder: 'Letna pogodba o dobavi mesa',
       supplier: 'Dobavitelj',
       status: 'Status',
-      st: { draft: 'Osnutek', active: 'Veljavna', expired: 'Potekla', terminated: 'Prekinjena' },
+      st: { draft: 'Osnutek', active: 'Veljavna', expiring: 'Pred potekom', in_notice: 'V odpovednem roku', expired: 'Potekla', terminated: 'Prekinjena' },
+      giveNotice: 'Odpovej',
+      cancelNotice: 'Prekliči odpoved',
+      noticeDateLabel: 'Datum odpovedi',
+      noticeGiven: 'Odpoved podana',
+      noticeTitle: 'Odpoved pogodbe',
       startDate: 'Začetek',
       endDate: 'Konec veljavnosti',
       openEnded: 'Za nedoločen čas',
@@ -1657,6 +1684,7 @@ export const translations = {
 
     // Categories
     categories: {
+      single: 'Kategorija',
       deleteSubTitle: 'Brisanje podkategorije',
       deleteSubQuestion: 'Ali ste prepričani, da želite izbrisati podkategorijo {name}? Tega dejanja ni mogoče razveljaviti.',
       deleteTitle: 'Brisanje kategorije',

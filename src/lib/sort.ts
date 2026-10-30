@@ -17,3 +17,7 @@ export function applySort<T>(list: T[], defs: SortDef<T>[], value: string): T[] 
   const def = defs.find(d => d.value === value) ?? defs[0]
   return [...list].sort(def.cmp)
 }
+
+/** Document numbers such as "POG-0012": compared by their digits, so 9 comes before 10 whatever the padding. */
+export const docNumber = <T,>(get: Get<T, string>) => (a: T, b: T) =>
+  Number((get(a) ?? '').replace(/\D/g, '') || 0) - Number((get(b) ?? '').replace(/\D/g, '') || 0)
