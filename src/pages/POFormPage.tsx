@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, Trash2, ChevronLeft, Search, X, Paperclip, FileText, UploadCloud } from 'lucide-react'
+import { Plus, Trash2, ChevronLeft, X, Paperclip, FileText, UploadCloud } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useAuth } from '../hooks/useAuth'
@@ -9,7 +9,9 @@ import { toast } from '../components/ui/Toast'
 import Button from '../components/ui/Button'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Input from '../components/ui/Input'
-import CategoryOptions from '../components/ui/CategoryOptions'
+import CatalogPicker from '../components/ui/CatalogPicker'
+import LineCategoryCells from '../components/ui/LineCategoryCells'
+import { categoryScope, mainCategoryId } from '../lib/categories'
 import type { Supplier, Category, Location, Department, Item, Contract } from '../types/database'
 import { matchesSearch } from '../lib/search'
 import { unitLabel } from '../lib/units'
@@ -21,6 +23,10 @@ interface LineItem {
   id?: string
   item_id?: string | null
   category_id: string
+  /** main category chosen on the line (can be set before a subcategory) */
+  main_id?: string
+  /** the category was chosen by hand, so the catalog search is narrowed to it */
+  scoped?: boolean
   position: number
   name: string
   long_description: string
@@ -49,48 +55,6 @@ const EMPTY_HEADER: POHeader = {
 
 function newLine(position: number): LineItem {
   return { position, name: '', long_description: '', quantity: '1', unit: 'kos', unit_price: '0', item_id: null, category_id: '' }
-}
-
-// ─── Item search component ────────────────────────────────────────────────────
-
-function ItemSearch({ items, onSelect, placeholder }: { items: Item[]; onSelect: (item: Item) => void; placeholder: string }) {
-  const { lang } = useLanguage()
-  const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
-
-  const filtered = query.length > 0
-    ? items.filter(i => matchesSearch(query, [i.item_number, i.name, i.long_description]))
-    : items
-
-  return (
-    <div className="relative">
-      <div className="flex items-center gap-1 border border-field rounded-lg hover:border-field-hover bg-white px-2 py-1.5 focus-within:border-field-focus">
-        <Search className="w-3 h-3 text-gray-400 shrink-0" />
-        <input
-          value={query}
-          onChange={e => { setQuery(e.target.value); setOpen(true) }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder={placeholder}
-          className="text-xs bg-transparent outline-none flex-1 text-ink placeholder:text-placeholder min-w-0"
-        />
-        {query && <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setQuery('')}><X className="w-3 h-3 text-gray-300" /></button>}
-      </div>
-      {open && filtered.length > 0 && (
-        <div className="absolute z-30 left-0 mt-1 w-72 bg-white border border-field rounded-lg shadow-lg overflow-y-auto max-h-56">
-          {filtered.map(item => (
-            <button key={item.id} type="button" onMouseDown={e => e.preventDefault()}
-              onClick={() => { onSelect(item); setQuery(''); setOpen(false) }}
-              className="w-full text-left px-3 py-2 hover:bg-accent-light transition-colors">
-              <span className=" text-xs text-gray-400 mr-2">{item.item_number}</span>
-              <span className="text-sm font-medium text-gray-800">{item.name}</span>
-              {item.default_unit && <span className="ml-2 text-xs text-gray-400">{unitLabel(item.default_unit, lang)}</span>}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
 }
 
 // ─── Supplier search combobox ─────────────────────────────────────────────────
@@ -296,9 +260,14 @@ export default function POFormPage() {
   }
 
   function applyItem(idx: number, item: Item) {
+    // the catalog stays narrowed to a category the user chose by hand; a category that only came from picking an item does not narrow it
+    const ids = categoryScope(lines[idx].main_id ?? mainCategoryId(lines[idx].category_id, categories), lines[idx].category_id, categories)
+    const stayScoped = !!lines[idx].scoped && !!ids && ids.has(item.category_id ?? '')
     setLine(idx, {
+      scoped: stayScoped,
       item_id: item.id,
       category_id: item.category_id ?? '',
+      main_id: mainCategoryId(item.category_id, categories),
       name: item.name,
       long_description: item.long_description ?? '',
       unit: item.default_unit ? unitLabel(item.default_unit, lang) : lines[idx].unit,
@@ -308,6 +277,13 @@ export default function POFormPage() {
         return price != null ? String(price).replace('.', ',') : lines[idx].unit_price
       })(),
     })
+  }
+
+  // the catalog offered on a line follows the category chosen on it
+  const itemsForLine = (l: LineItem) => {
+    const ids = categoryScope(l.main_id ?? mainCategoryId(l.category_id, categories), l.category_id, categories)
+    // narrowed only by a category chosen by hand; a category that came from picking an item leaves the whole catalog open
+    return ids && l.scoped ? items.filter(i => ids.has(i.category_id ?? '')) : items
   }
 
   // Accept both comma and dot as decimal separator
@@ -534,7 +510,7 @@ export default function POFormPage() {
 
       {/* Header fields */}
       <div className="bg-white rounded-lg border border-field p-6 mb-5">
-        <h2 className="text-sm font-semibold text-gray-700 mb-4">{t.po.orderDetails}</h2>
+        <h2 className="text-[15px] font-semibold text-ink mb-4">{t.po.orderDetails}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <SupplierSearch
             suppliers={suppliers}
@@ -653,18 +629,19 @@ export default function POFormPage() {
       {/* Line items */}
       <div className="bg-white rounded-lg border border-field overflow-hidden mb-5">
         <div className="px-6 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-700">{t.po.lineItems}</h2>
+          <h2 className="text-[15px] font-semibold text-ink">{t.po.lineItems}</h2>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[900px]">
+          <table className="w-full text-sm min-w-[1250px]">
             <thead className="bg-surface border-b border-field">
               <tr>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-12">{t.po.position}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">{s.catalog}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">{s.code}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">{t.po.itemName}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-40">{s.category} *</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-44">{s.category} *</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-48">{t.categories.subcategory} *</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">{t.po.qty}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-20">{t.po.unit}</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-28">{t.po.unitPrice}</th>
@@ -677,7 +654,7 @@ export default function POFormPage() {
                 <tr key={idx} className="align-top">
                   <td className="px-4 py-2.5 text-gray-400 text-xs pt-4">{line.position}</td>
                   <td className="px-4 py-2.5 pt-3">
-                    {!isReadOnly && <ItemSearch items={items} onSelect={item => applyItem(idx, item)} placeholder={t.common.searchCatalog} />}
+                    {!isReadOnly && <CatalogPicker items={itemsForLine(line)} allItems={items} onSelect={item => applyItem(idx, item)} placeholder={t.common.searchCatalog} />}
                   </td>
                   <td className="px-4 py-2.5 pt-3 text-xs text-gray-400">
                     {line.item_id ? items.find(i => i.id === line.item_id)?.item_number ?? '—' : '—'}
@@ -688,23 +665,17 @@ export default function POFormPage() {
                       onChange={e => setLine(idx, { name: e.target.value })}
                       readOnly={isReadOnly}
                       placeholder={s.itemNamePlaceholder}
-                      className="w-full text-sm border-0 bg-transparent outline-none text-gray-900 placeholder:text-placeholder font-medium focus:ring-0 pb-0.5"
+                      className="w-full h-9 px-3 text-sm font-medium rounded-lg border border-field hover:border-field-hover bg-white text-ink placeholder:text-placeholder placeholder:font-normal focus:outline-none focus:border-field-focus"
                     />
                     <input
                       value={line.long_description}
                       onChange={e => setLine(idx, { long_description: e.target.value })}
                       readOnly={isReadOnly}
                       placeholder={s.descPlaceholder}
-                      className="w-full text-xs border-0 bg-transparent outline-none text-gray-400 placeholder:text-placeholder focus:ring-0 mt-0.5"
+                      className="w-full h-9 px-3 mt-2.5 text-sm rounded-lg border border-field hover:border-field-hover bg-white text-ink placeholder:text-placeholder focus:outline-none focus:border-field-focus"
                     />
                   </td>
-                  <td className="px-4 py-2.5 pt-3">
-                    <select value={line.category_id} onChange={e => setLine(idx, { category_id: e.target.value })} disabled={isReadOnly}
-                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus bg-white text-ink">
-                      <option value="">{t.common.select}</option>
-                      <CategoryOptions categories={categories} selectedId={line.category_id} />
-                    </select>
-                  </td>
+                  <LineCategoryCells categories={categories} mainId={line.main_id} categoryId={line.category_id} disabled={isReadOnly} onChange={patch => setLine(idx, { ...patch, scoped: true })} />
                   <td className="px-4 py-2.5 pt-3">
                     <input
                       type="text" inputMode="decimal"

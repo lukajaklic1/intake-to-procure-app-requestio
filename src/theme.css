@@ -49,15 +49,17 @@
 
   /* User avatar (sidebar, bottom) */
   --color-user: #f26a1b;
-  /* Badges (colors from Carboniqdesk): background, border, text */
-  --badge-success-bg: #e0fced;  --badge-success-border: #d4f8e6;  --badge-success-text: #098259;
-  --badge-warn-bg:    #fff3bf;  --badge-warn-border:    #ffe066;  --badge-warn-text:    #e67700;
+  /* Status badges: border / background / text for success (green), warn (yellow), info (blue), orange as defined by the user;
+     the name badges below have their own palette. Neutral (grey) keeps its earlier values. */
+  --badge-success-bg: #e0fced;  --badge-success-border: #cbf7e1;  --badge-success-text: #007d53;
+  --badge-warn-bg:    #fff3cc;  --badge-warn-border:    #ffe59e;  --badge-warn-text:    #874d00;
   --badge-neutral-bg: #f1f3f5;  --badge-neutral-border: #e9ecef;  --badge-neutral-text: #868e96;
-  --badge-info-bg:    #e5eeff;  --badge-info-border:    #d6e5ff;  --badge-info-text:    #215bcf;
-  --badge-danger-bg:  #ffe3e3;  --badge-danger-border:  #ffc9c9;  --badge-danger-text:  #e03131;
-  --badge-purple-bg:  #f3e8ff;  --badge-purple-border:  #e9d5ff;  --badge-purple-text:  #7c3aed;
+  --badge-info-bg:    #ddf7ff;  --badge-info-border:    #d0eff7;  --badge-info-text:    #056c87;
+  /* danger = the rose of the name palette, purple = its violet (one definition each, see --avatar-* below) */
+  --badge-danger-bg:  var(--avatar-rose-bg);    --badge-danger-border:  var(--avatar-rose-border);    --badge-danger-text:  var(--avatar-rose-text);
+  --badge-purple-bg:  var(--avatar-violet-bg);  --badge-purple-border:  var(--avatar-violet-border);  --badge-purple-text:  var(--avatar-violet-text);
 
-  --badge-orange-bg:  #ffe4cc;  --badge-orange-border:  #f8c791;  --badge-orange-text:  #b45309;
+  --badge-orange-bg:  #feeee1;  --badge-orange-border:  #fee0c8;  --badge-orange-text:  #9e3f00;
 
   /* Name badges (person initials circles): fixed palette defined by the user, used everywhere names get a colour.
      Order per tone: border, background, text. */

@@ -139,7 +139,7 @@ export default function ReceiveFormPage() {
 
       <div className="bg-white rounded-lg border border-field overflow-hidden mb-5">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-700">{t.po.lineItems}</h2>
+          <h2 className="text-[15px] font-semibold text-ink">{t.po.lineItems}</h2>
           <Button variant="secondary" onClick={receiveAll}>{s.receiveAll}</Button>
         </div>
         <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CheckCircle2, Search, X, ClipboardList, MapPin, User, UserCheck, CalendarClock, Coins } from 'lucide-react'
+import { CheckCircle2, Search, X, ClipboardList, MapPin, User, UserCheck, CalendarClock, Coins, MessageSquare } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -59,6 +59,7 @@ export default function ApprovalsPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
 
+  const [comments, setComments] = useState<Record<string, string>>({})
   useEffect(() => { if (company && profile) { load(); loadRefs() } }, [company, profile, isAdmin])
 
   async function loadRefs() {
@@ -82,6 +83,12 @@ export default function ApprovalsPage() {
     const { data } = await query
     const list = (data as unknown as Row[]) ?? []
     setRows(list)
+    if (list.length) {
+      const { data: acts } = await supabase.from('activity_log').select('request_id, note, created_at').in('request_id', list.map(r => r.id)).eq('action', 'submitted').not('note', 'is', null).order('created_at')
+      const cm: Record<string, string> = {}
+      for (const a of acts ?? []) if (a.note) cm[a.request_id as string] = a.note as string
+      setComments(cm)
+    }
     const ids = [...new Set(list.flatMap(r => [r.created_by, r.approver_id]).filter(Boolean) as string[])]
     if (ids.length) {
       const { data: us } = await supabase.from('users').select('id, first_name, last_name').in('id', ids)
@@ -164,11 +171,11 @@ export default function ApprovalsPage() {
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[680px]">
-            <GridHead cols={[[s.requestNumber, ClipboardList], [s.location, MapPin], [a.requestedBy, User], ...(isAdmin ? [[s.approver, UserCheck] as GridCol] : []), [s.neededBy, CalendarClock], [s.estTotalCol, Coins], ['']]} />
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[900px]">
+            <GridHead cols={[[s.requestNumber, ClipboardList], [s.location, MapPin], [t.requests.commentCol, MessageSquare], [a.requestedBy, User], ...(isAdmin ? [[s.approver, UserCheck] as GridCol] : []), [s.neededBy, CalendarClock], [s.estTotalCol, Coins], ['']]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={CheckCircle2} colSpan={isAdmin ? 8 : 7} title={hasActiveFilters ? t.common.empty.noResults.title : t.common.empty.approvals.title} subtitle={hasActiveFilters ? t.common.empty.noResults.text : t.common.empty.approvals.text} />
+                <TableEmptyState icon={CheckCircle2} colSpan={isAdmin ? 9 : 8} title={hasActiveFilters ? t.common.empty.noResults.title : t.common.empty.approvals.title} subtitle={hasActiveFilters ? t.common.empty.noResults.text : t.common.empty.approvals.text} />
               ) : paginated.map(r => (
                 <tr key={r.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/requests/${r.id}`)}>
                   <td className="px-4 py-3 max-w-[300px]">
@@ -178,7 +185,8 @@ export default function ApprovalsPage() {
                       <span className="text-xs text-gray-400">{format(new Date(r.created_at), 'dd.MM.yyyy')}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-ink2">{r.locations?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-ink2">{r.locations?.name ?? '-'}</td>
+                  <td className="px-4 py-3 text-ink2 max-w-[260px] truncate" title={comments[r.id]}>{comments[r.id] ?? '-'}</td>
                   <td className="px-4 py-3"><PersonCell name={names[r.created_by]} /></td>
                   {isAdmin && <td className="px-4 py-3"><PersonCell name={r.approver_id ? names[r.approver_id] : null} /></td>}
                   <td className="px-4 py-3 text-gray-500 text-xs">{r.needed_by_date ? format(new Date(r.needed_by_date), 'dd.MM.yyyy') : '—'}</td>

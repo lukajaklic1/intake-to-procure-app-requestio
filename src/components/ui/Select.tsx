@@ -47,7 +47,8 @@ export default function Select({ id, label, required, value, onChange, options, 
     const above = r.top - 12
     const up = below < Math.min(wanted, 200) && above > below
     setPos({
-      left: r.left, width: r.width,
+      // the menu is at least 300px wide even when the field is narrow (a table cell), so long names stay readable; kept inside the window
+      left: Math.max(8, Math.min(r.left, window.innerWidth - Math.max(r.width, 300) - 8)), width: Math.max(r.width, 300),
       ...(up ? { bottom: window.innerHeight - r.top + 6 } : { top: r.bottom + 6 }),
       maxH: Math.max(140, Math.min(wanted, up ? above : below)),
     })

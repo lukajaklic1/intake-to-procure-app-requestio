@@ -1,6 +1,6 @@
-import { useEffect, useState, Fragment } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, Pencil, XCircle, Check, X, FileText, ShoppingCart, Send, Trash2, ClipboardList } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft, ChevronRight, Pencil, XCircle, Check, X, FileText, ShoppingCart, Send, Trash2, Package, Tag, Hash, Ruler, Coins, Eye } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { refreshCounts } from '../lib/refreshCounts'
 import { useCompany } from '../hooks/useCompany'
@@ -12,6 +12,9 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { format } from 'date-fns'
 import type { Request, RequestLineItem, RequestStatus, Approval, ActivityLog } from '../types/database'
 import ModalActions from '../components/ui/ModalActions'
+import PersonCell from '../components/ui/PersonCell'
+import GridHead from '../components/ui/GridHead'
+import { unitLabel } from '../lib/units'
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-neutral',
@@ -28,14 +31,30 @@ type ReqFull = Request & {
   departments: { name: string } | null
 }
 
-function Field({ label, value }: { label: string; value?: string | null }) {
-  return <div><p className="text-xs text-gray-400 mb-0.5">{label}</p><p className="text-sm text-gray-800 font-medium">{value || '—'}</p></div>
+/** A titled box of the page. */
+function Card({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
+  return (
+    <section className={`bg-white rounded-lg border border-field ${className}`}>
+      <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{title}</h2>
+      {children}
+    </section>
+  )
+}
+
+/** Small grey label above a value. */
+function Field({ label, children }: { label: string; children?: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[12.5px] font-medium text-ink2 mb-1">{label}</p>
+      <div className="text-sm text-ink">{children || '-'}</div>
+    </div>
+  )
 }
 
 export default function RequestDetailPage() {
   const { id } = useParams()
   const { company, profile, isAdmin, hasPerm } = useCompany()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const s = t.requests
   const navigate = useNavigate()
 
@@ -156,10 +175,10 @@ export default function RequestDetailPage() {
   const st = req.status as RequestStatus
 
   type FlowState = 'done' | 'current' | 'upcoming' | 'rejected' | 'cancelled'
-  const flowSteps: { label: string; name?: string; state: FlowState }[] = (() => {
+  const flowSteps: { label: string; name?: string; note?: string | null; state: FlowState }[] = (() => {
     if (st === 'draft') return []
     const pendingState: FlowState = st === 'pending' ? 'current' : 'upcoming'
-    const steps: { label: string; name?: string; state: FlowState }[] = []
+    const steps: { label: string; name?: string; note?: string | null; state: FlowState }[] = []
 
     // 1. Created
     steps.push({ label: s.flowCreated, name: req.created_by ? names[req.created_by] : undefined, state: 'done' })
@@ -170,11 +189,12 @@ export default function RequestDetailPage() {
     steps.push({
       label: s.roleManager,
       name: a1Approver ? names[a1Approver] : undefined,
+      note: a1?.decision_note,
       state: a1?.status === 'approved' ? 'done' : a1?.status === 'rejected' ? 'rejected' : pendingState,
     })
     const a2 = approvals.find(a => a.step === 2)
     if (a2) {
-      steps.push({ label: s.roleDirector, name: a2.approver_id ? names[a2.approver_id] : undefined, state: a2.status === 'approved' ? 'done' : a2.status === 'rejected' ? 'rejected' : pendingState })
+      steps.push({ label: s.roleDirector, name: a2.approver_id ? names[a2.approver_id] : undefined, note: a2.decision_note, state: a2.status === 'approved' ? 'done' : a2.status === 'rejected' ? 'rejected' : pendingState })
     } else {
       const threshold = company?.approval_second_over
       const director = company?.second_approver_id
@@ -196,183 +216,184 @@ export default function RequestDetailPage() {
     return steps
   })()
 
-  return (
-    <div className="p-4 lg:p-6 max-w-4xl mx-auto">
-      <button onClick={() => navigate('/requests')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-4"><ChevronLeft className="w-4 h-4" />{s.title}</button>
+  const flowCircle = (state: FlowState) =>
+    state === 'done' ? 'bg-success text-white'
+    : state === 'rejected' ? 'bg-danger text-white'
+    : state === 'cancelled' ? 'bg-icon text-white'
+    : state === 'current' ? 'bg-white border-2 border-warn text-warn'
+    : 'bg-white border border-field text-placeholder'
 
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 ">{req.request_number}</h1>
-            {req.title && <p className="text-sm text-ink2 mt-0.5">{req.title}</p>}
+  return (
+    <div className="p-4 lg:p-6">
+      <nav className="flex items-center gap-1.5 text-[13px] text-ink2 mb-4">
+        <button type="button" onClick={() => navigate('/requests')} aria-label={s.title} title={s.title}
+          className="w-7 h-7 -ml-1.5 mr-1 inline-flex items-center justify-center rounded-lg text-icon hover:bg-selected hover:text-ink transition-colors">
+          <ArrowLeft className="w-4 h-4" strokeWidth={1.75} />
+        </button>
+        <Link to="/requests" className="hover:text-ink transition-colors">{s.title}</Link>
+        <ChevronRight className="w-3.5 h-3.5 text-icon" />
+        <span className="text-ink font-medium">{req.request_number}</span>
+      </nav>
+
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-xl font-semibold text-ink tracking-tight">{req.title || req.request_number}</h1>
+            <span className={`badge ${STATUS_BADGE[st]}`}>{s.st[st]}</span>
           </div>
-          <span className={`badge ${STATUS_BADGE[st]}`}>{s.st[st]}</span>
+          <p className="mt-2 text-sm text-ink2">{req.title ? `${req.request_number} · ` : ''}{format(new Date(req.created_at), 'dd.MM.yyyy')}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {st === 'approved' && !req.po_id && (hasPerm('purchase_orders', 'create') || isAdmin) && (
-            <Button loading={actionLoading} onClick={doCreatePo} className="gap-1.5"><ShoppingCart className="w-3.5 h-3.5" />{s.createPO}</Button>
+            <Button loading={actionLoading} onClick={doCreatePo} className="gap-2"><ShoppingCart className="w-4 h-4" />{s.createPO}</Button>
           )}
           {st === 'draft' && (isCreator || isAdmin) && (
-            <Button loading={actionLoading} onClick={doSubmit} className="gap-1.5"><Send className="w-3.5 h-3.5" />{s.submit}</Button>
-          )}
-          {st !== 'cancelled' && !req.po_id && (isCreator || isAdmin) && (
-            <Button variant="secondary" onClick={() => navigate(`/requests/${id}/edit`)} className="gap-1.5"><Pencil className="w-3.5 h-3.5" />{s.edit}</Button>
+            <Button loading={actionLoading} onClick={doSubmit} className="gap-2"><Send className="w-4 h-4" />{s.submit}</Button>
           )}
           {st === 'pending' && myPending && (
             <>
-              <Button variant="secondary" onClick={() => { setDecision('reject'); setNote('') }} className="gap-1.5 text-red-600"><X className="w-3.5 h-3.5" />{t.approvals.reject}</Button>
-              <Button onClick={() => { setDecision('approve'); setNote('') }} className="gap-1.5"><Check className="w-3.5 h-3.5" />{t.approvals.approve}</Button>
+              <Button variant="secondary" onClick={() => { setDecision('reject'); setNote('') }} className="gap-2 !text-danger !border-line"><X className="w-4 h-4" />{t.approvals.reject}</Button>
+              <Button onClick={() => { setDecision('approve'); setNote('') }} className="gap-2"><Check className="w-4 h-4" />{t.approvals.approve}</Button>
             </>
           )}
+          {st !== 'cancelled' && !req.po_id && (isCreator || isAdmin) && (
+            <Button variant="secondary" onClick={() => navigate(`/requests/${id}/edit`)} className="gap-2"><Pencil className="w-4 h-4" />{s.edit}</Button>
+          )}
           {st === 'draft' && (isCreator || isAdmin) && (
-            <Button variant="secondary" onClick={() => setConfirmDelete(true)} className="gap-1.5 text-red-600"><Trash2 className="w-3.5 h-3.5" />{s.deleteDraft}</Button>
+            <Button variant="secondary" onClick={() => setConfirmDelete(true)} className="gap-2 !text-danger !border-line"><Trash2 className="w-4 h-4" />{s.deleteDraft}</Button>
           )}
           {st !== 'cancelled' && st !== 'draft' && !req.po_id && (isCreator || isAdmin) && (
-            <Button variant="secondary" onClick={() => setConfirmCancel(true)} className="gap-1.5 text-red-600"><XCircle className="w-3.5 h-3.5" />{s.cancelRequest}</Button>
+            <Button variant="secondary" onClick={() => setConfirmCancel(true)} className="gap-2 !text-danger !border-line"><XCircle className="w-4 h-4" />{s.cancelRequest}</Button>
           )}
         </div>
       </div>
 
-      {linkedPo && (linkedPo.status === 'cancelled' ? (
-        <button onClick={() => navigate(`/purchase-orders/${linkedPo.id}`)}
-          className="w-full flex items-center gap-3 p-4 mb-5 bg-selected border border-field rounded-lg text-left hover:bg-hover transition-colors">
-          <XCircle className="w-5 h-5 text-gray-400 shrink-0" />
-          <div className="flex-1">
-            <p className="text-xs text-gray-400">{s.linkedPO} · {t.status.cancelled}</p>
-            <p className="text-sm font-semibold text-gray-500 line-through decoration-gray-300">{linkedPo.po_number}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{format(new Date(linkedPo.created_at), 'dd.MM.yyyy')}</p>
-          </div>
-          <span className="text-sm font-medium text-gray-400">{fmt(linkedPo.total_amount ?? 0)}</span>
-        </button>
-      ) : (
-        <button onClick={() => navigate(`/purchase-orders/${linkedPo.id}`)}
-          className="w-full flex items-center gap-3 p-4 mb-5 bg-accent-light border border-accent-border rounded-lg text-left hover:bg-accent-light transition-colors">
-          <ShoppingCart className="w-5 h-5 text-accent shrink-0" />
-          <div className="flex-1">
-            <p className="text-xs text-accent">{s.linkedPO}</p>
-            <p className="text-sm font-semibold text-accent-hover ">{linkedPo.po_number}</p>
-            <p className="text-xs text-accent mt-0.5">{format(new Date(linkedPo.created_at), 'dd.MM.yyyy')}</p>
-          </div>
-          <span className="text-sm font-medium text-accent-hover">{fmt(linkedPo.total_amount ?? 0)}</span>
-        </button>
-      ))}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+        {/* left: what is being requested */}
+        <div className="xl:col-span-2 flex flex-col gap-4">
+          <Card title={s.lineItems} className="overflow-hidden">
+            <div className="overflow-x-auto"><table className="table-grid w-full text-sm min-w-[620px]">
+              <GridHead cols={[[s.itemName, Package], [s.category, Tag], [s.quantity, Hash, 'right'], [s.unit, Ruler], [s.estUnitPrice, Coins, 'right'], [s.lineTotal, Coins, 'right']]} />
+              <tbody className="divide-y divide-field">
+                {lines.map(l => (
+                  <tr key={l.id}>
+                    <td className="px-4 py-3">
+                      <div className="flex items-baseline gap-2 min-w-0">
+                        <span className="font-medium text-ink whitespace-nowrap">{l.name}</span>
+                        {l.long_description && <span className="text-xs text-gray-400 truncate max-w-[220px]">{l.long_description}</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-ink2">{l.categories?.name ?? '-'}</td>
+                    <td className="px-4 py-3 text-right text-ink2 tabular-nums">{l.quantity}</td>
+                    <td className="px-4 py-3 text-ink2">{unitLabel(l.unit, lang) || '-'}</td>
+                    <td className="px-4 py-3 text-right text-ink2 tabular-nums">{fmt(l.est_unit_price)}</td>
+                    <td className="px-4 py-3 text-right text-ink tabular-nums">{fmt(l.line_total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>
+            <div className="flex justify-end px-5 py-4 border-t border-field">
+              <div className="w-64 flex flex-col gap-1.5 text-sm">
+                {req.discount_amount > 0 && <div className="flex justify-between"><span className="text-ink2">{s.discount}</span><span className="tabular-nums">-{fmt(req.discount_amount)}</span></div>}
+                <div className="flex justify-between items-baseline"><span className="font-medium text-ink2">{s.estTotal}</span><span className="text-lg font-semibold text-ink tabular-nums">{fmt(req.total_estimate)}</span></div>
+              </div>
+            </div>
+          </Card>
 
+          {attachments.length > 0 && (
+            <Card title={s.attachments}>
+              <ul className="divide-y divide-field">
+                {attachments.map(att => (
+                  <li key={att.id}>
+                    <button type="button" onClick={() => openAttachment(att.file_path)} className="w-full flex items-center gap-2.5 px-5 py-2.5 text-left hover:bg-surface transition-colors">
+                      <FileText className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
+                      <span className="text-sm font-medium text-ink flex-1 truncate">{att.file_name}</span>
+                      <Eye className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
 
-      <div className="bg-white rounded-lg border border-field p-6 mb-5 grid grid-cols-2 sm:grid-cols-3 gap-5">
-        <Field label={s.supplier} value={req.suppliers?.name ?? req.supplier_name} />
-        <Field label={s.location} value={req.locations?.name} />
-        <Field label={s.department} value={req.departments?.name} />
-        <Field label={s.neededBy} value={req.needed_by_date ? format(new Date(req.needed_by_date), 'dd.MM.yyyy') : null} />
-        <Field label={s.requestedBy} value={names[req.created_by]} />
-        <Field label={s.approver} value={req.approver_id ? names[req.approver_id] : null} />
-        {req.note && <div className="col-span-2 sm:col-span-3"><Field label={s.note} value={req.note} /></div>}
-      </div>
+          {activity.length > 0 && (
+            <Card title={s.auditTrail}>
+              <ol className="flex flex-col gap-4 p-5">
+                {activity.map((a, i) => {
+                  const dot = a.action === 'approved' ? 'bg-success' : a.action === 'rejected' ? 'bg-danger' : a.action === 'cancelled' ? 'bg-icon' : a.action === 'submitted' ? 'bg-warn' : 'bg-primary'
+                  return (
+                    <li key={a.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <span className={`w-2.5 h-2.5 rounded-full ${dot} mt-1.5`} />
+                        {i < activity.length - 1 && <span className="flex-1 w-px bg-line mt-1" />}
+                      </div>
+                      <div className="flex-1 -mt-0.5">
+                        <p className="text-sm text-ink">
+                          <span className="font-medium">{a.actor_id ? names[a.actor_id] ?? '-' : '-'}</span>{' '}
+                          {s.act[a.action]}{a.meta?.step ? ` (${s.step} ${a.meta.step})` : ''}{a.meta?.po_number ? ` ${a.meta.po_number}` : ''}
+                        </p>
+                        <p className="text-xs text-ink2">{format(new Date(a.created_at), 'dd.MM.yyyy HH:mm')}</p>
+                        {a.note && <p className="text-sm text-ink mt-1 pl-3 border-l-2 border-line whitespace-pre-wrap">{a.note}</p>}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ol>
+            </Card>
+          )}
+        </div>
 
-      {flowSteps.length > 0 && (
-        <div className="bg-white rounded-lg border border-field p-6 mb-5">
-          <p className="text-sm font-semibold text-gray-900 mb-4">{s.flowTitle}</p>
-          <div className="flex items-start overflow-x-auto py-2">
-            {flowSteps.map((step, i) => {
-              const circle =
-                step.state === 'done' ? 'bg-green-500 text-white border-2 border-green-500'
-                : step.state === 'rejected' ? 'bg-red-500 text-white border-2 border-red-500'
-                : step.state === 'cancelled' ? 'bg-gray-400 text-white border-2 border-gray-400'
-                : step.state === 'current' ? 'bg-warn-light text-amber-600 border-2 border-amber-400'
-                : 'bg-gray-100 text-gray-300 border-2 border-field'
-              return (
-                <Fragment key={i}>
-                  <div className="flex flex-col items-center text-center px-1.5 w-28 shrink-0">
-                    <div style={{ width: 44, height: 44, minWidth: 44, minHeight: 44, aspectRatio: '1 / 1' }} className={`shrink-0 rounded-full flex items-center justify-center ${circle}`}>
-                      {step.state === 'done' ? <Check className="w-5 h-5" />
-                        : step.state === 'rejected' || step.state === 'cancelled' ? <X className="w-5 h-5" />
-                        : <span style={{ width: 10, height: 10 }} className="rounded-full bg-current" />}
+        {/* right: who, when, where and how far it got */}
+        <div className="flex flex-col gap-4 order-first xl:order-none">
+          <Card title={s.detailsTitle}>
+            <div className="p-5 grid grid-cols-2 gap-x-6 gap-y-5">
+              <div className="col-span-2"><Field label={s.supplier}>{req.suppliers?.name ?? req.supplier_name}</Field></div>
+              <Field label={s.location}>{req.locations?.name}</Field>
+              <Field label={s.department}>{req.departments?.name}</Field>
+              <Field label={s.neededBy}>{req.needed_by_date ? format(new Date(req.needed_by_date), 'dd.MM.yyyy') : null}</Field>
+              <Field label={s.requestedBy}>{names[req.created_by] && <PersonCell name={names[req.created_by]} />}</Field>
+              <Field label={s.approver}>{req.approver_id && names[req.approver_id] ? <PersonCell name={names[req.approver_id]} /> : null}</Field>
+              {req.note && <div className="col-span-2"><Field label={s.note}><span className="whitespace-pre-wrap">{req.note}</span></Field></div>}
+            </div>
+          </Card>
+
+          {flowSteps.length > 0 && (
+            <Card title={s.flowTitle}>
+              <ol className="p-5 flex flex-col">
+                {flowSteps.map((step, i) => (
+                  <li key={i} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${flowCircle(step.state)}`}>
+                        {step.state === 'done' ? <Check className="w-3.5 h-3.5" />
+                          : step.state === 'rejected' || step.state === 'cancelled' ? <X className="w-3.5 h-3.5" />
+                          : <span className="w-1.5 h-1.5 rounded-full bg-current" />}
+                      </span>
+                      {i < flowSteps.length - 1 && <span className={`w-px flex-1 my-1 min-h-[14px] ${step.state === 'done' ? 'bg-success' : 'bg-line'}`} />}
                     </div>
-                    <p className="text-[11px] font-semibold text-gray-700 mt-1.5">{step.label}</p>
-                    {step.name && <p className="text-xs text-gray-500 truncate w-full">{step.name}</p>}
-                  </div>
-                  {i < flowSteps.length - 1 && <div className={`flex-1 h-0.5 mt-[22px] min-w-[20px] ${step.state === 'done' ? 'bg-green-300' : 'bg-gray-200'}`} />}
-                </Fragment>
-              )
-            })}
-          </div>
-        </div>
-      )}
+                    <div className="pb-4">
+                      <p className="text-sm font-medium text-ink leading-6">{step.label}</p>
+                      {step.name && <p className="text-[13px] text-ink2 -mt-0.5">{step.name}</p>}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          )}
 
-      {attachments.length > 0 && (
-        <div className="bg-white rounded-lg border border-field p-6 mb-5">
-          <p className="text-sm font-semibold text-gray-900 mb-3">{s.attachments}</p>
-          <div className="flex flex-col gap-2">
-            {attachments.map(att => (
-              <button key={att.id} type="button" onClick={() => openAttachment(att.file_path)}
-                className="flex items-center gap-2 p-2.5 bg-accent-light border border-accent-border rounded-lg text-left">
-                <FileText className="w-4 h-4 text-accent shrink-0" />
-                <span className="text-sm text-accent hover:underline font-medium flex-1 truncate">{att.file_name}</span>
+          {linkedPo && (
+            <Card title={s.linkedPO}>
+              <button onClick={() => navigate(`/purchase-orders/${linkedPo.id}`)} className="w-full flex items-center gap-3 p-5 text-left hover:bg-surface transition-colors rounded-b-lg">
+                <ShoppingCart className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium text-ink ${linkedPo.status === 'cancelled' ? 'line-through decoration-gray-300' : ''}`}>{linkedPo.po_number}</p>
+                  <p className="text-xs text-ink2 mt-0.5">{format(new Date(linkedPo.created_at), 'dd.MM.yyyy')}{linkedPo.status === 'cancelled' ? ` · ${t.status.cancelled}` : ''}</p>
+                </div>
+                <span className="text-sm text-ink tabular-nums">{fmt(linkedPo.total_amount ?? 0)}</span>
               </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="bg-white rounded-lg border border-field overflow-hidden mb-5">
-        <div className="overflow-x-auto"><table className="w-full text-sm min-w-[500px]">
-          <thead className="bg-surface border-b border-field"><tr>
-            <th className="text-left px-4 py-2.5 text-sm font-medium text-ink2">{s.itemName}</th>
-            <th className="text-left px-4 py-2.5 text-sm font-medium text-ink2">{s.category}</th>
-            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2">{s.quantity}</th>
-            <th className="text-left px-4 py-2.5 text-sm font-medium text-ink2">{s.unit}</th>
-            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2">{s.estUnitPrice}</th>
-            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2">{s.lineTotal}</th>
-          </tr></thead>
-          <tbody className="divide-y divide-field">
-            {lines.map(l => (
-              <tr key={l.id}>
-                <td className="px-4 py-2.5 text-gray-800">
-                  {l.name}
-                  {l.long_description && <p className="text-xs text-gray-400 mt-0.5">{l.long_description}</p>}
-                </td>
-                <td className="px-4 py-2.5 text-gray-600">{l.categories?.name ?? '—'}</td>
-                <td className="px-4 py-2.5 text-right text-gray-600">{l.quantity}</td>
-                <td className="px-4 py-2.5 text-gray-600">{l.unit}</td>
-                <td className="px-4 py-2.5 text-right text-gray-600">{fmt(l.est_unit_price)}</td>
-                <td className="px-4 py-2.5 text-right font-medium text-gray-800">{fmt(l.line_total)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table></div>
-        <div className="flex justify-end p-4 border-t border-gray-100">
-          <div className="w-64 flex flex-col gap-1.5">
-            {req.discount_amount > 0 && <div className="flex justify-between text-sm"><span className="text-gray-500">{s.discount}</span><span>−{fmt(req.discount_amount)}</span></div>}
-            <div className="flex justify-between border-t border-gray-100 pt-1.5"><span className="text-sm font-semibold text-gray-700">{s.estTotal}</span><span className="text-base font-bold text-gray-900">{fmt(req.total_estimate)}</span></div>
-          </div>
+            </Card>
+          )}
         </div>
       </div>
-
-      {activity.length > 0 && (
-        <div className="bg-white rounded-lg border border-field p-6 mb-5">
-          <p className="text-sm font-semibold text-gray-900 mb-4">{s.auditTrail}</p>
-          <ol className="flex flex-col gap-4">
-            {activity.map(a => {
-              const dot = a.action === 'approved' ? 'bg-green-500' : a.action === 'rejected' ? 'bg-red-500' : a.action === 'cancelled' ? 'bg-gray-400' : a.action === 'submitted' ? 'bg-amber-500' : 'bg-accent'
-              return (
-                <li key={a.id} className="flex gap-3">
-                  <div className="flex flex-col items-center">
-                    <span className={`w-2.5 h-2.5 rounded-full ${dot} mt-1.5`} />
-                    <span className="flex-1 w-px bg-gray-100 mt-1" />
-                  </div>
-                  <div className="flex-1 -mt-0.5">
-                    <p className="text-sm text-gray-800">
-                      <span className="font-medium">{a.actor_id ? names[a.actor_id] ?? '—' : '—'}</span>{' '}
-                      {s.act[a.action]}{a.meta?.step ? ` (${s.step} ${a.meta.step})` : ''}{a.meta?.po_number ? ` ${a.meta.po_number}` : ''}
-                    </p>
-                    <p className="text-xs text-gray-400">{format(new Date(a.created_at), 'dd.MM.yyyy HH:mm')}</p>
-                    {a.note && <p className="text-sm text-gray-600 mt-1 bg-gray-50 border border-gray-100 rounded-lg px-3 py-1.5">{a.note}</p>}
-                  </div>
-                </li>
-              )
-            })}
-          </ol>
-        </div>
-      )}
 
       <ConfirmDialog open={confirmCancel} onClose={() => setConfirmCancel(false)} onConfirm={doCancel}
         title={s.cancelTitle} message={s.cancelQuestion} name={req.request_number} danger loading={actionLoading} confirmLabel={s.cancelRequest} />
@@ -380,11 +401,14 @@ export default function RequestDetailPage() {
       <ConfirmDialog open={confirmDelete} onClose={() => setConfirmDelete(false)} onConfirm={doDeleteDraft}
         title={s.deleteTitle} message={s.deleteQuestion} name={req.request_number} danger loading={actionLoading} confirmLabel={t.common.deleteEntity} />
 
-      <Modal open={!!decision} onClose={() => setDecision(null)} title={decision === 'approve' ? t.approvals.approveTitle : t.approvals.rejectTitle} size="sm" icon={ClipboardList}>
-        <div className="flex flex-col gap-1 mb-4">
-          <label className="text-sm font-medium text-gray-700">{t.approvals.noteOptional}</label>
-          <textarea value={note} onChange={e => setNote(e.target.value)} rows={3}
-            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus" />
+      <Modal open={!!decision} onClose={() => setDecision(null)} title={decision === 'approve' ? t.approvals.approveTitle : t.approvals.rejectTitle} size="sm" icon={decision === 'reject' ? X : Check}>
+        <p className="text-sm text-ink2 mb-4">
+          <span className="font-medium text-ink">{req.request_number}</span>{req.title ? ` · ${req.title}` : ''} · <span className="tabular-nums">{fmt(req.total_estimate)}</span>
+        </p>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="d-note">{t.approvals.noteOptional}</label>
+          <textarea id="d-note" value={note} onChange={e => setNote(e.target.value)} rows={3}
+            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none" />
         </div>
         <ModalActions className="justify-end">
           <Button variant="secondary" onClick={() => setDecision(null)}>{t.common.cancel}</Button>

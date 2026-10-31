@@ -5,11 +5,13 @@ import { useLanguage } from '../hooks/useLanguage'
 import { toast } from '../components/ui/Toast'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import Select from '../components/ui/Select'
 import CountrySelect from '../components/ui/CountrySelect'
 import type { Company } from '../types/database'
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HRK']
 
+/** One group of settings: a card with the title and explanation on top, the fields below and its own Save button at the bottom. */
 function Section({ title, description, footer, saving, onSave, children }: {
   title: string
   description?: string
@@ -20,17 +22,17 @@ function Section({ title, description, footer, saving, onSave, children }: {
 }) {
   const { t } = useLanguage()
   return (
-    <div className="bg-white rounded-lg border border-field overflow-hidden form-skin">
-      <div className="px-6 py-5">
-        <h2 className="text-lg font-semibold text-ink">{title}</h2>
-        {description && <p className="text-sm text-ink2 mt-1.5">{description}</p>}
+    <section className="bg-white rounded-lg border border-field form-skin">
+      <div className="px-6 pt-5 pb-6">
+        <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
+        {description && <p className="text-sm text-ink2 mt-1">{description}</p>}
         <div className="mt-5">{children}</div>
       </div>
       <div className="flex items-center justify-between gap-4 px-6 py-3 border-t border-field">
-        <p className="text-xs text-gray-400">{footer}</p>
+        <p className="text-[13px] text-ink2">{footer}</p>
         <Button loading={saving} onClick={onSave}>{t.common.save}</Button>
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -94,11 +96,13 @@ export default function SettingsPage() {
 
   if (loading && !company) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
 
+  const memberOptions = [{ value: '', label: '-' }, ...members.map(m => ({ value: m.id, label: `${m.first_name} ${m.last_name}` }))]
+
   return (
-    <div className="p-4 lg:p-6 max-w-3xl mx-auto">
+    <div className="p-4 lg:p-6 max-w-4xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">{s.title}</h1>
-        <p className="text-gray-500 text-sm mt-1">{s.subtitle}</p>
+        <h1 className="text-xl font-semibold text-ink tracking-tight">{s.title}</h1>
+        <p className="text-sm text-ink2 mt-1">{s.subtitle}</p>
       </div>
 
       <div className="flex flex-col gap-5">
@@ -117,32 +121,32 @@ export default function SettingsPage() {
         <Section title={s.companyProfile} description={s.companyProfileHint} saving={saving === 'profile'}
           onSave={() => save('profile', ['name', 'email', 'phone', 'tax_id', 'address_street', 'address_city', 'address_postal_code', 'address_country'])}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <Input id="name" label={s.companyName} {...field('name')} />
             </div>
             <Input id="email" label={t.common.email} type="email" {...field('email')} />
             <Input id="phone" label={t.common.phone} {...field('phone')} />
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <Input id="tax_id" label={s.vatTaxId} {...field('tax_id')} />
             </div>
-            <Input id="address_street" label={t.common.streetAddress} {...field('address_street')} />
-            <Input id="address_city" label={t.common.city} {...field('address_city')} />
+            <div className="sm:col-span-2">
+              <Input id="address_street" label={t.common.streetAddress} {...field('address_street')} />
+            </div>
             <Input id="address_postal_code" label={t.common.postalCode} {...field('address_postal_code')} />
-            <CountrySelect id="address_country" label={t.common.country} value={(form.address_country as string) ?? ''} onChange={v => setForm(f => ({ ...f, address_country: v }))} />
+            <Input id="address_city" label={t.common.city} {...field('address_city')} />
+            <div className="sm:col-span-2">
+              <CountrySelect id="address_country" label={t.common.country} value={(form.address_country as string) ?? ''} onChange={v => setForm(f => ({ ...f, address_country: v }))} />
+            </div>
           </div>
         </Section>
 
         <Section title={s.poSettings} description={s.poSettingsHint} saving={saving === 'po'}
           onSave={() => save('po', ['currency', 'po_prefix', 'po_next_number'])}
-          footer={<>{s.nextPoWillBe}: <span className="text-gray-600 font-medium">{form.po_prefix ?? 'PO'}-{String(form.po_next_number ?? 1).padStart(4, '0')}</span></>}>
+          footer={<>{s.nextPoWillBe}: <span className="text-ink font-medium">{form.po_prefix ?? 'PO'}-{String(form.po_next_number ?? 1).padStart(4, '0')}</span></>}>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-ink2">{s.currency}</label>
-              <select value={form.currency ?? 'EUR'} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}
-                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus">
-                {CURRENCIES.map(c => <option key={c}>{c}</option>)}
-              </select>
-            </div>
+            <Select id="currency" label={s.currency} value={form.currency ?? 'EUR'}
+              options={CURRENCIES.map(c => ({ value: c, label: c }))}
+              onChange={v => setForm(f => ({ ...f, currency: v }))} />
             <Input id="po_prefix" label={s.poPrefix} {...field('po_prefix')} />
             <Input id="po_next_number" label={s.nextPoNumber} type="number"
               value={form.po_next_number?.toString() ?? '1'}
@@ -162,36 +166,26 @@ export default function SettingsPage() {
         {isAdmin && (
           <Section title={s.approvalsSettings} description={s.approvalsSettingsHint} saving={saving === 'approvals'}
             onSave={() => save('approvals', ['approver_id', 'approval_second_over', 'second_approver_id', 'team_edit_requests'])}>
-            <div className="flex flex-col gap-1 mb-4 sm:max-w-[calc(50%-0.5rem)]">
-              <label className="text-sm font-medium text-ink2">{s.approver}</label>
-              <select value={form.approver_id ?? ''}
-                onChange={e => setForm(f => ({ ...f, approver_id: e.target.value || null }))}
-                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus bg-white">
-                <option value="">{s.selectApprover}</option>
-                {members.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
-              </select>
-              <p className="text-xs text-muted">{s.approverHint}</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input id="approval_second_over" label={s.secondApprovalOver} type="number"
-                value={form.approval_second_over?.toString() ?? ''}
-                onChange={e => setForm(f => ({ ...f, approval_second_over: e.target.value === '' ? null : parseFloat(e.target.value) }))} />
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-ink2">{s.secondApprover}</label>
-                <select value={form.second_approver_id ?? ''}
-                  onChange={e => setForm(f => ({ ...f, second_approver_id: e.target.value || null }))}
-                  className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus bg-white">
-                  <option value="">{s.selectApprover}</option>
-                  {members.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
-                </select>
+            <div className="flex flex-col gap-4">
+              <div className="sm:max-w-[calc(50%-0.5rem)]">
+                <Select id="approver" label={s.approver} value={form.approver_id ?? ''} options={memberOptions} placeholder={s.selectApprover}
+                  onChange={v => setForm(f => ({ ...f, approver_id: v || null }))} />
+                <p className="text-xs text-ink2 mt-1.5 leading-4">{s.approverHint}</p>
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input id="approval_second_over" label={s.secondApprovalOver} type="number"
+                  value={form.approval_second_over?.toString() ?? ''}
+                  onChange={e => setForm(f => ({ ...f, approval_second_over: e.target.value === '' ? null : parseFloat(e.target.value) }))} />
+                <Select id="second_approver" label={s.secondApprover} value={form.second_approver_id ?? ''} options={memberOptions} placeholder={s.selectApprover}
+                  onChange={v => setForm(f => ({ ...f, second_approver_id: v || null }))} />
+              </div>
+              <label className="flex items-center gap-2.5 text-sm text-ink">
+                <input type="checkbox" checked={form.team_edit_requests ?? false}
+                  onChange={e => setForm(f => ({ ...f, team_edit_requests: e.target.checked }))}
+                  className="rounded border-field text-accent focus:ring-accent" />
+                {s.teamEditRequests}
+              </label>
             </div>
-            <label className="flex items-center gap-2 mt-4 text-sm text-ink2">
-              <input type="checkbox" checked={form.team_edit_requests ?? false}
-                onChange={e => setForm(f => ({ ...f, team_edit_requests: e.target.checked }))}
-                className="rounded border-field text-accent focus:ring-accent" />
-              {s.teamEditRequests}
-            </label>
           </Section>
         )}
       </div>

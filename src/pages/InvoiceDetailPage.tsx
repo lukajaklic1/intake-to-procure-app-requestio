@@ -216,7 +216,7 @@ export default function InvoiceDetailPage() {
         <div className="space-y-4">
           <div className="bg-white rounded-lg border border-field p-5">
             <div className="flex items-center gap-3 flex-wrap mb-2">
-              <h2 className="text-sm font-semibold text-gray-700">{s.matching}</h2>
+              <h2 className="text-[15px] font-semibold text-ink">{s.matching}</h2>
               <span className={`badge ${MATCH_BADGE[result.status]}`}>{s.matchSt[result.status]}</span>
               <span className="text-xs text-gray-400">{s.basis[result.basis]}</span>
             </div>

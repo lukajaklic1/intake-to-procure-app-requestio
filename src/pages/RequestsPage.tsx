@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, FileText, Eye, Search, X, ClipboardList, Tag, Building2, CalendarClock, User, Coins, CircleDot, ShoppingCart } from 'lucide-react'
+import { Plus, FileText, Eye, Search, X, ClipboardList, IdCard, Tag, Building2, CalendarClock, User, Coins, CircleDot, ShoppingCart } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -33,11 +33,19 @@ const STATUS_BADGE: Record<string, string> = {
 
 const STATUSES: RequestStatus[] = ['draft', 'pending', 'approved', 'rejected', 'cancelled', 'completed']
 
-// Distinct line categories of a document: "Food", or "Food +2" when mixed.
-function catLabel(lines: { categories: { name: string } | null }[] | null | undefined) {
-  const names = [...new Set((lines ?? []).map(l => l.categories?.name).filter(Boolean) as string[])]
-  if (names.length === 0) return '—'
-  return names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`
+// Main category of a document: the one with the most lines ("Food"), plus how many other main categories its lines have ("Food +1").
+function catLabel(lines: { category_id: string | null }[] | null | undefined, cats: { id: string; name: string; parent_id: string | null }[]) {
+  const mains = (lines ?? []).map(l => {
+    const c = cats.find(x => x.id === l.category_id)
+    return (c?.parent_id ? cats.find(x => x.id === c.parent_id) : c)?.name
+  }).filter(Boolean) as string[]
+  if (mains.length === 0) return '-'
+  // the main category with the most lines; on a tie the one that comes first
+  const counts = new Map<string, number>()
+  for (const n of mains) counts.set(n, (counts.get(n) ?? 0) + 1)
+  let top = mains[0]
+  for (const [n, c] of counts) if (c > counts.get(top)!) top = n
+  return counts.size === 1 ? top : `${top} +${counts.size - 1}`
 }
 
 interface Row {
@@ -87,13 +95,11 @@ export default function RequestsPage() {
   useEffect(() => { setPage(1) }, [sort])
   const [status, setStatus] = useState('all')
   const [dateRange, setDateRange] = useState('all')
-  const [supplierId, setSupplierId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [departmentId, setDepartmentId] = useState('')
   const [poFilter, setPoFilter] = useState('all')
   const [creatorId, setCreatorId] = useState('')
 
-  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
   const [categories, setCategories] = useState<{ id: string; name: string; parent_id: string | null; status: 'active' | 'inactive' }[]>([])
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
   const [members, setMembers] = useState<{ id: string; first_name: string; last_name: string }[]>([])
@@ -105,13 +111,12 @@ export default function RequestsPage() {
   async function loadRefs() {
     if (!company) return
     const cid = company.id
-    const [sp, c, d, u] = await Promise.all([
-      supabase.from('suppliers').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
+    const [c, d, u] = await Promise.all([
       supabase.from('categories').select('id, name, parent_id, status').eq('company_id', cid).order('name'),
       supabase.from('departments').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('users').select('id, first_name, last_name').eq('company_id', cid).order('first_name'),
     ])
-    setSuppliers(sp.data ?? []); setCategories(c.data ?? []); setDepartments(d.data ?? []); setMembers(u.data ?? [])
+    setCategories(c.data ?? []); setDepartments(d.data ?? []); setMembers(u.data ?? [])
   }
 
   async function load() {
@@ -145,12 +150,12 @@ export default function RequestsPage() {
 
   function clearFilters() {
     setSearch(''); setStatus('all'); setDateRange('all')
-    setSupplierId(''); setCategoryId(''); setDepartmentId(''); setPoFilter('all'); setCreatorId(''); setPage(1)
+    setCategoryId(''); setDepartmentId(''); setPoFilter('all'); setCreatorId(''); setPage(1)
   }
-  const hasActiveFilters = search || status !== 'all' || dateRange !== 'all' || supplierId || categoryId || departmentId || poFilter !== 'all' || creatorId
+  const hasActiveFilters = search || status !== 'all' || dateRange !== 'all' || categoryId || departmentId || poFilter !== 'all' || creatorId
 
   const dateFrom = getDateFrom(dateRange)
-  useEffect(() => { setPage(1) }, [search, status, dateRange, supplierId, categoryId, departmentId, poFilter, creatorId])
+  useEffect(() => { setPage(1) }, [search, status, dateRange, categoryId, departmentId, poFilter, creatorId])
 
   const sortDefs: SortDef<(typeof rows)[number]>[] = [
     { value: 'newest', label: t.sort.newest, cmp: rev(date(r => r.created_at)) },
@@ -166,7 +171,6 @@ export default function RequestsPage() {
     if (!matchesSearch(search, [r.request_number, r.title, r.suppliers?.name ?? r.supplier_name, r.locations?.name, names[r.created_by], ...r.request_line_items.map(l => l.categories?.name)])) return false
     if (status !== 'all' && r.status !== status) return false
     if (dateFrom && r.created_at < dateFrom) return false
-    if (supplierId && r.supplier_id !== supplierId) return false
     if (categoryId) { const ids = categoryAndChildren(categoryId, categories); if (!r.request_line_items?.some(l => ids.has(l.category_id ?? ''))) return false }
     if (departmentId && r.department_id !== departmentId) return false
     if (poFilter === 'ordered' && !r.po_id) return false
@@ -179,7 +183,7 @@ export default function RequestsPage() {
   const exportCols: ExportColumn<Row>[] = [
     { header: s.requestNumber, get: r => r.request_number, kind: 'text', width: 14 },
     { header: s.requestTitle, get: r => r.title, kind: 'text', width: 40 },
-    { header: s.category, get: r => catLabel(r.request_line_items), kind: 'text', width: 24 },
+    { header: s.category, get: r => catLabel(r.request_line_items, categories), kind: 'text', width: 24 },
     { header: s.supplier, get: r => r.suppliers?.name ?? r.supplier_name, kind: 'text', width: 30 },
     { header: s.neededBy, get: r => r.needed_by_date, kind: 'date', width: 14 },
     { header: s.requestedBy, get: r => names[r.created_by], kind: 'text', width: 22 },
@@ -197,7 +201,7 @@ export default function RequestsPage() {
       <PageToolbar attached actions={<><ExportButton fileName="zahtevki" columns={exportCols} rows={sortedRows} /><Button onClick={() => navigate('/requests/new')} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}>
           <div className="relative min-w-40 flex-1 max-w-[220px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder={s.requestNumber + ' / ' + s.supplier}
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
               className="w-full pl-9 pr-3 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
           </div>
           <SortFilter defs={sortDefs} value={sort} onChange={setSort} />
@@ -211,10 +215,6 @@ export default function RequestsPage() {
             <option value="3m">{t.filters.last3Months}</option>
             <option value="6m">{t.filters.last6Months}</option>
             <option value="1y">{t.filters.last12Months}</option>
-          </FilterSelect>
-          <FilterSelect label={t.filters.labels.supplier} value={supplierId} onChange={e => setSupplierId(e.target.value)}>
-            <option value="">{t.filters.allM}</option>
-            {suppliers.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
           </FilterSelect>
           <FilterSelect label={t.filters.labels.category} value={categoryId} onChange={e => setCategoryId(e.target.value)}>
             <option value="">{t.filters.allF}</option>
@@ -244,45 +244,27 @@ export default function RequestsPage() {
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1000px]">
-            <GridHead cols={[[s.requestNumber, ClipboardList], [s.category, Tag], [s.supplier, Building2], [s.neededBy, CalendarClock], [s.requestedBy, User], [s.estTotalCol, Coins], [t.common.status, CircleDot], [s.poCol, ShoppingCart], ['']]} />
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1100px]">
+            <GridHead cols={[[s.requestNumber, IdCard], [s.requestTitle, ClipboardList], [s.category, Tag], [s.supplier, Building2], [s.neededBy, CalendarClock], [s.requestedBy, User], [s.estTotalCol, Coins], [t.common.status, CircleDot], [s.poCol, ShoppingCart], ['']]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
                 <TableEmptyState icon={FileText} colSpan={10} title={hasActiveFilters ? t.common.empty.noResults.title : t.common.empty.requests.title} subtitle={hasActiveFilters ? t.common.empty.noResults.text : t.common.empty.requests.text} />
               ) : paginated.map(r => (
                 <tr key={r.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/requests/${r.id}`)}>
-                  <td className="px-4 py-3 max-w-[300px]">
-                    {r.title && <p className="text-sm font-medium text-ink truncate" title={r.title}>{r.title}</p>}
-                    <div className="flex items-center gap-2 whitespace-nowrap">
-                      <Link to={`/requests/${r.id}`} className={`font-medium hover:text-ink ${r.title ? 'text-xs text-gray-400' : 'text-sm text-gray-400'}`} onClick={e => e.stopPropagation()}>{r.request_number}</Link>
-                      <span className="text-xs text-gray-400">{format(new Date(r.created_at), 'dd.MM.yyyy')}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-ink2">{catLabel(r.request_line_items)}</td>
-                  <td className="px-4 py-3 text-ink2 max-w-[200px] truncate" title={r.suppliers?.name ?? r.supplier_name ?? undefined}>{r.suppliers?.name ?? r.supplier_name ?? '—'}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <p className="text-sm text-ink">{r.needed_by_date ? format(new Date(r.needed_by_date), 'dd.MM.yyyy') : '—'}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{r.locations?.name ?? '—'}</p>
-                  </td>
+                  <td className="px-4 py-3 text-ink2 whitespace-nowrap">{r.request_number}</td>
+                  <td className="px-4 py-3 max-w-[300px]"><p className="font-medium text-ink truncate" title={r.title ?? undefined}>{r.title || '-'}</p></td>
+                  <td className="px-4 py-3 text-ink2">{catLabel(r.request_line_items, categories)}</td>
+                  <td className="px-4 py-3 text-ink2 max-w-[200px] truncate" title={r.suppliers?.name ?? r.supplier_name ?? undefined}>{r.suppliers?.name ?? r.supplier_name ?? '-'}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-ink">{r.needed_by_date ? format(new Date(r.needed_by_date), 'dd.MM.yyyy') : '-'}</td>
                   <td className="px-4 py-3"><PersonCell name={names[r.created_by]} /></td>
-                  <td className="px-4 py-3 font-medium text-ink whitespace-nowrap">{fmt(r.total_estimate ?? 0, company?.currency)}</td>
+                  <td className="px-4 py-3 text-ink whitespace-nowrap tabular-nums">{fmt(r.total_estimate ?? 0, company?.currency)}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`badge ${STATUS_BADGE[r.status]}`}>{s.st[r.status]}</span>
-                    {r.status === 'pending' && r.approver_id && names[r.approver_id] && (
-                      <p className="text-xs text-gray-400 mt-1">{names[r.approver_id]}</p>
-                    )}
+                    <span className={`badge ${STATUS_BADGE[r.status]}`} title={r.status === 'pending' && r.approver_id ? names[r.approver_id] : undefined}>{s.st[r.status]}</span>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {r.po_id && poNums[r.po_id]
-                      ? (poNums[r.po_id].status === 'cancelled'
-                        ? <>
-                            <Link to={`/purchase-orders/${r.po_id}`} onClick={e => e.stopPropagation()} className="text-sm font-medium text-gray-400 line-through decoration-gray-300 hover:text-gray-600">{poNums[r.po_id].po_number}</Link>
-                            <p className="text-xs text-gray-400 mt-0.5">{format(new Date(poNums[r.po_id].created_at), 'dd.MM.yyyy')}</p>
-                          </>
-                        : <>
-                            <Link to={`/purchase-orders/${r.po_id}`} onClick={e => e.stopPropagation()} className=" text-sm font-medium text-gray-400 hover:text-gray-600">{poNums[r.po_id].po_number}</Link>
-                            <p className="text-xs text-gray-400 mt-0.5">{format(new Date(poNums[r.po_id].created_at), 'dd.MM.yyyy')}</p>
-                          </>)
+                      ? <Link to={`/purchase-orders/${r.po_id}`} onClick={e => e.stopPropagation()}
+                          className={`text-ink2 hover:text-ink ${poNums[r.po_id].status === 'cancelled' ? 'line-through decoration-gray-300' : ''}`}>{poNums[r.po_id].po_number}</Link>
                       : r.status === 'approved' && (hasPerm('purchase_orders', 'create') || isAdmin)
                         ? <button onClick={e => { e.stopPropagation(); navigate(`/requests/${r.id}`) }}
                             className="inline-flex items-center gap-1 badge badge-warn hover:brightness-95 transition-all whitespace-nowrap">
@@ -290,7 +272,7 @@ export default function RequestsPage() {
                           </button>
                         : r.status === 'approved'
                           ? <span className="badge badge-neutral">{t.requests.pendingPO}</span>
-                          : <span className="text-gray-300">—</span>}
+                          : <span className="text-ink2">-</span>}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end" onClick={e => e.stopPropagation()}>

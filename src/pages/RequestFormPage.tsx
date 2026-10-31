@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, Trash2, ChevronLeft, Search, X, Paperclip, FileText, UploadCloud, Send } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Plus, Trash2, ArrowLeft, ChevronRight, Search, X, Paperclip, FileText, UploadCloud, Send, Hash, IdCard, Package, Tag, Ruler, Coins } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -8,101 +8,25 @@ import { useRequired } from '../lib/useRequired'
 import { toast } from '../components/ui/Toast'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
-import CategoryOptions from '../components/ui/CategoryOptions'
+import Select from '../components/ui/Select'
+import GridHead from '../components/ui/GridHead'
+import { categoryScope, mainCategoryId } from '../lib/categories'
+import CatalogPicker from '../components/ui/CatalogPicker'
+import LineCategoryCells from '../components/ui/LineCategoryCells'
 import Modal from '../components/ui/Modal'
 import type { Item } from '../types/database'
-import { matchesSearch } from '../lib/search'
-import { unitLabel } from '../lib/units'
+import { unitLabel, unitCode, unitOptions } from '../lib/units'
 import ModalActions from '../components/ui/ModalActions'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
-
-// ─── Catalog search ────────────────────────────────────────────
-function ItemSearch({ items, onSelect, placeholder }: { items: Item[]; onSelect: (item: Item) => void; placeholder: string }) {
-  const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
-  const filtered = query.length > 0
-    ? items.filter(i => matchesSearch(query, [i.item_number, i.name, i.long_description]))
-    : items
-  return (
-    <div className="relative">
-      <div className="flex items-center gap-1 border border-field rounded-lg hover:border-field-hover bg-white px-2 py-1.5 focus-within:border-field-focus">
-        <Search className="w-3 h-3 text-gray-400 shrink-0" />
-        <input value={query} onChange={e => { setQuery(e.target.value); setOpen(true) }}
-          onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder={placeholder} className="text-xs bg-transparent outline-none flex-1 text-ink placeholder:text-placeholder min-w-0" />
-        {query && <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setQuery('')}><X className="w-3 h-3 text-gray-300" /></button>}
-      </div>
-      {open && filtered.length > 0 && (
-        <div className="absolute z-30 left-0 mt-1 w-72 bg-white border border-field rounded-lg shadow-lg overflow-y-auto max-h-56">
-          {filtered.map(item => (
-            <button key={item.id} type="button" onMouseDown={e => e.preventDefault()}
-              onClick={() => { onSelect(item); setQuery(''); setOpen(false) }}
-              className="w-full text-left px-3 py-2 hover:bg-accent-light transition-colors">
-              <span className=" text-xs text-gray-400 mr-2">{item.item_number}</span>
-              <span className="text-sm font-medium text-gray-800">{item.name}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Generic search combobox ───────────────────────────────────
-function SearchCombobox({ items, value, onChange, label, required, placeholder, emptyText }: {
-  items: { id: string; name: string; sub?: string }[]
-  value: string; onChange: (id: string) => void; label: string; required?: boolean; placeholder: string; emptyText: string
-}) {
-  const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
-  const selected = items.find(i => i.id === value)
-  const filtered = query.length > 0 ? items.filter(i => matchesSearch(query, [i.name, i.sub])) : items
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-gray-700">{label}{required && ' *'}</label>
-      <div className="relative">
-        <input value={open ? query : (selected?.name ?? '')}
-          onChange={e => { setQuery(e.target.value); setOpen(true) }}
-          onFocus={() => { setQuery(''); setOpen(true) }}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder={placeholder}
-          className="w-full rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-ink placeholder:text-placeholder focus:outline-none focus:border-field-focus bg-white" />
-        {open && (
-          <div className="absolute z-30 left-0 mt-1 w-full bg-white border border-field rounded-lg shadow-lg overflow-y-auto max-h-56">
-            {filtered.length > 0 ? filtered.map(item => (
-              <button key={item.id} type="button" onMouseDown={e => e.preventDefault()}
-                onClick={() => { onChange(item.id); setQuery(''); setOpen(false) }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-accent-light transition-colors ${item.id === value ? 'bg-accent-light font-medium text-accent-hover' : 'text-gray-800'}`}>
-                {item.name}{item.sub && <span className="ml-2 text-xs text-gray-400">{item.sub}</span>}
-              </button>
-            )) : <p className="px-3 py-2 text-sm text-gray-400">{emptyText}</p>}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function Select({ id, label, value, onChange, children, placeholder, required, hint }: {
-  id: string; label: string; value: string; onChange: (v: string) => void; children: React.ReactNode; placeholder: string; required?: boolean; hint?: string
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium text-gray-700">{label}{required && ' *'}</label>
-      <select id={id} value={value} onChange={e => onChange(e.target.value)}
-        className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-ink focus:outline-none focus:border-field-focus bg-white">
-        <option value="">{placeholder}</option>
-        {children}
-      </select>
-      {hint && <p className="text-xs text-gray-400">{hint}</p>}
-    </div>
-  )
-}
 
 interface Line {
   id?: string
   item_id?: string | null
   category_id: string
+  /** main category chosen on the line (can be set before a subcategory) */
+  main_id?: string
+  /** the category was chosen by hand, so the catalog search is narrowed to it */
+  scoped?: boolean
   position: number
   name: string
   long_description: string
@@ -197,8 +121,12 @@ export default function RequestFormPage() {
   function addLine() { const maxPos = lines.length ? Math.max(...lines.map(l => l.position)) : 0; setLines(ls => [...ls, newLine(maxPos + 10)]) }
   function removeLine(idx: number) { setLines(ls => ls.filter((_, i) => i !== idx)) }
   function applyItem(idx: number, item: Item) {
+    // the catalog stays narrowed to a category the user chose by hand; a category that only came from picking an item does not narrow it
+    const ids = categoryScope(lines[idx].main_id ?? mainCategoryId(lines[idx].category_id, categories), lines[idx].category_id, categories)
+    const stayScoped = !!lines[idx].scoped && !!ids && ids.has(item.category_id ?? '')
     setLine(idx, {
-      item_id: item.id, category_id: item.category_id ?? '', name: item.name, long_description: item.long_description ?? '',
+      scoped: stayScoped,
+      item_id: item.id, category_id: item.category_id ?? '', main_id: mainCategoryId(item.category_id, categories), name: item.name, long_description: item.long_description ?? '',
       unit: item.default_unit ? unitLabel(item.default_unit, lang) : lines[idx].unit,
       est_unit_price: item.default_unit_price != null ? String(item.default_unit_price).replace('.', ',') : lines[idx].est_unit_price,
     })
@@ -249,7 +177,7 @@ export default function RequestFormPage() {
   async function persist(): Promise<string | null> {
     if (!company || !profile) return null
     if (!titleReq.check(header as unknown as Record<string, unknown>, ['title'], { title: 'r-title' })) return null
-    if (!header.location_id) { toast.error(s.location + ' *'); return null }
+    if (!header.location_id) { titleReq.setError('location', t.common.fieldRequired, 'r-location'); return null }
     if (lines.length === 0 || lines.some(l => !l.name.trim())) { toast.error(s.lineItems); return null }
     if (lines.some(l => !l.category_id)) { toast.error(s.category + ' *'); return null }
 
@@ -310,161 +238,156 @@ export default function RequestFormPage() {
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
 
+  // the catalog offered on a line follows the category chosen on it
+  const itemsForLine = (l: Line) => {
+    const ids = categoryScope(l.main_id ?? mainCategoryId(l.category_id, categories), l.category_id, categories)
+    // narrowed only by a category chosen by hand; a category that came from picking an item leaves the whole catalog open
+    return ids && l.scoped ? items.filter(i => ids.has(i.category_id ?? '')) : items
+  }
+  const supplierOptions = [{ value: '', label: s.noSupplier }, ...suppliers.map(x => ({ value: x.id, label: x.name }))]
+  const actionButtons = (
+    <>
+      <Button variant="secondary" onClick={() => navigate(-1)} disabled={saving}>{id ? s.cancelEdit : t.common.cancel}</Button>
+      {reqStatus === 'draft' && <Button variant="secondary" onClick={saveDraft} loading={saving}>{s.saveDraft}</Button>}
+      <Button onClick={() => { setSubmitNote(''); setSubmitOpen(true) }} loading={saving} className="gap-2"><Send className="w-4 h-4" />{s.submit}</Button>
+    </>
+  )
+
   return (
-    <div className="p-4 lg:p-6 max-w-6xl mx-auto form-skin">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/requests')} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-surface rounded-lg transition-colors"><ChevronLeft className="w-5 h-5" /></button>
-          <h1 className="text-2xl font-bold text-gray-900">{isNew ? s.new : s.edit}</h1>
-        </div>
-        <div className="hidden lg:flex items-center gap-2">
-          <Button variant="secondary" onClick={() => navigate(-1)} disabled={saving}>{id ? s.cancelEdit : t.common.cancel}</Button>
-          {reqStatus === 'draft' && <Button variant="secondary" onClick={saveDraft} loading={saving}>{s.saveDraft}</Button>}
-          <Button onClick={() => { setSubmitNote(""); setSubmitOpen(true) }} loading={saving}>{s.submit}</Button>
-        </div>
+    <div className="p-4 lg:p-6 form-skin">
+      <nav className="flex items-center gap-1.5 text-[13px] text-ink2 mb-4">
+        <button type="button" onClick={() => navigate('/requests')} aria-label={s.title} title={s.title}
+          className="w-7 h-7 -ml-1.5 mr-1 inline-flex items-center justify-center rounded-lg text-icon hover:bg-selected hover:text-ink transition-colors">
+          <ArrowLeft className="w-4 h-4" strokeWidth={1.75} />
+        </button>
+        <Link to="/requests" className="hover:text-ink transition-colors">{s.title}</Link>
+        <ChevronRight className="w-3.5 h-3.5 text-icon" />
+        <span className="text-ink font-medium">{isNew ? s.new : s.edit}</span>
+      </nav>
+
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
+        <h1 className="text-xl font-semibold text-ink tracking-tight">{isNew ? s.new : s.edit}</h1>
+        <div className="hidden lg:flex items-center gap-2">{actionButtons}</div>
       </div>
 
-      {/* Request details */}
-      <div className="bg-white rounded-lg border border-field p-6 mb-5">
-        <h2 className="text-sm font-semibold text-gray-700 mb-4">{t.po.orderDetails}</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="sm:col-span-2 lg:col-span-3">
-            <Input id="r-title" label={s.requestTitle + ' *'} placeholder={s.requestTitlePlaceholder} value={header.title} error={titleReq.errors.title}
-              onChange={e => { titleReq.clear('title'); setHeader(h => ({ ...h, title: e.target.value })) }} />
+      <div className="flex flex-col gap-4">
+        {/* Request details */}
+        <section className="bg-white rounded-lg border border-field">
+          <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{s.detailsTitle}</h2>
+          <div className="p-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="sm:col-span-2 lg:col-span-4">
+                <Input id="r-title" label={s.requestTitle + ' *'} placeholder={s.requestTitlePlaceholder} value={header.title} error={titleReq.errors.title}
+                  onChange={e => { titleReq.clear('title'); setHeader(h => ({ ...h, title: e.target.value })) }} />
+              </div>
+              <Select id="r-supplier" label={s.supplier} value={header.supplier_id} options={supplierOptions} placeholder={s.noSupplier}
+                onChange={v => setHeader(h => ({ ...h, supplier_id: v }))} />
+              <div>
+                <Select id="r-location" label={s.location} required value={header.location_id} placeholder={t.common.select} error={titleReq.errors.location}
+                  options={locations.map(l => ({ value: l.id, label: l.name }))}
+                  onChange={v => { titleReq.clear('location'); setHeader(h => ({ ...h, location_id: v })) }} />
+                {locationHint && <p className="text-xs text-ink2 mt-1.5">{locationHint}</p>}
+              </div>
+              <Select id="r-department" label={s.department} value={header.department_id} placeholder={t.common.select}
+                options={[{ value: '', label: '-' }, ...departments.map(d => ({ value: d.id, label: d.name }))]}
+                onChange={v => setHeader(h => ({ ...h, department_id: v }))} />
+              <Input id="r-needed" label={s.neededBy} type="date" value={header.needed_by_date} onChange={e => setHeader(h => ({ ...h, needed_by_date: e.target.value }))} />
+              <div className="sm:col-span-2 lg:col-span-4 flex flex-col gap-1">
+                <label htmlFor="r-note" className="text-sm font-medium text-gray-700">{s.note}</label>
+                <textarea id="r-note" rows={3} value={header.note} onChange={e => setHeader(h => ({ ...h, note: e.target.value }))}
+                  className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none" />
+              </div>
+            </div>
+            {approverName && (
+              <p className="mt-4 text-[13px] text-ink2">{s.goesTo} <span className="font-medium text-ink">{approverName}</span></p>
+            )}
           </div>
-          <SearchCombobox items={suppliers} value={header.supplier_id} onChange={v => setHeader(h => ({ ...h, supplier_id: v }))} label={s.supplier} placeholder={s.noSupplier} emptyText={s.noMatch} />
-          <Select id="r-location" label={s.location} required hint={locationHint} value={header.location_id} onChange={v => setHeader(h => ({ ...h, location_id: v }))} placeholder={t.common.select}>
-            {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </Select>
-          <Select id="r-department" label={s.department} value={header.department_id} onChange={v => setHeader(h => ({ ...h, department_id: v }))} placeholder={t.common.select}>
-            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </Select>
-          <Input id="r-needed" label={s.neededBy} type="date" value={header.needed_by_date} onChange={e => setHeader(h => ({ ...h, needed_by_date: e.target.value }))} />
-        </div>
+        </section>
 
-        {approverName && (
-          <p className="mt-3 text-xs text-gray-500">{s.goesTo} <span className="font-medium text-gray-700">{approverName}</span></p>
-        )}
-
-        <div className="mt-4 flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-700">{s.note}</label>
-          <textarea rows={3} value={header.note} onChange={e => setHeader(h => ({ ...h, note: e.target.value }))}
-            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none" />
-        </div>
+        {/* Line items */}
+        <section className="bg-white rounded-lg border border-field overflow-hidden">
+          <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{s.lineItems}</h2>
+          <div className="overflow-x-auto">
+            <table className="table-grid w-full text-sm min-w-[1280px]">
+              <GridHead cols={[[t.po.position, Hash], [s.catalog, Search], [s.code, IdCard], [s.itemName, Package], [s.category + ' *', Tag], [t.categories.subcategory + ' *', Tag], [s.quantity, Hash, 'right'], [s.unit, Ruler], [s.estUnitPrice, Coins, 'right'], [s.lineTotal, Coins, 'right'], ['']]} />
+              <tbody className="divide-y divide-field">
+                {lines.map((line, idx) => (
+                  <tr key={idx} className="align-top">
+                    <td className="px-4 py-2.5 text-ink2 pt-4 tabular-nums">{idx + 1}</td>
+                    <td className="px-3 py-2.5 min-w-[150px]"><CatalogPicker items={itemsForLine(line)} allItems={items} onSelect={item => applyItem(idx, item)} placeholder={t.common.searchCatalog} /></td>
+                    <td className="px-4 py-2.5 pt-4 text-ink2 whitespace-nowrap">{line.item_id ? items.find(i => i.id === line.item_id)?.item_number ?? '-' : '-'}</td>
+                    <td className="px-3 py-2.5 min-w-[220px]">
+                      <input value={line.name} onChange={e => setLine(idx, { name: e.target.value })} placeholder={s.itemPlaceholder}
+                        className="w-full h-9 px-3 text-sm font-medium rounded-lg border border-field hover:border-field-hover bg-white text-ink placeholder:text-placeholder placeholder:font-normal focus:outline-none focus:border-field-focus" />
+                      <input value={line.long_description} onChange={e => setLine(idx, { long_description: e.target.value })} placeholder={s.descPlaceholder}
+                        className="w-full h-9 px-3 mt-2.5 text-sm rounded-lg border border-field hover:border-field-hover bg-white text-ink placeholder:text-placeholder focus:outline-none focus:border-field-focus" />
+                    </td>
+                    <LineCategoryCells categories={categories} mainId={line.main_id} categoryId={line.category_id} onChange={patch => setLine(idx, { ...patch, scoped: true })} />
+                    <td className="px-3 py-2.5 w-24"><input type="text" inputMode="decimal" {...numInput(line.quantity, v => setLine(idx, { quantity: v }))} className="w-full text-sm tabular-nums border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right" /></td>
+                    <td className="px-3 py-2.5 w-28">
+                      <Select value={unitCode(line.unit) ?? line.unit} options={unitOptions(line.unit, lang)}
+                        onChange={v => setLine(idx, { unit: v ? unitLabel(v, lang) : '' })} />
+                    </td>
+                    <td className="px-3 py-2.5 w-32"><input type="text" inputMode="decimal" {...numInput(line.est_unit_price, v => setLine(idx, { est_unit_price: v }))} className="w-full text-sm tabular-nums border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right" /></td>
+                    <td className="px-4 py-2.5 pt-4 text-right text-ink tabular-nums whitespace-nowrap">{fmt(lineTotal(line))}</td>
+                    <td className="px-3 py-2.5 pt-3"><button type="button" onClick={() => removeLine(idx)} aria-label={t.common.deleteEntity} className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-icon hover:bg-selected hover:text-danger transition-colors"><Trash2 className="w-4 h-4" /></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-5 py-3 border-t border-field">
+            <button type="button" onClick={addLine} className="inline-flex items-center gap-1.5 text-sm text-primary hover:text-primary-hover font-medium"><Plus className="w-4 h-4" />{s.addItem}</button>
+          </div>
+          <div className="flex justify-end px-5 py-4 border-t border-field">
+            <div className="w-72 flex flex-col gap-2 text-sm">
+              {discountAmount > 0 && <div className="flex justify-between"><span className="text-ink2">{s.estTotal}</span><span className="tabular-nums text-ink2">{fmt(subtotal)}</span></div>}
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="r-discount" className="text-ink2">{s.discount} ({company?.currency ?? 'EUR'})</label>
+                <input id="r-discount" type="text" inputMode="decimal" {...numInput(discount, setDiscount)} className="w-28 text-sm tabular-nums border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right" />
+              </div>
+              <div className="flex justify-between items-baseline pt-2 border-t border-field"><span className="font-medium text-ink2">{s.estTotal}</span><span className="text-lg font-semibold text-ink tabular-nums">{fmt(grandTotal)}</span></div>
+            </div>
+          </div>
+        </section>
 
         {/* Attachments */}
-        <div className="mt-4">
-          <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5 mb-2"><Paperclip className="w-3.5 h-3.5" />{s.attachOffer}</label>
-          {attachments.map(att => (
-            <div key={att.id} className="flex items-center gap-2 p-2.5 bg-accent-light border border-accent-border rounded-lg mb-2">
-              <FileText className="w-4 h-4 text-accent shrink-0" />
-              <button type="button" onClick={() => openAttachment(att.file_path)} className="text-sm text-accent hover:underline font-medium flex-1 text-left truncate">{att.file_name}</button>
-              <button type="button" onClick={() => setAttToDelete(att)} className="text-gray-400 hover:text-red-500 transition-colors shrink-0"><X className="w-4 h-4" /></button>
-            </div>
-          ))}
-          {newFiles.map((f, i) => (
-            <div key={i} className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-lg mb-2">
-              <FileText className="w-4 h-4 text-green-500 shrink-0" />
-              <span className="text-sm text-success font-medium flex-1 truncate">{f.name}</span>
-              <span className="text-xs text-green-500 shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
-              <button type="button" onClick={() => setNewFiles(fs => fs.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 transition-colors shrink-0"><X className="w-4 h-4" /></button>
-            </div>
-          ))}
-          <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-accent hover:bg-accent-light transition-colors w-full">
-            <UploadCloud className="w-4 h-4 text-gray-400 shrink-0" />
-            <span className="text-sm text-gray-500">{s.uploadHint}</span>
-            <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple className="hidden"
-              onChange={e => { const fl = Array.from(e.target.files ?? []); setNewFiles(fs => [...fs, ...fl]); e.target.value = '' }} />
-          </label>
-          {uploading && <p className="text-xs text-accent mt-1">{s.uploading}</p>}
-        </div>
-      </div>
+        <section className="bg-white rounded-lg border border-field">
+          <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink flex items-center gap-1.5"><Paperclip className="w-3.5 h-3.5" />{s.attachOffer}</h2>
+          <div className="p-5 flex flex-col gap-2">
+            {attachments.map(att => (
+              <div key={att.id} className="flex items-center gap-2.5 px-3 py-2 bg-surface rounded-lg">
+                <FileText className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
+                <button type="button" onClick={() => openAttachment(att.file_path)} className="text-sm text-ink hover:text-primary font-medium flex-1 text-left truncate transition-colors">{att.file_name}</button>
+                <button type="button" onClick={() => setAttToDelete(att)} aria-label={t.common.deleteEntity} className="text-icon hover:text-danger transition-colors shrink-0"><X className="w-4 h-4" /></button>
+              </div>
+            ))}
+            {newFiles.map((f, i) => (
+              <div key={i} className="flex items-center gap-2.5 px-3 py-2 bg-accent-light rounded-lg">
+                <FileText className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
+                <span className="text-sm text-ink font-medium flex-1 truncate">{f.name}</span>
+                <span className="text-xs text-ink2 shrink-0 tabular-nums">{Math.max(1, Math.round(f.size / 1024))} KB</span>
+                <button type="button" onClick={() => setNewFiles(fs => fs.filter((_, j) => j !== i))} aria-label={t.common.cancel} className="text-icon hover:text-danger transition-colors shrink-0"><X className="w-4 h-4" /></button>
+              </div>
+            ))}
+            <label className="flex items-center gap-2 h-10 px-3 rounded-lg border border-dashed border-field cursor-pointer text-sm text-ink2 hover:bg-surface transition-colors w-full">
+              <UploadCloud className="w-4 h-4 text-icon shrink-0" />
+              <span>{s.uploadHint}</span>
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple className="hidden"
+                onChange={e => { const fl = Array.from(e.target.files ?? []); setNewFiles(fs => [...fs, ...fl]); e.target.value = '' }} />
+            </label>
+            {uploading && <p className="text-xs text-ink2">{s.uploading}</p>}
+          </div>
+        </section>
 
-      {/* Line items */}
-      <div className="bg-white rounded-lg border border-field overflow-hidden mb-5">
-        <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-sm font-semibold text-gray-700">{s.lineItems}</h2></div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[900px]">
-            <thead className="bg-surface border-b border-field">
-              <tr>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-12">{t.po.position}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">{s.catalog}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">{s.code}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">{s.itemName}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-40">{s.category} *</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">{s.quantity}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-20">{s.unit}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-28">{s.estUnitPrice}</th>
-                <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-500 w-28">{s.lineTotal}</th>
-                <th className="w-8" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-field">
-              {lines.map((line, idx) => (
-                <tr key={idx} className="align-top">
-                  <td className="px-4 py-2.5 text-gray-400 text-xs pt-4">{line.position}</td>
-                  <td className="px-4 py-2.5 pt-3"><ItemSearch items={items} onSelect={item => applyItem(idx, item)} placeholder={t.common.searchCatalog} /></td>
-                  <td className="px-4 py-2.5 pt-3 text-xs text-gray-400">{line.item_id ? items.find(i => i.id === line.item_id)?.item_number ?? '—' : '—'}</td>
-                  <td className="px-4 py-2.5">
-                    <input value={line.name} onChange={e => setLine(idx, { name: e.target.value })} placeholder={s.itemPlaceholder}
-                      className="w-full text-sm border-0 bg-transparent outline-none text-gray-900 placeholder:text-placeholder font-medium focus:ring-0 pb-0.5" />
-                    <input value={line.long_description} onChange={e => setLine(idx, { long_description: e.target.value })} placeholder={s.descPlaceholder}
-                      className="w-full text-xs border-0 bg-transparent outline-none text-gray-400 placeholder:text-placeholder focus:ring-0 mt-0.5" />
-                  </td>
-                  <td className="px-4 py-2.5 pt-3">
-                    <select value={line.category_id} onChange={e => setLine(idx, { category_id: e.target.value })}
-                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus bg-white text-ink">
-                      <option value="">{t.common.select}</option>
-                      <CategoryOptions categories={categories} selectedId={line.category_id} />
-                    </select>
-                  </td>
-                  <td className="px-4 py-2.5 pt-3"><input type="text" inputMode="decimal" {...numInput(line.quantity, v => setLine(idx, { quantity: v }))} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right" /></td>
-                  <td className="px-4 py-2.5 pt-3"><input value={line.unit} onChange={e => setLine(idx, { unit: e.target.value })} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus" /></td>
-                  <td className="px-4 py-2.5 pt-3"><input type="text" inputMode="decimal" {...numInput(line.est_unit_price, v => setLine(idx, { est_unit_price: v }))} className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right" /></td>
-                  <td className="px-4 py-2.5 pt-3 text-right font-medium text-gray-800">{fmt(lineTotal(line))}</td>
-                  <td className="px-2 py-2.5 pt-3"><button type="button" onClick={() => removeLine(idx)} className="p-1 text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button></td>
-                </tr>
-              ))}
-              <tr>
-                <td colSpan={10} className="px-4 py-2 border-t border-gray-100 text-right">
-                  <button type="button" onClick={addLine} className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover font-medium"><Plus className="w-4 h-4" />{s.addItem}</button>
-                </td>
-              </tr>
-            </tbody>
-            <tfoot className="border-t border-field bg-surface">
-              {discountAmount > 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 pt-3 pb-1 text-right text-sm text-gray-500">{s.estTotal}</td>
-                  <td className="px-4 pt-3 pb-1 text-right text-sm text-gray-700">{fmt(subtotal)}</td>
-                  <td />
-                </tr>
-              )}
-              <tr>
-                <td colSpan={7} className="px-4 py-2 text-right text-sm text-gray-500">{s.discount} (€)</td>
-                <td className="px-4 py-2 text-right"><input type="text" inputMode="decimal" {...numInput(discount, setDiscount)} className="w-28 text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right ml-auto block" /></td>
-                <td />
-              </tr>
-              <tr className="border-t-2 border-field">
-                <td colSpan={7} className="px-4 py-3 text-right text-sm font-bold text-gray-900">{s.estTotal}</td>
-                <td className="px-4 py-3 text-right text-base font-bold text-accent-hover">{fmt(grandTotal)}</td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
-
-      <div className="hidden lg:flex justify-end gap-2">
-        <Button variant="secondary" onClick={() => navigate(-1)} disabled={saving}>{id ? s.cancelEdit : t.common.cancel}</Button>
-        {reqStatus === 'draft' && <Button variant="secondary" onClick={saveDraft} loading={saving}>{s.saveDraft}</Button>}
-        <Button onClick={() => { setSubmitNote(""); setSubmitOpen(true) }} loading={saving}>{s.submit}</Button>
+        <div className="hidden lg:flex justify-end gap-2">{actionButtons}</div>
       </div>
 
       <Modal open={submitOpen} onClose={() => setSubmitOpen(false)} title={s.submitTitle} size="sm" icon={Send}>
-        <div className="flex flex-col gap-1 mb-4">
-          <label className="text-sm font-medium text-gray-700">{s.submitComment}</label>
-          <textarea value={submitNote} onChange={e => setSubmitNote(e.target.value)} rows={3}
+        {approverName && <p className="text-sm text-ink2 mb-4">{s.goesTo} <span className="font-medium text-ink">{approverName}</span></p>}
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="r-submit-note">{s.submitComment}</label>
+          <textarea id="r-submit-note" value={submitNote} onChange={e => setSubmitNote(e.target.value)} rows={3}
             className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none" />
         </div>
         <ModalActions className="justify-end">

@@ -221,7 +221,7 @@ export default function InvoiceFormPage() {
       {/* Lines */}
       <div className="bg-white rounded-lg border border-field overflow-hidden mb-5">
         <div className="px-5 py-3 border-b border-field flex items-center justify-between gap-3 flex-wrap">
-          <h2 className="text-sm font-semibold text-gray-700">{s.lines}</h2>
+          <h2 className="text-[15px] font-semibold text-ink">{s.lines}</h2>
           {header.po_id && <Button variant="secondary" onClick={fillFromPo} title={s.fromPoHint} className="gap-2"><Wand2 className="w-4 h-4" />{s.fromPo}</Button>}
         </div>
         <div className="overflow-x-auto">
@@ -275,7 +275,7 @@ export default function InvoiceFormPage() {
       {/* Live matching */}
       <div className="bg-white rounded-lg border border-field p-5 mb-5">
         <div className="flex items-center gap-3 mb-2 flex-wrap">
-          <h2 className="text-sm font-semibold text-gray-700">{s.matching}</h2>
+          <h2 className="text-[15px] font-semibold text-ink">{s.matching}</h2>
           <span className={`badge ${MATCH_BADGE[result.status]}`}>{s.matchSt[result.status]}</span>
           <span className="text-xs text-gray-400">{s.basis[result.basis]}</span>
         </div>
@@ -292,7 +292,7 @@ export default function InvoiceFormPage() {
       <div className="bg-white rounded-lg border border-field p-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <h2 className="text-sm font-semibold text-gray-700 mb-2">{s.documents}</h2>
+            <h2 className="text-[15px] font-semibold text-ink mb-2">{s.documents}</h2>
             <input ref={fileRef} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
               onChange={e => { setNewFiles(f => [...f, ...Array.from(e.target.files ?? [])]); if (fileRef.current) fileRef.current.value = '' }} />
             <Button variant="secondary" onClick={() => fileRef.current?.click()} className="gap-2"><Upload className="w-4 h-4" />{s.upload}</Button>

@@ -91,7 +91,7 @@ function OverviewBar({ items }: { items: { icon: React.ElementType; label: strin
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-white rounded-lg border border-line p-5 overflow-hidden">
-      <h2 className="text-sm font-semibold text-ink2 mb-5">{title}</h2>
+      <h2 className="text-[15px] font-semibold text-ink mb-5">{title}</h2>
       {children}
     </div>
   )

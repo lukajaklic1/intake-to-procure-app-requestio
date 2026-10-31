@@ -38,3 +38,16 @@ export function categoryOptions(cats: CatLike[], activeOnly = true): { id: strin
 export function categoryAndChildren(id: string, cats: CatLike[]): Set<string> {
   return new Set([id, ...cats.filter(c => c.parent_id === id).map(c => c.id)])
 }
+
+/** The main category of a category id (the id itself for a main category, '' when unknown). */
+export function mainCategoryId(id: string | null | undefined, cats: CatLike[]): string {
+  const c = cats.find(x => x.id === id)
+  return c ? (c.parent_id ?? c.id) : ''
+}
+
+/** Category ids an item may belong to for a line with this main category / subcategory chosen; null = no restriction. */
+export function categoryScope(mainId: string | undefined, categoryId: string | undefined, cats: CatLike[]): Set<string> | null {
+  if (categoryId && categoryId !== mainId) return new Set([categoryId])
+  if (mainId) return categoryAndChildren(mainId, cats)
+  return null
+}

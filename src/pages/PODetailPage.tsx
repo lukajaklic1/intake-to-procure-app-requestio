@@ -281,7 +281,7 @@ export default function PODetailPage() {
       {/* Line items */}
       <div className="bg-white rounded-lg border border-field overflow-hidden mb-5">
         <div className="px-6 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-700">{s.lineItems}</h2>
+          <h2 className="text-[15px] font-semibold text-ink">{s.lineItems}</h2>
         </div>
         <div className="overflow-x-auto"><table className="w-full text-sm min-w-[500px]">
           <thead className="bg-surface border-b border-field">

@@ -36,7 +36,7 @@ const PO_BADGE: Record<string, string> = { draft: 'badge-neutral', issued: 'badg
 function Card({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
   return (
     <section className={`bg-white rounded-lg border border-field ${className}`}>
-      <h2 className="px-5 py-3 border-b border-field text-[13px] font-medium text-ink2">{title}</h2>
+      <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{title}</h2>
       <div className="p-5">{children}</div>
     </section>
   )
