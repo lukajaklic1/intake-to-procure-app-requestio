@@ -260,6 +260,7 @@ export default function POFormPage() {
   function validate() {
     if (!header.supplier_id) { toast.error(t.common.nameRequired); return false }
     if (!header.location_id) { toast.error(t.common.nameRequired); return false }
+    if (!header.department_id) { toast.error(`${s.department} *`); return false }
     if (!header.payment_terms.trim()) { toast.error(t.common.nameRequired); return false }
     if (!header.expected_delivery_date) { toast.error(t.common.nameRequired); return false }
     if (lines.length === 0) { toast.error(t.po.lineItems); return false }
@@ -441,7 +442,9 @@ export default function POFormPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-4">
+      {/* on a wide screen the budget sits beside the form and stays in view while the lines are filled in */}
+      <div className="min-[1700px]:grid min-[1700px]:grid-cols-[minmax(0,1fr)_300px] min-[1700px]:gap-4 min-[1700px]:items-start">
+      <div className="flex flex-col gap-4 min-w-0">
         {/* Order details */}
         <section className="bg-white rounded-lg border border-field">
           <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{t.po.orderDetails}</h2>
@@ -467,8 +470,8 @@ export default function POFormPage() {
                 onChange={v => setHeader(h => ({ ...h, location_id: v }))} />
               {locationHint && <p className="text-xs text-ink2 mt-1.5">{locationHint}</p>}
             </div>
-            <Select id="po-department" label={s.department} value={header.department_id} disabled={isReadOnly} placeholder="-"
-              options={[{ value: '', label: '-' }, ...departments.map(d => ({ value: d.id, label: d.name }))]}
+            <Select id="po-department" label={s.department} required value={header.department_id} disabled={isReadOnly} placeholder={t.common.select}
+              options={departments.map(d => ({ value: d.id, label: d.name }))}
               onChange={v => setHeader(h => ({ ...h, department_id: v }))} />
             <Input id="payment_terms" label={s.paymentTermsLabel + ' *'}
               value={header.payment_terms}
@@ -494,7 +497,7 @@ export default function POFormPage() {
             </div>
             {header.department_id && (
               <div className="sm:col-span-2 lg:col-span-4">
-                <BudgetStatus className="pt-4 border-t border-field" departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludePoId={id} />
+                <BudgetStatus className="pt-4 border-t border-field min-[1700px]:hidden" departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludePoId={id} />
               </div>
             )}
           </div>
@@ -608,6 +611,16 @@ export default function POFormPage() {
 
         {/* Bottom actions: hidden on mobile (the sticky bar handles it) */}
         {!isReadOnly && <div className="hidden lg:flex justify-end gap-2">{actionButtons}</div>}
+      </div>
+
+      {header.department_id && (
+        <aside className="hidden min-[1700px]:block sticky top-4">
+          <section className="bg-white rounded-lg border border-field">
+            <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{t.budgets.title}</h2>
+            <div className="p-5"><BudgetStatus departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludePoId={id} /></div>
+          </section>
+        </aside>
+      )}
       </div>
 
       <ConfirmDialog open={confirmDelete} onClose={() => setConfirmDelete(false)} onConfirm={deleteDraft}

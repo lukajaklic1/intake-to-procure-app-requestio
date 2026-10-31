@@ -182,6 +182,7 @@ export default function RequestFormPage() {
     if (!company || !profile) return null
     if (!titleReq.check(header as unknown as Record<string, unknown>, ['title'], { title: 'r-title' })) return null
     if (!header.location_id) { titleReq.setError('location', t.common.fieldRequired, 'r-location'); return null }
+    if (!header.department_id) { titleReq.setError('department', t.common.fieldRequired, 'r-department'); return null }
     if (lines.length === 0 || lines.some(l => !l.name.trim())) { toast.error(s.lineItems); return null }
     if (lines.some(l => !l.category_id)) { toast.error(s.category + ' *'); return null }
 
@@ -274,7 +275,9 @@ export default function RequestFormPage() {
         <div className="hidden lg:flex items-center gap-2">{actionButtons}</div>
       </div>
 
-      <div className="flex flex-col gap-4">
+      {/* on a wide screen the budget sits beside the form and stays in view while the lines are filled in */}
+      <div className="min-[1700px]:grid min-[1700px]:grid-cols-[minmax(0,1fr)_300px] min-[1700px]:gap-4 min-[1700px]:items-start">
+      <div className="flex flex-col gap-4 min-w-0">
         {/* Request details */}
         <section className="bg-white rounded-lg border border-field">
           <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{s.detailsTitle}</h2>
@@ -292,9 +295,9 @@ export default function RequestFormPage() {
                   onChange={v => { titleReq.clear('location'); setHeader(h => ({ ...h, location_id: v })) }} />
                 {locationHint && <p className="text-xs text-ink2 mt-1.5">{locationHint}</p>}
               </div>
-              <Select id="r-department" label={s.department} value={header.department_id} placeholder={t.common.select}
-                options={[{ value: '', label: '-' }, ...departments.map(d => ({ value: d.id, label: d.name }))]}
-                onChange={v => setHeader(h => ({ ...h, department_id: v }))} />
+              <Select id="r-department" label={s.department} required value={header.department_id} placeholder={t.common.select} error={titleReq.errors.department}
+                options={departments.map(d => ({ value: d.id, label: d.name }))}
+                onChange={v => { titleReq.clear('department'); setHeader(h => ({ ...h, department_id: v })) }} />
               <Input id="r-needed" label={s.neededBy} type="date" value={header.needed_by_date} onChange={e => setHeader(h => ({ ...h, needed_by_date: e.target.value }))} />
               <div className="sm:col-span-2 lg:col-span-4 flex flex-col gap-1">
                 <label htmlFor="r-note" className="text-sm font-medium text-gray-700">{s.note}</label>
@@ -306,7 +309,7 @@ export default function RequestFormPage() {
               <p className="mt-4 text-[13px] text-ink2">{s.goesTo} <span className="font-medium text-ink">{approverName}</span></p>
             )}
             {header.department_id && (
-              <BudgetStatus className="mt-5 pt-4 border-t border-field" departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludeRequestId={id} />
+              <BudgetStatus className="mt-5 pt-4 border-t border-field min-[1700px]:hidden" departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludeRequestId={id} />
             )}
           </div>
         </section>
@@ -388,6 +391,16 @@ export default function RequestFormPage() {
         </section>
 
         <div className="hidden lg:flex justify-end gap-2">{actionButtons}</div>
+      </div>
+
+      {header.department_id && (
+        <aside className="hidden min-[1700px]:block sticky top-4">
+          <section className="bg-white rounded-lg border border-field">
+            <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{t.budgets.title}</h2>
+            <div className="p-5"><BudgetStatus departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludeRequestId={id} /></div>
+          </section>
+        </aside>
+      )}
       </div>
 
       <Modal open={submitOpen} onClose={() => setSubmitOpen(false)} title={s.submitTitle} size="sm" icon={Send}>

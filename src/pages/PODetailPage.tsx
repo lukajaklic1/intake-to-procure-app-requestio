@@ -12,6 +12,7 @@ import { format } from 'date-fns'
 import type { PoActivityLog } from '../types/database'
 import { localizeCountry } from '../lib/countries'
 import GridHead from '../components/ui/GridHead'
+import BudgetStatus from '../components/budget/BudgetStatus'
 import { unitLabel } from '../lib/units'
 
 interface LineItem {
@@ -336,6 +337,15 @@ export default function PODetailPage() {
               <div className="mt-4"><Field label={s.desiredDelivery}>{po.expected_delivery_date ? format(new Date(po.expected_delivery_date), 'dd.MM.yyyy') : null}</Field></div>
             </div>
           </Card>
+
+          {po.department_id && po.status !== 'cancelled' && (
+            <Card title={t.budgets.title}>
+              <div className="p-5">
+                {/* an issued, sent or closed order is already part of the usage; a draft is shown as if it were issued */}
+                <BudgetStatus departmentId={po.department_id} amount={po.status === 'draft' ? po.total_amount : 0} />
+              </div>
+            </Card>
+          )}
 
           <Card title={s.orderDetails}>
             <div className="p-5 grid grid-cols-2 gap-x-6 gap-y-5">

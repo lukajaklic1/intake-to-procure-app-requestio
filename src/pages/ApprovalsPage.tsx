@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, Search, X, ClipboardList, IdCard, MapPin, User, UserCheck, CalendarClock, Coins, MessageSquare, Eye } from 'lucide-react'
+import { CheckCircle2, Search, X, ClipboardList, IdCard, Wallet, MapPin, User, UserCheck, CalendarClock, Coins, MessageSquare, Eye } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -18,6 +18,8 @@ import SortFilter from '../components/ui/SortFilter'
 import { applySort, num, date, dateLast, rev, docNumber, type SortDef } from '../lib/sort'
 import ExportButton from '../components/ui/ExportButton'
 import type { ExportColumn } from '../lib/exportExcel'
+import { loadBudgetUsage, usageOf, usedPercent } from '../lib/budget'
+import { UsedBar } from './BudgetsPage'
 
 interface Row {
   id: string
@@ -26,6 +28,7 @@ interface Row {
   total_estimate: number
   created_at: string
   needed_by_date: string | null
+  department_id: string | null
   created_by: string
   approver_id: string | null
   locations: { name: string } | null
@@ -61,6 +64,8 @@ export default function ApprovalsPage() {
   const [pageSize, setPageSize] = useState(20)
 
   const [comments, setComments] = useState<Record<string, string>>({})
+  // how full the budget of each department is this year (percent), for departments that have one
+  const [budgetPct, setBudgetPct] = useState<Record<string, number>>({})
   useEffect(() => { if (company && profile) { load(); loadRefs() } }, [company, profile, isAdmin])
 
   async function loadRefs() {
@@ -76,7 +81,7 @@ export default function ApprovalsPage() {
     // spinner only on the first load: later reloads refresh the data in place
     let query = supabase
       .from('requests')
-      .select('id, request_number, title, total_estimate, created_at, needed_by_date, created_by, approver_id, locations(name)')
+      .select('id, request_number, title, total_estimate, created_at, needed_by_date, department_id, created_by, approver_id, locations(name)')
       .eq('company_id', company.id)
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
@@ -85,6 +90,12 @@ export default function ApprovalsPage() {
     const list = (data as unknown as Row[]) ?? []
     setRows(list)
     if (list.length) {
+      const year = new Date().getFullYear()
+      const [{ data: bs }, us] = await Promise.all([
+        supabase.from('budgets').select('department_id, amount').eq('company_id', company.id).eq('year', year).is('category_id', null).gt('amount', 0),
+        loadBudgetUsage(year),
+      ])
+      setBudgetPct(Object.fromEntries((bs ?? []).map(b => [b.department_id, usedPercent(usageOf(us, b.department_id, null, 'ordered') + usageOf(us, b.department_id, null, 'requested'), Number(b.amount))])))
       const { data: acts } = await supabase.from('activity_log').select('request_id, note, created_at').in('request_id', list.map(r => r.id)).eq('action', 'submitted').not('note', 'is', null).order('created_at')
       const cm: Record<string, string> = {}
       for (const a of acts ?? []) if (a.note) cm[a.request_id as string] = a.note as string
@@ -172,17 +183,18 @@ export default function ApprovalsPage() {
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1100px]">
-            <GridHead cols={[[s.requestNumber, IdCard], [s.requestTitle, ClipboardList], [s.location, MapPin], [t.requests.commentCol, MessageSquare], [a.requestedBy, User], ...(isAdmin ? [[s.approver, UserCheck] as GridCol] : []), [s.neededBy, CalendarClock], [s.estTotalCol, Coins], ['']]} />
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1250px]">
+            <GridHead cols={[[s.requestNumber, IdCard], [s.requestTitle, ClipboardList], [s.location, MapPin], [t.requests.commentCol, MessageSquare], [t.budgets.title, Wallet], [a.requestedBy, User], ...(isAdmin ? [[s.approver, UserCheck] as GridCol] : []), [s.neededBy, CalendarClock], [s.estTotalCol, Coins], ['']]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={CheckCircle2} colSpan={isAdmin ? 10 : 9} title={hasActiveFilters ? t.common.empty.noResults.title : t.common.empty.approvals.title} subtitle={hasActiveFilters ? t.common.empty.noResults.text : t.common.empty.approvals.text} />
+                <TableEmptyState icon={CheckCircle2} colSpan={isAdmin ? 11 : 10} title={hasActiveFilters ? t.common.empty.noResults.title : t.common.empty.approvals.title} subtitle={hasActiveFilters ? t.common.empty.noResults.text : t.common.empty.approvals.text} />
               ) : paginated.map(r => (
                 <tr key={r.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/requests/${r.id}`, { state: { from: '/approvals' } })}>
                   <td className="px-4 py-3 text-ink2 whitespace-nowrap">{r.request_number}</td>
                   <td className="px-4 py-3 max-w-[300px]"><p className="font-medium text-ink truncate" title={r.title ?? undefined}>{r.title || '-'}</p></td>
                   <td className="px-4 py-3 text-ink2">{r.locations?.name ?? '-'}</td>
                   <td className="px-4 py-3 text-ink2 max-w-[260px] truncate" title={comments[r.id]}>{comments[r.id] ?? '-'}</td>
+                  <td className="px-4 py-3">{r.department_id && budgetPct[r.department_id] !== undefined ? <UsedBar pct={budgetPct[r.department_id]} /> : <span className="text-ink2">-</span>}</td>
                   <td className="px-4 py-3"><PersonCell name={names[r.created_by]} /></td>
                   {isAdmin && <td className="px-4 py-3"><PersonCell name={r.approver_id ? names[r.approver_id] : null} /></td>}
                   <td className="px-4 py-3 text-ink whitespace-nowrap">{r.needed_by_date ? format(new Date(r.needed_by_date), 'dd.MM.yyyy') : '-'}</td>
