@@ -151,7 +151,7 @@ export default function BudgetYearPage() {
                         <td className="px-4 py-2.5 text-right text-ink2 tabular-nums whitespace-nowrap">{fmtUsage(ordered, money)}</td>
                         <td className="px-4 py-2.5 text-right text-ink2 tabular-nums whitespace-nowrap">{fmtUsage(requested, money)}</td>
                         <td className={`px-4 py-2.5 text-right tabular-nums whitespace-nowrap ${amount > 0 && remaining < 0 ? 'text-danger' : 'text-ink'}`}>{amount > 0 ? money(remaining) : '-'}</td>
-                        <td className="px-4 py-2.5">{amount > 0 ? <UsedBar pct={usedPercent(ordered + requested, amount)} /> : <span className="text-ink2">-</span>}</td>
+                        <td className="px-4 py-2.5">{amount > 0 ? <UsedBar pct={usedPercent(ordered + requested, amount)} orderedPct={(ordered / amount) * 100} /> : <span className="text-ink2">-</span>}</td>
                       </tr>
                     )
                   })}
@@ -161,7 +161,7 @@ export default function BudgetYearPage() {
                     <td className="px-4 py-3 text-right font-medium text-ink tabular-nums whitespace-nowrap">{money(totals.ordered)}</td>
                     <td className="px-4 py-3 text-right font-medium text-ink tabular-nums whitespace-nowrap">{money(totals.requested)}</td>
                     <td className={`px-4 py-3 text-right font-medium tabular-nums whitespace-nowrap ${totals.amount - totals.ordered - totals.requested < 0 ? 'text-danger' : 'text-ink'}`}>{money(totals.amount - totals.ordered - totals.requested)}</td>
-                    <td className="px-4 py-3"><UsedBar pct={usedPercent(totals.ordered + totals.requested, totals.amount)} /></td>
+                    <td className="px-4 py-3"><UsedBar pct={usedPercent(totals.ordered + totals.requested, totals.amount)} orderedPct={totals.amount > 0 ? (totals.ordered / totals.amount) * 100 : 0} /></td>
                   </tr>
                 </>
               )}

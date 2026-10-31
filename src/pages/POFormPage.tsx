@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Plus, Trash2, ArrowLeft, ChevronRight, Search, X, Paperclip, FileText, UploadCloud, Hash, IdCard, Package, Tag, Ruler, Coins } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
@@ -19,6 +19,7 @@ import type { Supplier, Category, Location, Department, Item, Contract } from '.
 import { unitLabel, unitCode, unitOptions } from '../lib/units'
 import { incotermOptions } from '../lib/incoterms'
 import { effectiveStatus } from '../lib/contracts'
+import { createPoFromRequest } from '../lib/createPo'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,8 @@ function newLine(position: number): LineItem {
 export default function POFormPage() {
   const { id } = useParams<{ id?: string }>()
   const navigate = useNavigate()
+  // an order opened from an approved request is prefilled from it and only created when it is saved
+  const fromRequestId = useSearchParams()[0].get('fromRequest')
   const { company } = useCompany()
   const { t, lang } = useLanguage()
   const s = t.po
@@ -82,6 +85,8 @@ export default function POFormPage() {
   const [header, setHeader] = useState<POHeader>(EMPTY_HEADER)
   const [lines, setLines] = useState<LineItem[]>([newLine(10)])
   const [discount, setDiscount] = useState<string>('0')
+  // extra discount agreed by procurement: internal, for tracking savings, never on the order document
+  const [negotiated, setNegotiated] = useState<string>('')
 
   // Attachments
   interface Attachment { id: string; file_name: string; file_path: string }
@@ -96,12 +101,41 @@ export default function POFormPage() {
   const [departments, setDepartments] = useState<Department[]>([])
   const [contracts, setContracts] = useState<Pick<Contract, 'id' | 'title' | 'contract_number' | 'supplier_id' | 'status' | 'end_date' | 'notice_days' | 'notice_given_at' | 'auto_renew'>[]>([])
   const [items, setItems] = useState<Item[]>([])
+  const [refsLoaded, setRefsLoaded] = useState(false)
+  const [requestAtts, setRequestAtts] = useState<{ id: string; file_name: string; file_path: string }[]>([])
+  const prefilled = useRef(false)
   // Agreed prices of the selected contract (item id -> price): they take the place of the catalog price.
   const [contractPrices, setContractPrices] = useState<Map<string, number>>(new Map())
 
   useEffect(() => {
     if (company) { loadRefs(); if (!isNew) loadPO() }
   }, [company, id])
+
+  useEffect(() => {
+    if (!isNew || !fromRequestId || !refsLoaded || !company || prefilled.current) return
+    prefilled.current = true
+    ;(async () => {
+      const { data: r } = await supabase.from('requests').select('*').eq('id', fromRequestId).single()
+      if (!r || r.po_id || r.status !== 'approved') { toast.error(t.common.notFound); navigate('/requests'); return }
+      const [{ data: ls }, { data: at }] = await Promise.all([
+        supabase.from('request_line_items').select('*').eq('request_id', fromRequestId).order('position'),
+        supabase.from('request_attachments').select('id, file_name, file_path').eq('request_id', fromRequestId),
+      ])
+      const sup = suppliers.find(x => x.id === r.supplier_id)
+      const usable = r.supplier_id ? usableContracts(r.supplier_id) : []
+      setHeader({
+        ...EMPTY_HEADER, supplier_id: r.supplier_id ?? '', location_id: r.location_id ?? '', department_id: r.department_id ?? '',
+        payment_terms: sup?.payment_terms ?? '', incoterm: sup?.incoterm ?? '', expected_delivery_date: r.needed_by_date ?? '',
+        notes: r.note ?? '', contract_id: usable.length === 1 ? usable[0].id : '',
+      })
+      setDiscount(String(r.discount_amount ?? 0).replace('.', ','))
+      setLines((ls ?? []).map(l => ({
+        item_id: l.item_id, category_id: l.category_id ?? '', position: l.position, name: l.name, long_description: l.long_description ?? '',
+        quantity: String(l.quantity), unit: l.unit, unit_price: String(l.est_unit_price ?? 0).replace('.', ','),
+      })))
+      setRequestAtts(at ?? [])
+    })()
+  }, [isNew, fromRequestId, refsLoaded, company])
 
   useEffect(() => {
     if (!header.contract_id) { setContractPrices(new Map()); return }
@@ -137,6 +171,7 @@ export default function POFormPage() {
     setItems(itm.data ?? [])
     const { data: ctr } = await supabase.from('contracts').select('id, title, contract_number, supplier_id, status, end_date, notice_days, notice_given_at, auto_renew').eq('company_id', cid)
     setContracts(ctr ?? [])
+    setRefsLoaded(true)
   }
 
   async function loadPO() {
@@ -160,6 +195,7 @@ export default function POFormPage() {
     })
 
     setDiscount(String(po.discount_amount ?? 0))
+    setNegotiated(po.negotiated_discount ? String(po.negotiated_discount).replace('.', ',') : '')
 
     const { data: atts } = await supabase.from('po_attachments').select('id, file_name, file_path').eq('po_id', id!)
     setAttachments(atts ?? [])
@@ -220,6 +256,12 @@ export default function POFormPage() {
     const ids = categoryScope(l.main_id ?? mainCategoryId(l.category_id, categories), l.category_id, categories)
     // narrowed only by a category chosen by hand; a category that came from picking an item leaves the whole catalog open
     return ids && l.scoped ? items.filter(i => ids.has(i.category_id ?? '')) : items
+  }
+
+  // lines of catalog items whose price differs from the one agreed in the selected contract
+  const contractMismatches = lines.filter(l => l.item_id && contractPrices.has(l.item_id) && Math.abs(parseNum(l.unit_price) - contractPrices.get(l.item_id)!) >= 0.005)
+  function applyContractPrices() {
+    setLines(ls => ls.map(l => { const p = l.item_id ? contractPrices.get(l.item_id) : undefined; return p != null ? { ...l, unit_price: String(p).replace('.', ',') } : l }))
   }
 
   // Accept both comma and dot as decimal separator
@@ -322,7 +364,16 @@ export default function POFormPage() {
       unit_price: parseNum(l.unit_price),
     }))
 
-    if (isNew) {
+    // from a request: the order is created from it now (number, link, offers), then saved with what was typed
+    let editId = id
+    if (isNew && fromRequestId) {
+      const res = await createPoFromRequest(fromRequestId, company.id)
+      if ('error' in res) { toast.error(res.error); setSaving(false); return }
+      editId = res.poId
+      await supabase.from('po_activity_log').insert({ company_id: company.id, po_id: editId, actor_id: session.user.id, action: 'created' })
+    }
+
+    if (isNew && !fromRequestId) {
       // Generate PO number atomically
       const { data: poNum, error: numErr } = await (supabase as any).rpc('generate_po_number', { p_company_id: company.id })
       if (numErr || !poNum) { toast.error(t.common.numberGenerateFailed); setSaving(false); return }
@@ -340,6 +391,7 @@ export default function POFormPage() {
         supplier_quote_ref: header.supplier_quote_ref || null,
         notes: header.notes || null,
         discount_amount: discountAmount,
+        negotiated_discount: parseNum(negotiated),
       }).select().single()
 
       if (poErr || !po) { toast.error(poErr?.message ?? t.common.nameRequired); setSaving(false); return }
@@ -371,24 +423,25 @@ export default function POFormPage() {
         supplier_quote_ref: header.supplier_quote_ref || null,
         notes: header.notes || null,
         discount_amount: discountAmount,
-      }).eq('id', id)
+        negotiated_discount: parseNum(negotiated),
+      }).eq('id', editId)
       if (poErr) { toast.error(poErr.message); setSaving(false); return }
 
-      await uploadAttachments(id!)
+      await uploadAttachments(editId!)
 
       // Replace line items
-      await supabase.from('po_line_items').delete().eq('po_id', id)
+      await supabase.from('po_line_items').delete().eq('po_id', editId)
       if (linePayload.length > 0) {
-        await supabase.from('po_line_items').insert(linePayload.map(l => ({ ...l, po_id: id })))
+        await supabase.from('po_line_items').insert(linePayload.map(l => ({ ...l, po_id: editId })))
       }
 
       // Audit: status transition (e.g. draft -> issued) or a plain edit
       const action = targetStatus !== poStatus ? targetStatus : 'edited'
-      await supabase.from('po_activity_log').insert({ company_id: company.id, po_id: id!, actor_id: session.user.id, action })
+      await supabase.from('po_activity_log').insert({ company_id: company.id, po_id: editId!, actor_id: session.user.id, action })
 
       toast.success(t.common.saved)
       // Osnutek → seznam, ostalo → view
-      navigate(targetStatus === 'draft' ? '/purchase-orders' : `/purchase-orders/${id}`)
+      navigate(targetStatus === 'draft' ? '/purchase-orders' : `/purchase-orders/${editId}`)
     }
     setSaving(false)
   }
@@ -442,9 +495,7 @@ export default function POFormPage() {
         </div>
       )}
 
-      {/* on a wide screen the budget sits beside the form and stays in view while the lines are filled in */}
-      <div className="min-[1700px]:grid min-[1700px]:grid-cols-[minmax(0,1fr)_300px] min-[1700px]:gap-4 min-[1700px]:items-start">
-      <div className="flex flex-col gap-4 min-w-0">
+      <div className="flex flex-col gap-4">
         {/* Order details */}
         <section className="bg-white rounded-lg border border-field">
           <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{t.po.orderDetails}</h2>
@@ -462,10 +513,13 @@ export default function POFormPage() {
                   incoterm: h.incoterm || sup?.incoterm || '',
                 }))
               }} />
-            <Select id="po-contract" label={t.contracts.linkedContract} value={header.contract_id} disabled={isReadOnly || !header.supplier_id} placeholder="-" options={contractOptions}
-              onChange={v => setHeader(h => ({ ...h, contract_id: v }))} />
             <div>
-              <Select id="po-location" label={s.location} required value={header.location_id} disabled={isReadOnly} placeholder={t.common.select}
+              <Select id="po-contract" label={t.contracts.linkedContract} value={header.contract_id} disabled={isReadOnly || !header.supplier_id} placeholder="-" options={contractOptions}
+                onChange={v => setHeader(h => ({ ...h, contract_id: v }))} />
+              {header.supplier_id && !isReadOnly && contractOptions.length === 1 && <p className="text-xs text-ink2 mt-1.5">{s.noContracts}</p>}
+            </div>
+            <div>
+              <Select id="po-location" label={s.deliveryLocation} required value={header.location_id} disabled={isReadOnly} placeholder={t.common.select}
                 options={locations.map(l => ({ value: l.id, label: l.name }))}
                 onChange={v => setHeader(h => ({ ...h, location_id: v }))} />
               {locationHint && <p className="text-xs text-ink2 mt-1.5">{locationHint}</p>}
@@ -487,6 +541,11 @@ export default function POFormPage() {
               value={header.supplier_quote_ref}
               onChange={e => setHeader(h => ({ ...h, supplier_quote_ref: e.target.value }))}
               readOnly={isReadOnly} />
+            <div>
+              <Input id="negotiated" label={`${s.negotiatedDiscount} (${company?.currency ?? 'EUR'})`} inputMode="decimal" placeholder="0,00"
+                {...numericInput(negotiated, setNegotiated)} readOnly={isReadOnly} />
+              <p className="text-xs text-ink2 mt-1.5">{s.negotiatedHint}</p>
+            </div>
             <div className="sm:col-span-2 lg:col-span-4 flex flex-col gap-1">
               <label htmlFor="po-notes" className="text-sm font-medium text-gray-700">{s.notes}</label>
               <textarea id="po-notes" rows={3} value={header.notes}
@@ -497,7 +556,7 @@ export default function POFormPage() {
             </div>
             {header.department_id && (
               <div className="sm:col-span-2 lg:col-span-4">
-                <BudgetStatus className="pt-4 border-t border-field min-[1700px]:hidden" departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludePoId={id} />
+                <BudgetStatus className="pt-4 border-t border-field" departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludePoId={id} excludeRequestId={fromRequestId} />
               </div>
             )}
           </div>
@@ -505,7 +564,12 @@ export default function POFormPage() {
 
         {/* Line items */}
         <section className="bg-white rounded-lg border border-field overflow-hidden">
-          <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{t.po.lineItems}</h2>
+          <div className="px-5 py-3 border-b border-field flex items-center justify-between gap-3 min-h-[49px]">
+            <h2 className="text-[15px] font-semibold text-ink">{t.po.lineItems}</h2>
+            {!isReadOnly && header.contract_id && contractMismatches.length > 0 && (
+              <Button variant="secondary" onClick={applyContractPrices} className="!h-8 text-[13px]">{s.applyContractPrices.replace('{n}', String(contractMismatches.length))}</Button>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="table-grid w-full text-sm min-w-[1300px]">
               <GridHead cols={[[t.po.position, Hash], [s.catalog, Search], [s.code, IdCard], [t.po.itemName, Package], [s.category + ' *', Tag], [t.categories.subcategory + ' *', Tag], [t.po.qty, Hash, 'right'], [t.po.unit, Ruler], [t.po.unitPrice, Coins, 'right'], [t.po.amount, Coins, 'right'], ...(isReadOnly ? [] : [['']] as [string][])]} />
@@ -590,6 +654,13 @@ export default function POFormPage() {
                 {!isReadOnly && <button type="button" onClick={() => setAttToDelete(att)} aria-label={t.common.deleteEntity} className="text-icon hover:text-danger transition-colors shrink-0"><X className="w-4 h-4" /></button>}
               </div>
             ))}
+            {requestAtts.map(att => (
+              <div key={att.id} className="flex items-center gap-2.5 px-3 py-2 bg-surface rounded-lg">
+                <FileText className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
+                <button type="button" onClick={() => openAttachment(att.file_path)} className="text-sm text-ink hover:text-primary font-medium flex-1 text-left truncate transition-colors">{att.file_name}</button>
+                <span className="text-xs text-ink2 shrink-0">{t.requests.fromRequest}</span>
+              </div>
+            ))}
             {newFiles.map((f, i) => (
               <div key={i} className="flex items-center gap-2.5 px-3 py-2 bg-accent-light rounded-lg">
                 <FileText className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
@@ -613,15 +684,6 @@ export default function POFormPage() {
         {!isReadOnly && <div className="hidden lg:flex justify-end gap-2">{actionButtons}</div>}
       </div>
 
-      {header.department_id && (
-        <aside className="hidden min-[1700px]:block sticky top-4">
-          <section className="bg-white rounded-lg border border-field">
-            <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{t.budgets.title}</h2>
-            <div className="p-5"><BudgetStatus departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludePoId={id} /></div>
-          </section>
-        </aside>
-      )}
-      </div>
 
       <ConfirmDialog open={confirmDelete} onClose={() => setConfirmDelete(false)} onConfirm={deleteDraft}
         title={t.po.deleteTitle} message={t.po.deleteQuestion} name={poNumber ?? ''} danger loading={deleting} confirmLabel={t.common.deleteEntity} />

@@ -41,6 +41,9 @@ export default function SettingsPage() {
   const { t } = useLanguage()
   const s = t.settings
   const [form, setForm] = useState<Partial<Company>>({})
+  // order numbers: prefix + year + counter that starts again every year (PO-260001)
+  const thisYY = new Date().getFullYear() % 100
+  const nextPoNumber = `${form.po_prefix ?? 'PO'}-${String(thisYY).padStart(2, '0')}${String(form.po_year === thisYY ? form.po_next_number ?? 1 : 1).padStart(4, '0')}`
   const [saving, setSaving] = useState<string | null>(null)
 
   // Personal profile
@@ -155,8 +158,8 @@ export default function SettingsPage() {
         </Section>
 
         <Section title={s.poSettings} description={s.poSettingsHint} saving={saving === 'po'}
-          onSave={() => save('po', ['currency', 'po_prefix', 'po_next_number'])}
-          footer={<>{s.nextPoWillBe}: <span className="text-ink font-medium">{form.po_prefix ?? 'PO'}-{String(form.po_next_number ?? 1).padStart(4, '0')}</span></>}>
+          onSave={() => save('po', ['currency', 'po_prefix', 'po_next_number', 'po_year'])}
+          footer={<>{s.nextPoWillBe}: <span className="text-ink font-medium">{nextPoNumber}</span></>}>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Select id="currency" label={s.currency} value={form.currency ?? 'EUR'}
               options={CURRENCIES.map(c => ({ value: c, label: c }))}
@@ -164,7 +167,7 @@ export default function SettingsPage() {
             <Input id="po_prefix" label={s.poPrefix} {...field('po_prefix')} />
             <Input id="po_next_number" label={s.nextPoNumber} type="number"
               value={form.po_next_number?.toString() ?? '1'}
-              onChange={e => setForm(f => ({ ...f, po_next_number: parseInt(e.target.value) || 1 }))}
+              onChange={e => setForm(f => ({ ...f, po_next_number: parseInt(e.target.value) || 1, po_year: thisYY }))}
             />
           </div>
         </Section>

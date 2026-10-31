@@ -147,25 +147,8 @@ export default function RequestDetailPage() {
     toast.success(s.draftDeleted); refreshCounts(); navigate('/requests')
   }
 
-  async function doCreatePo() {
-    setActionLoading(true)
-    const { data: poId, error } = await (supabase as any).rpc('create_po_from_request', { p_request_id: id })
-    if (error) { setActionLoading(false); toast.error(error.message); return }
-    // Carry the request's attachments (offers) over to the new PO — independent copies
-    if (company && poId) {
-      const { data: atts } = await supabase.from('request_attachments').select('file_path, file_name, file_size').eq('request_id', id!)
-      for (let i = 0; i < (atts?.length ?? 0); i++) {
-        const att = atts![i]
-        const newPath = `${company.id}/${poId}/${Date.now()}-${i}-${att.file_name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-        const { error: cpErr } = await supabase.storage.from('quotations').copy(att.file_path, newPath)
-        if (!cpErr) await supabase.from('po_attachments').insert({ po_id: poId, company_id: company.id, file_path: newPath, file_name: att.file_name, file_size: att.file_size })
-      }
-    }
-    setActionLoading(false)
-    toast.success(s.poCreatedToast)
-    refreshCounts()
-    navigate(`/purchase-orders/${poId}/edit`)
-  }
+  // opens the order form filled in from this request; the order is only created when that form is saved
+  const doCreatePo = () => navigate(`/purchase-orders/new?fromRequest=${id}`)
 
   async function doDecide() {
     if (!decision || !myPending) return
@@ -262,7 +245,7 @@ export default function RequestDetailPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {st === 'approved' && !req.po_id && (hasPerm('purchase_orders', 'create') || isAdmin) && (
-            <Button loading={actionLoading} onClick={doCreatePo} className="gap-2"><ShoppingCart className="w-4 h-4" />{s.createPO}</Button>
+            <Button onClick={doCreatePo} className="gap-2"><ShoppingCart className="w-4 h-4" />{s.createPO}</Button>
           )}
           {st === 'draft' && (isCreator || isAdmin) && (
             <Button loading={actionLoading} onClick={doSubmit} className="gap-2"><Send className="w-4 h-4" />{s.submit}</Button>

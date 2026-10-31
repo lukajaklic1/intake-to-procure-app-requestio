@@ -266,7 +266,7 @@ export default function RequestsPage() {
                       ? <Link to={`/purchase-orders/${r.po_id}`} onClick={e => e.stopPropagation()}
                           className={`text-ink2 hover:text-ink ${poNums[r.po_id].status === 'cancelled' ? 'line-through decoration-gray-300' : ''}`}>{poNums[r.po_id].po_number}</Link>
                       : r.status === 'approved' && (hasPerm('purchase_orders', 'create') || isAdmin)
-                        ? <button onClick={e => { e.stopPropagation(); navigate(`/requests/${r.id}`) }}
+                        ? <button onClick={e => { e.stopPropagation(); navigate(`/purchase-orders/new?fromRequest=${r.id}`) }}
                             className="inline-flex items-center gap-1 badge badge-warn hover:brightness-95 transition-all whitespace-nowrap">
                             <Plus className="w-3 h-3" />{t.requests.createPO}
                           </button>

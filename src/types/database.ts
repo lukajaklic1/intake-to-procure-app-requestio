@@ -4,6 +4,8 @@ export interface Company {
   currency: string
   po_prefix: string
   po_next_number: number
+  /** two-digit year the counter belongs to; the counter starts at 1 again in a new year */
+  po_year: number | null
   address_street: string | null
   address_city: string | null
   address_postal_code: string | null
@@ -172,6 +174,8 @@ export interface PurchaseOrder {
   delivery_notes: string | null
   total_amount: number
   discount_amount: number
+  /** extra discount negotiated by procurement: internal, only for tracking savings (not on the order document, not in the total) */
+  negotiated_discount: number | null
   request_id: string | null
   version: number
   change_note: string | null

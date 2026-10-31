@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Search, Eye, Pencil, FileText, X, Building2, MapPin, Tag, CalendarClock, Coins, CircleDot, ClipboardList } from 'lucide-react'
+import { Plus, Search, Eye, Pencil, FileText, X, Building2, MapPin, Tag, CalendarClock, Coins, CircleDot, ClipboardList, User } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -15,6 +15,7 @@ import { categoryOptions, categoryAndChildren } from '../lib/categories'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import { format, subMonths, startOfMonth } from 'date-fns'
 import GridHead from '../components/ui/GridHead'
+import PersonCell from '../components/ui/PersonCell'
 import RowMenu from '../components/ui/RowMenu'
 import { matchesSearch } from '../lib/search'
 import SortFilter from '../components/ui/SortFilter'
@@ -43,6 +44,7 @@ interface PO {
   status: string
   received_status: 'none' | 'partial' | 'full'
   total_amount: number
+  negotiated_discount: number | null
   created_at: string
   created_by: string
   expected_delivery_date: string | null
@@ -123,7 +125,7 @@ export default function PurchaseOrdersPage() {
     // spinner only on the first load: later reloads refresh the data in place
     const { data } = await supabase
       .from('purchase_orders')
-      .select('id, po_number, status, received_status, total_amount, created_at, created_by, expected_delivery_date, supplier_id, department_id, request_id, suppliers(name), po_line_items(category_id, categories(name)), locations(name)')
+      .select('id, po_number, status, received_status, total_amount, negotiated_discount, created_at, created_by, expected_delivery_date, supplier_id, department_id, request_id, suppliers(name), po_line_items(category_id, categories(name)), locations(name)')
       .eq('company_id', company.id)
       .order('created_at', { ascending: false })
     const list = (data as unknown as PO[]) ?? []
@@ -181,6 +183,7 @@ export default function PurchaseOrdersPage() {
     return true
   })
 
+  const creatorName = (id: string) => { const m = members.find(x => x.id === id); return m ? `${m.first_name} ${m.last_name}` : null }
   const sortedRows = applySort(filtered, sortDefs, sort)
   const exportCols: ExportColumn<PO>[] = [
     { header: s.poNumber, get: p => p.po_number, kind: 'text', width: 14 },
@@ -188,7 +191,9 @@ export default function PurchaseOrdersPage() {
     { header: s.location, get: p => p.locations?.name, kind: 'text', width: 26 },
     { header: s.category, get: p => catLabel(p.po_line_items, categories), kind: 'text', width: 24 },
     { header: s.deliveryDate, get: p => p.expected_delivery_date, kind: 'date', width: 14 },
+    { header: s.creator, get: p => creatorName(p.created_by), kind: 'text', width: 22 },
     { header: s.total, get: p => p.total_amount, kind: 'money', width: 14 },
+    { header: s.negotiatedShort, get: p => p.negotiated_discount, kind: 'money', width: 22 },
     { header: t.common.status, get: p => t.status[p.status as keyof typeof t.status] ?? p.status, kind: 'text', width: 16 },
     { header: s.requestCol, get: p => (p.request_id ? reqNums[p.request_id] : null), kind: 'text', width: 14 },
     { header: t.common.created, get: p => p.created_at, kind: 'date', width: 14 },
@@ -258,11 +263,11 @@ export default function PurchaseOrdersPage() {
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1100px]">
-            <GridHead cols={[[s.poNumber, FileText], [s.supplier, Building2], [s.location, MapPin], [s.category, Tag], [s.deliveryDate, CalendarClock], [s.total, Coins], [t.common.status, CircleDot], [s.requestCol, ClipboardList], ['']]} />
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1250px]">
+            <GridHead cols={[[s.poNumber, FileText], [s.supplier, Building2], [s.location, MapPin], [s.category, Tag], [s.deliveryDate, CalendarClock], [s.creator, User], [s.total, Coins], [t.common.status, CircleDot], [s.requestCol, ClipboardList], ['']]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={FileText} colSpan={10} title={hasActiveFilters ? t.common.empty.noResults.title : t.common.empty.purchaseOrders.title} subtitle={hasActiveFilters ? t.common.empty.noResults.text : t.common.empty.purchaseOrders.text} />
+                <TableEmptyState icon={FileText} colSpan={11} title={hasActiveFilters ? t.common.empty.noResults.title : t.common.empty.purchaseOrders.title} subtitle={hasActiveFilters ? t.common.empty.noResults.text : t.common.empty.purchaseOrders.text} />
               ) : paginated.map(po => (
                 <tr key={po.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/purchase-orders/${po.id}`)}>
                   <td className="px-4 py-3 text-ink2 whitespace-nowrap">{po.po_number}</td>
@@ -270,6 +275,7 @@ export default function PurchaseOrdersPage() {
                   <td className="px-4 py-3 text-ink2 max-w-[220px] truncate">{po.locations?.name ?? '-'}</td>
                   <td className="px-4 py-3 text-ink2">{catLabel(po.po_line_items, categories)}</td>
                   <td className="px-4 py-3 text-ink whitespace-nowrap">{po.expected_delivery_date ? format(new Date(po.expected_delivery_date), 'dd.MM.yyyy') : '-'}</td>
+                  <td className="px-4 py-3 whitespace-nowrap"><PersonCell name={creatorName(po.created_by)} /></td>
                   <td className="px-4 py-3 text-ink whitespace-nowrap tabular-nums">{fmt(po.total_amount ?? 0, company?.currency)}</td>
                   <td className="px-4 py-3">
                     {po.status === 'sent' && po.received_status === 'partial'

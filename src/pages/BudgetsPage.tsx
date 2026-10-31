@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Wallet, Users, Trash2, Copy, CalendarRange, Pencil } from 'lucide-react'
+import { Plus, Wallet, Users, Trash2, Copy, CalendarRange } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -19,13 +19,30 @@ import AmountInput from '../components/budget/AmountInput'
 import { loadBudgetUsage, usageOf, usedPercent, usedTone, type UsageRow } from '../lib/budget'
 import type { Budget, Department } from '../types/database'
 
-/** Progress bar of a used share: calm up to 80 %, yellow above, red over the budget. */
-export function UsedBar({ pct }: { pct: number }) {
+/** Filled part of a budget bar: what is ordered in the full colour, what is still only requested in a lighter shade of it
+ *  (calm up to 80 %, yellow above, red over the budget). Both values are shares of the budget in %. */
+export function BarFill({ orderedPct, requestedPct }: { orderedPct: number; requestedPct: number }) {
+  const tone = usedTone(Math.round(orderedPct + requestedPct))
+  const color = tone === 'danger' ? 'bg-danger' : tone === 'warn' ? 'bg-warn' : 'bg-primary'
+  const o = Math.min(100, orderedPct)
+  const r = Math.max(0, Math.min(100 - o, requestedPct))
+  return (
+    <div className="h-full flex">
+      <div className={`h-full ${color}`} style={{ width: `${o}%` }} />
+      <div className={`h-full ${color} opacity-40`} style={{ width: `${r}%` }} />
+    </div>
+  )
+}
+
+/** Progress bar of a used share. Without `orderedPct` it is one colour; with it the ordered part is solid and the rest lighter. */
+export function UsedBar({ pct, orderedPct }: { pct: number; orderedPct?: number }) {
   const tone = usedTone(pct)
   return (
     <div className="flex items-center gap-2.5 min-w-[130px]">
       <div className="h-1.5 w-20 rounded-full bg-selected overflow-hidden shrink-0">
-        <div className={`h-full rounded-full ${tone === 'danger' ? 'bg-danger' : tone === 'warn' ? 'bg-warn' : 'bg-primary'}`} style={{ width: `${Math.min(100, pct)}%` }} />
+        {orderedPct === undefined
+          ? <div className={`h-full rounded-full ${tone === 'danger' ? 'bg-danger' : tone === 'warn' ? 'bg-warn' : 'bg-primary'}`} style={{ width: `${Math.min(100, pct)}%` }} />
+          : <BarFill orderedPct={orderedPct} requestedPct={pct - orderedPct} />}
       </div>
       <span className={`text-xs tabular-nums ${tone === 'danger' ? 'text-danger' : 'text-ink2'}`}>{pct} %</span>
     </div>
@@ -33,15 +50,16 @@ export function UsedBar({ pct }: { pct: number }) {
 }
 
 /** What has been spent against a budget as a bar with the amount and the share: "598 € [=====---] 1 %" (yellow above 80 %, red over the budget). */
-function SpentBar({ used, budget, fmt }: { used: number; budget: number; fmt: (n: number) => string }) {
+function SpentBar({ ordered, requested, budget, fmt, s }: { ordered: number; requested: number; budget: number; fmt: (n: number) => string; s: { ordered: string; requested: string } }) {
+  const used = ordered + requested
   if (budget <= 0) return <span className="block pr-2 text-right text-ink2 tabular-nums">{used > 0 ? fmt(used) : '-'}</span>
   const pct = usedPercent(used, budget)
   const tone = usedTone(pct)
   return (
     <div className="flex items-center gap-3 px-1">
       <span className="w-[76px] shrink-0 text-right text-ink2 tabular-nums whitespace-nowrap">{used > 0 ? fmt(used) : '-'}</span>
-      <div className="h-2 flex-1 min-w-[56px] rounded-full bg-selected overflow-hidden">
-        <div className={`h-full rounded-full ${tone === 'danger' ? 'bg-danger' : tone === 'warn' ? 'bg-warn' : 'bg-primary'}`} style={{ width: `${Math.min(100, pct)}%` }} />
+      <div className="h-2 flex-1 min-w-[56px] rounded-full bg-selected overflow-hidden" title={`${s.ordered}: ${fmt(ordered)} · ${s.requested}: ${fmt(requested)}`}>
+        <BarFill orderedPct={(ordered / budget) * 100} requestedPct={(requested / budget) * 100} />
       </div>
       <span className={`w-10 shrink-0 text-right text-xs tabular-nums ${tone === 'danger' ? 'text-danger' : tone === 'warn' ? 'text-warn' : 'text-ink2'}`}>{pct} %</span>
     </div>
@@ -89,7 +107,8 @@ export default function BudgetsPage() {
   useHeaderCounts(loading ? [] : [{ value: years.length }])
   const budgetOf = (deptId: string, year: number) => budgets.find(b => b.department_id === deptId && b.year === year)
   const amountOf = (deptId: string, year: number) => Number(budgetOf(deptId, year)?.amount ?? 0)
-  const usedOf = (deptId: string, year: number) => usageOf(usage[year] ?? [], deptId, null, 'ordered') + usageOf(usage[year] ?? [], deptId, null, 'requested')
+  const orderedOf = (deptId: string, year: number) => usageOf(usage[year] ?? [], deptId, null, 'ordered')
+  const requestedOf = (deptId: string, year: number) => usageOf(usage[year] ?? [], deptId, null, 'requested')
   // active departments, and inactive ones that still have a budget somewhere
   const shown = departments.filter(d => d.status === 'active' || years.some(y => amountOf(d.id, y) > 0))
 
@@ -153,7 +172,8 @@ export default function BudgetsPage() {
   }
 
   const totalOf = (year: number) => shown.reduce((n, d) => n + amountOf(d.id, year), 0)
-  const totalUsed = (year: number) => shown.reduce((n, d) => n + (amountOf(d.id, year) > 0 ? usedOf(d.id, year) : 0), 0)
+  const totalOrdered = (year: number) => shown.reduce((n, d) => n + (amountOf(d.id, year) > 0 ? orderedOf(d.id, year) : 0), 0)
+  const totalRequested = (year: number) => shown.reduce((n, d) => n + (amountOf(d.id, year) > 0 ? requestedOf(d.id, year) : 0), 0)
 
   return (
     <div className="p-4 lg:p-6">
@@ -176,7 +196,7 @@ export default function BudgetsPage() {
                     <span className="flex items-center justify-between gap-3">
                       <span className="inline-flex items-center gap-2 text-[15px] text-ink font-semibold"><CalendarRange className="w-4 h-4 text-icon" strokeWidth={1.75} />{y}</span>
                       {canEdit && (
-                        <RowMenu label={t.common.editEntity} icon={Pencil} items={[
+                        <RowMenu items={[
                           { label: s.detail, icon: CalendarRange, onClick: () => navigate(`/budgets/${y}`) },
                           ...(years.some(p => p < y) ? [{ label: s.copyPrevious, icon: Copy, onClick: () => copyFromPrevious(y) }] : []),
                           // deleting a whole year is for the admin only
@@ -211,7 +231,7 @@ export default function BudgetsPage() {
                             <td className="px-1 py-0.5 w-[150px] border-l border-field">
                               <AmountInput value={amount} format={fmt} disabled={!canEdit} placeholder={s.noBudget} onSave={n => save(d.id, y, n)} />
                             </td>
-                            <td className="px-3 py-1"><SpentBar used={usedOf(d.id, y)} budget={amount} fmt={fmt} /></td>
+                            <td className="px-3 py-1"><SpentBar ordered={orderedOf(d.id, y)} requested={requestedOf(d.id, y)} budget={amount} fmt={fmt} s={s} /></td>
                           </Fragment>
                         )
                       })}
@@ -222,7 +242,7 @@ export default function BudgetsPage() {
                     {years.map(y => (
                       <Fragment key={y}>
                         <td className="px-3 py-1 text-right font-medium text-ink tabular-nums border-l border-field">{fmt(totalOf(y))}</td>
-                        <td className="px-3 py-1"><SpentBar used={totalUsed(y)} budget={totalOf(y)} fmt={fmt} /></td>
+                        <td className="px-3 py-1"><SpentBar ordered={totalOrdered(y)} requested={totalRequested(y)} budget={totalOf(y)} fmt={fmt} s={s} /></td>
                       </Fragment>
                     ))}
                   </tr>

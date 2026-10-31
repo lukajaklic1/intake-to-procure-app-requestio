@@ -27,6 +27,7 @@ interface POFull {
   incoterm: string | null; supplier_quote_ref: string | null
   notes: string | null
   discount_amount: number
+  negotiated_discount: number | null
   request_id: string | null
   version: number
   change_note: string | null
@@ -328,7 +329,7 @@ export default function PODetailPage() {
             </div>
           </Card>
 
-          <Card title={s.location}>
+          <Card title={s.deliveryLocation}>
             <div className="p-5 text-sm">
               <p className="font-medium text-ink">{po.locations?.name}</p>
               <div className="mt-1.5 flex flex-col gap-0.5 text-ink2">
@@ -354,6 +355,7 @@ export default function PODetailPage() {
               <div className="col-span-2"><Field label={s.paymentTermsLabel}>{po.payment_terms}</Field></div>
               {contract && <div className="col-span-2"><Field label={t.contracts.linkedContract}>{contract.contract_number} · {contract.title}</Field></div>}
               {po.supplier_quote_ref && <div className="col-span-2"><Field label={s.quoteRef}>{po.supplier_quote_ref}</Field></div>}
+              {(po.negotiated_discount ?? 0) > 0 && <div className="col-span-2"><Field label={s.negotiatedShort}>{fmt(po.negotiated_discount!)}</Field></div>}
               {linkedReq && (
                 <div className="col-span-2">
                   <Field label={t.requests.fromRequest}><Link to={`/requests/${linkedReq.id}`} className="hover:underline">{linkedReq.request_number}</Link></Field>

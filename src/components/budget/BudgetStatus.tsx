@@ -3,6 +3,7 @@ import { Wallet } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useCompany } from '../../hooks/useCompany'
 import { useLanguage } from '../../hooks/useLanguage'
+import { BarFill } from '../../pages/BudgetsPage'
 import { loadBudgetUsage, usageOf, usedPercent, usedTone, type UsageRow } from '../../lib/budget'
 import type { Budget } from '../../types/database'
 
@@ -57,7 +58,9 @@ export default function BudgetStatus({ departmentId, amount = 0, byCategory = {}
     <div className={`flex flex-col gap-3 ${className}`}>
       {shown.map(b => {
         const budget = Number(b.amount)
-        const used = usageOf(usage, b.department_id, b.category_id, 'ordered') + usageOf(usage, b.department_id, b.category_id, 'requested')
+        const ordered = usageOf(usage, b.department_id, b.category_id, 'ordered')
+        const requested = usageOf(usage, b.department_id, b.category_id, 'requested')
+        const used = ordered + requested
         const add = b.category_id === null ? amount : byCategory[b.category_id] ?? 0
         const now = usedPercent(used, budget)
         const after = usedPercent(used + add, budget)
@@ -73,8 +76,8 @@ export default function BudgetStatus({ departmentId, amount = 0, byCategory = {}
                 {fmt(used + add)} / {fmt(budget)}
               </span>
             </div>
-            <div className="h-1.5 rounded-full bg-selected mt-1.5 overflow-hidden">
-              <div className={`h-full rounded-full ${tone === 'danger' ? 'bg-danger' : tone === 'warn' ? 'bg-warn' : 'bg-primary'}`} style={{ width: `${Math.min(100, after)}%` }} />
+            <div className="h-1.5 rounded-full bg-selected mt-1.5 overflow-hidden" title={`${s.ordered}: ${fmt(ordered)} · ${s.requested}: ${fmt(requested)}`}>
+              <BarFill orderedPct={(ordered / budget) * 100} requestedPct={((requested + add) / budget) * 100} />
             </div>
             <p className={`text-xs mt-1 tabular-nums ${tone === 'danger' ? 'text-danger' : 'text-ink2'}`}>
               {add > 0 ? `${now} % → ${after} % ${s.afterThis}` : `${after} %`}{tone === 'danger' ? ` · ${s.over}` : ''}

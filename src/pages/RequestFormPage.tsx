@@ -275,9 +275,7 @@ export default function RequestFormPage() {
         <div className="hidden lg:flex items-center gap-2">{actionButtons}</div>
       </div>
 
-      {/* on a wide screen the budget sits beside the form and stays in view while the lines are filled in */}
-      <div className="min-[1700px]:grid min-[1700px]:grid-cols-[minmax(0,1fr)_300px] min-[1700px]:gap-4 min-[1700px]:items-start">
-      <div className="flex flex-col gap-4 min-w-0">
+      <div className="flex flex-col gap-4">
         {/* Request details */}
         <section className="bg-white rounded-lg border border-field">
           <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{s.detailsTitle}</h2>
@@ -309,7 +307,7 @@ export default function RequestFormPage() {
               <p className="mt-4 text-[13px] text-ink2">{s.goesTo} <span className="font-medium text-ink">{approverName}</span></p>
             )}
             {header.department_id && (
-              <BudgetStatus className="mt-5 pt-4 border-t border-field min-[1700px]:hidden" departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludeRequestId={id} />
+              <BudgetStatus className="mt-5 pt-4 border-t border-field" departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludeRequestId={id} />
             )}
           </div>
         </section>
@@ -393,15 +391,6 @@ export default function RequestFormPage() {
         <div className="hidden lg:flex justify-end gap-2">{actionButtons}</div>
       </div>
 
-      {header.department_id && (
-        <aside className="hidden min-[1700px]:block sticky top-4">
-          <section className="bg-white rounded-lg border border-field">
-            <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{t.budgets.title}</h2>
-            <div className="p-5"><BudgetStatus departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludeRequestId={id} /></div>
-          </section>
-        </aside>
-      )}
-      </div>
 
       <Modal open={submitOpen} onClose={() => setSubmitOpen(false)} title={s.submitTitle} size="sm" icon={Send}>
         {approverName && <p className="text-sm text-ink2 mb-4">{s.goesTo} <span className="font-medium text-ink">{approverName}</span></p>}

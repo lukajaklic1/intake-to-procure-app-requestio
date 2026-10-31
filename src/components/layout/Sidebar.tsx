@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { LogOut, X, Building2, Settings, PanelLeftClose } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { onRefreshCounts } from '../../lib/refreshCounts'
+import { onRefreshCounts, refreshCounts } from '../../lib/refreshCounts'
 import { useAuth } from '../../hooks/useAuth'
 import { useCompany } from '../../hooks/useCompany'
 import { useLanguage } from '../../hooks/useLanguage'
@@ -51,8 +51,33 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
       setExpiringContracts((ctr ?? []).filter(c => needsAttention(c as { status: 'active'; end_date: string | null; notice_days: number | null; auto_renew: boolean }, 60)).length)
     }
     loadCounts()
-    return onRefreshCounts(loadCounts)
-  }, [company, profile, isAdmin, location.pathname])
+    const offRefresh = onRefreshCounts(loadCounts)
+
+    // live: the database tells us when something behind a counter changes (a short delay bundles several changes)
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const soon = () => { clearTimeout(timer); timer = setTimeout(loadCounts, 300) }
+    let channel = supabase.channel('sidebar-counts')
+    for (const table of ['requests', 'purchase_orders', 'contracts', 'invoices']) {
+      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `company_id=eq.${company.id}` }, soon)
+    }
+    channel.subscribe()
+
+    // safety net in case realtime is not available: refresh when the tab is shown again and every 30 s
+    const onVisible = () => { if (document.visibilityState === 'visible') loadCounts() }
+    document.addEventListener('visibilitychange', onVisible)
+    const poll = setInterval(onVisible, 30000)
+
+    return () => {
+      offRefresh()
+      clearTimeout(timer)
+      clearInterval(poll)
+      document.removeEventListener('visibilitychange', onVisible)
+      supabase.removeChannel(channel)
+    }
+  }, [company, profile, isAdmin])
+
+  // moving to another page refreshes the counters too
+  useEffect(() => { refreshCounts() }, [location.pathname])
 
   async function handleSignOut() {
     await signOut()
