@@ -13,6 +13,7 @@ import { format } from 'date-fns'
 import type { Request, RequestLineItem, RequestStatus, Approval, ActivityLog } from '../types/database'
 import ModalActions from '../components/ui/ModalActions'
 import PersonCell from '../components/ui/PersonCell'
+import BudgetStatus from '../components/budget/BudgetStatus'
 import GridHead from '../components/ui/GridHead'
 import { unitLabel } from '../lib/units'
 
@@ -69,6 +70,8 @@ export default function RequestDetailPage() {
   const [linkedPo, setLinkedPo] = useState<{ id: string; po_number: string; status: string; total_amount: number; created_at: string } | null>(null)
   const [attachments, setAttachments] = useState<{ id: string; file_name: string; file_path: string }[]>([])
   const [names, setNames] = useState<Record<string, string>>({})
+  // parent of every category, to find the main category of a line
+  const [catParent, setCatParent] = useState<Record<string, string | null>>({})
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
@@ -92,6 +95,8 @@ export default function RequestDetailPage() {
     } else setLinkedPo(null)
     const { data: ls } = await supabase.from('request_line_items').select('*, categories(name)').eq('request_id', id!).order('position')
     setLines((ls as any[]) ?? [])
+    const { data: cats } = await supabase.from('categories').select('id, parent_id').eq('company_id', data.company_id)
+    setCatParent(Object.fromEntries((cats ?? []).map(c => [c.id, c.parent_id])))
     const { data: aps } = await supabase.from('approvals').select('*').eq('request_id', id!).order('step')
     const apList = (aps as Approval[]) ?? []
     setApprovals(apList)
@@ -182,6 +187,10 @@ export default function RequestDetailPage() {
   const hasSecondStep = approvals.some(x => x.step === 2)
   const stepNote = (step?: number) => (!step || !hasSecondStep ? '' : ` (${step === 2 ? s.roleDirector : s.roleManager})`)
 
+  // what each main category of this request adds (only used for a draft or rejected request)
+  const budgetByCategory: Record<string, number> = {}
+  for (const l of lines) { const m = l.category_id ? (catParent[l.category_id] ?? l.category_id) : ''; if (m) budgetByCategory[m] = (budgetByCategory[m] ?? 0) + Number(l.line_total) }
+
   type FlowState = 'done' | 'current' | 'upcoming' | 'rejected' | 'cancelled'
   const flowSteps: { label: string; name?: string; note?: string | null; state: FlowState }[] = (() => {
     if (st === 'draft') return []
@@ -233,7 +242,7 @@ export default function RequestDetailPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <nav className="flex items-center gap-1.5 text-[13px] text-ink2 mb-4">
+      <nav className="flex items-center gap-2 text-sm text-ink2 mb-5">
         <button type="button" onClick={() => navigate(backTo)} aria-label={backLabel} title={backLabel}
           className="w-7 h-7 -ml-1.5 mr-1 inline-flex items-center justify-center rounded-lg text-icon hover:bg-selected hover:text-ink transition-colors">
           <ArrowLeft className="w-4 h-4" strokeWidth={1.75} />
@@ -364,6 +373,17 @@ export default function RequestDetailPage() {
               {req.note && <div className="col-span-2"><Field label={s.note}><span className="whitespace-pre-wrap">{req.note}</span></Field></div>}
             </div>
           </Card>
+
+          {req.department_id && !req.po_id && st !== 'cancelled' && (
+            <Card title={t.budgets.title}>
+              <div className="p-5">
+                {/* a pending or approved request is already part of the usage; a draft or rejected one is shown as if it were sent */}
+                <BudgetStatus departmentId={req.department_id}
+                  amount={st === 'draft' || st === 'rejected' ? req.total_estimate : 0}
+                  byCategory={st === 'draft' || st === 'rejected' ? budgetByCategory : {}} />
+              </div>
+            </Card>
+          )}
 
           {flowSteps.length > 0 && (
             <Card title={s.flowTitle}>

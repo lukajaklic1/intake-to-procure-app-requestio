@@ -34,6 +34,11 @@ const PDF_LABELS = {
     paymentTerms: 'Payment terms',
     incoterm: 'Incoterm',
     quoteRef: 'Supplier quote no.',
+    regNo: 'Reg. no.',
+    capital: 'Share capital',
+    registeredAt: 'Registered at',
+    director: 'Director',
+    terms: 'GENERAL TERMS AND CONDITIONS',
   },
   sl: {
     title: 'Nabavno naročilo',
@@ -58,6 +63,11 @@ const PDF_LABELS = {
     paymentTerms: 'Plačilni pogoji',
     incoterm: 'Pariteta',
     quoteRef: 'Št. ponudbe dobavitelja',
+    regNo: 'Matična št.',
+    capital: 'Osnovni kapital',
+    registeredAt: 'Registrirano pri',
+    director: 'Direktor',
+    terms: 'SPLOŠNI POGOJI',
   },
 } as const
 
@@ -70,6 +80,8 @@ export interface PODocData {
   incoterm: string | null
   supplier_quote_ref: string | null
   notes: string | null
+  /** general terms and conditions in the language of the document */
+  terms?: string | null
   discount_amount: number
   total_amount: number
   currency: string
@@ -79,6 +91,8 @@ export interface PODocData {
     address_postal_code: string | null; address_country: string | null
     email: string | null; phone: string | null; tax_id: string | null
     bank_name: string | null; bank_iban: string | null
+    bank_swift?: string | null; registration_number?: string | null; share_capital?: string | null
+    register_court?: string | null; director_name?: string | null; website?: string | null
   }
   supplier: {
     name: string; vat_number: string | null; contact_name: string | null
@@ -109,7 +123,7 @@ const BLUE_LIGHT = '#eff6ff'
 const s = StyleSheet.create({
   page: {
     fontFamily: 'Roboto', fontSize: 9, color: DARK,
-    paddingTop: 36, paddingBottom: 54, paddingHorizontal: 40,
+    paddingTop: 36, paddingBottom: 78, paddingHorizontal: 40,
   },
 
   // ── 1. Top row: logo + title block ──────────────────────────────────────────
@@ -201,6 +215,10 @@ const s = StyleSheet.create({
   notesLabel: { fontSize: 7, fontFamily: 'Roboto', color: MUTED, marginBottom: 3 },
   notesText: { fontSize: 8.5, color: DARK, lineHeight: 1.6 },
 
+  // ── Terms ────────────────────────────────────────────────────────────────────
+  termsSection: { marginTop: 14, paddingTop: 8, borderTopWidth: 1, borderTopColor: BORDER, borderTopStyle: 'solid' },
+  termsText: { fontSize: 7, color: MID, lineHeight: 1.5 },
+
   // ── Footer ───────────────────────────────────────────────────────────────────
   footer: {
     position: 'absolute', bottom: 18, left: 40, right: 40,
@@ -235,6 +253,14 @@ function addrLines(lang: string, obj: {
 export default function PODocument({ data, lang = 'sl' }: { data: PODocData; lang?: 'en' | 'sl' }) {
   const { company, supplier, location, lines } = data
   const L = PDF_LABELS[lang]
+  // registration number, share capital, court, director and website in one line of the footer
+  const legalLine = [
+    data.company.registration_number ? `${L.regNo}: ${data.company.registration_number}` : '',
+    data.company.share_capital ? `${L.capital}: ${data.company.share_capital}` : '',
+    data.company.register_court ? `${L.registeredAt}: ${data.company.register_court}` : '',
+    data.company.director_name ? `${L.director}: ${data.company.director_name}` : '',
+    data.company.website ?? '',
+  ].filter(Boolean).join('  ·  ')
 
   // Terms — only show fields that have values
   const termFields = [
@@ -363,6 +389,13 @@ export default function PODocument({ data, lang = 'sl' }: { data: PODocData; lan
           </View>
         ) : null}
 
+        {/* ── General terms and conditions ── */}
+        {data.terms ? (
+          <View style={s.termsSection}>
+            <Text style={s.notesLabel}>{L.terms}</Text>
+            <Text style={s.termsText}>{data.terms}</Text>
+          </View>
+        ) : null}
 
         {/* ── Footer ── */}
         <View style={s.footer} fixed>
@@ -373,11 +406,10 @@ export default function PODocument({ data, lang = 'sl' }: { data: PODocData; lan
               : null}
             {(company.bank_name || company.bank_iban) ? (
               <Text style={s.footerText}>
-                {company.bank_name ? `${L.bank}: ${company.bank_name}` : ''}
-                {company.bank_name && company.bank_iban ? '   ' : ''}
-                {company.bank_iban ? `IBAN: ${company.bank_iban}` : ''}
+                {[company.bank_name ? `${L.bank}: ${company.bank_name}` : '', company.bank_iban ? `IBAN: ${company.bank_iban}` : '', company.bank_swift ? `SWIFT: ${company.bank_swift}` : ''].filter(Boolean).join('   ')}
               </Text>
             ) : null}
+            {legalLine ? <Text style={s.footerText}>{legalLine}</Text> : null}
           </View>
           <Text
             style={s.footerPage}

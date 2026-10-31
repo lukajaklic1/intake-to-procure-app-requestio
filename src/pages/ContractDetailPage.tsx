@@ -262,7 +262,7 @@ export default function ContractDetailPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <nav className="flex items-center gap-1.5 text-[13px] text-ink2 mb-4">
+      <nav className="flex items-center gap-2 text-sm text-ink2 mb-5">
         <button type="button" onClick={() => navigate('/contracts')} aria-label={s.title} title={s.title}
           className="w-7 h-7 -ml-1.5 mr-1 inline-flex items-center justify-center rounded-lg text-icon hover:bg-selected hover:text-ink transition-colors">
           <ArrowLeft className="w-4 h-4" strokeWidth={1.75} />

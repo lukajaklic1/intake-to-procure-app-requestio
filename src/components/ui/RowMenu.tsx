@@ -9,7 +9,7 @@ const ROW_H = 36
 /** Three-dots button at the end of a table row. The menu is rendered in a portal so the table
  *  card's overflow clipping can't cut it off, and flips upwards near the bottom of the window.
  *  Destructive actions don't belong here; they live inside the edit popup. */
-export default function RowMenu({ items }: { items: RowMenuItem[] }) {
+export default function RowMenu({ items, label, icon: TriggerIcon }: { items: RowMenuItem[]; label?: string; icon?: LucideIcon }) {
   const [pos, setPos] = useState<{ right: number; top?: number; bottom?: number } | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
 
@@ -43,9 +43,9 @@ export default function RowMenu({ items }: { items: RowMenuItem[] }) {
 
   return (
     <>
-      <button ref={btnRef} type="button" onClick={toggle} aria-haspopup="menu" aria-expanded={!!pos}
-        className={`w-7 h-7 inline-flex items-center justify-center rounded-lg text-icon transition-colors ${pos ? 'bg-selected' : 'hover:bg-selected'}`}>
-        <MoreHorizontal className="w-4 h-4" />
+      <button ref={btnRef} type="button" onClick={toggle} aria-haspopup="menu" aria-expanded={!!pos} aria-label={label}
+        className={`inline-flex items-center justify-center rounded-lg transition-colors ${label ? 'h-7 px-2 gap-1.5 text-[13px] font-normal text-ink2 hover:text-ink' : 'w-7 h-7 text-icon'} ${pos ? 'bg-selected' : 'hover:bg-selected'}`}>
+        {label ? <>{TriggerIcon && <TriggerIcon className="w-3.5 h-3.5 text-icon" strokeWidth={1.75} />}{label}</> : <MoreHorizontal className="w-4 h-4" />}
       </button>
       {pos && createPortal(
         <div data-row-menu role="menu" style={{ position: 'fixed', right: pos.right, top: pos.top, bottom: pos.bottom }}

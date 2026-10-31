@@ -22,11 +22,19 @@ import { applySort, text, num, date, dateLast, rev, docNumber, type SortDef } fr
 import ExportButton from '../components/ui/ExportButton'
 import type { ExportColumn } from '../lib/exportExcel'
 
-// Distinct line categories of a document: "Food", or "Food +2" when mixed.
-function catLabel(lines: { categories: { name: string } | null }[] | null | undefined) {
-  const names = [...new Set((lines ?? []).map(l => l.categories?.name).filter(Boolean) as string[])]
-  if (names.length === 0) return '—'
-  return names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`
+// Main category of a document: the one with the most lines ("Food"), plus how many other main categories its lines have ("Food +1").
+function catLabel(lines: { category_id: string | null }[] | null | undefined, cats: { id: string; name: string; parent_id: string | null }[]) {
+  const mains = (lines ?? []).map(l => {
+    const c = cats.find(x => x.id === l.category_id)
+    return (c?.parent_id ? cats.find(x => x.id === c.parent_id) : c)?.name
+  }).filter(Boolean) as string[]
+  if (mains.length === 0) return '-'
+  // the main category with the most lines; on a tie the one that comes first
+  const counts = new Map<string, number>()
+  for (const n of mains) counts.set(n, (counts.get(n) ?? 0) + 1)
+  let top = mains[0]
+  for (const [n, c] of counts) if (c > counts.get(top)!) top = n
+  return counts.size === 1 ? top : `${top} +${counts.size - 1}`
 }
 
 interface PO {
@@ -81,13 +89,11 @@ export default function PurchaseOrdersPage() {
   useEffect(() => { setPage(1) }, [sort])
   const [status, setStatus]           = useState('all')
   const [dateRange, setDateRange]     = useState('all')
-  const [supplierId, setSupplierId]   = useState('')
   const [categoryId, setCategoryId]   = useState('')
   const [departmentId, setDepartmentId] = useState('')
   const [creatorId, setCreatorId]     = useState('')
 
   // Reference data for dropdowns
-  const [suppliers, setSuppliers]     = useState<{ id: string; name: string }[]>([])
   const [categories, setCategories]   = useState<{ id: string; name: string; parent_id: string | null; status: 'active' | 'inactive' }[]>([])
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
   const [members, setMembers]         = useState<{ id: string; first_name: string; last_name: string }[]>([])
@@ -102,13 +108,11 @@ export default function PurchaseOrdersPage() {
   async function loadRefs() {
     if (!company) return
     const cid = company.id
-    const [s, c, d, u] = await Promise.all([
-      supabase.from('suppliers').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
+    const [c, d, u] = await Promise.all([
       supabase.from('categories').select('id, name, parent_id, status').eq('company_id', cid).order('name'),
       supabase.from('departments').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('users').select('id, first_name, last_name').eq('company_id', cid).order('first_name'),
     ])
-    setSuppliers(s.data ?? [])
     setCategories(c.data ?? [])
     setDepartments(d.data ?? [])
     setMembers(u.data ?? [])
@@ -144,16 +148,16 @@ export default function PurchaseOrdersPage() {
 
   function clearFilters() {
     setSearch(''); setStatus('all'); setDateRange('all')
-    setSupplierId(''); setCategoryId(''); setDepartmentId(''); setCreatorId('')
+    setCategoryId(''); setDepartmentId(''); setCreatorId('')
     setPage(1)
   }
 
-  const hasActiveFilters = search || status !== 'all' || dateRange !== 'all' || supplierId || categoryId || departmentId || creatorId
+  const hasActiveFilters = search || status !== 'all' || dateRange !== 'all' || categoryId || departmentId || creatorId
 
   const dateFrom = getDateFrom(dateRange)
 
   // Reset page on any filter change
-  useEffect(() => { setPage(1) }, [search, status, dateRange, supplierId, categoryId, departmentId, creatorId])
+  useEffect(() => { setPage(1) }, [search, status, dateRange, categoryId, departmentId, creatorId])
 
   const sortDefs: SortDef<(typeof pos)[number]>[] = [
     { value: 'newest', label: t.sort.newest, cmp: rev(date(p => p.created_at)) },
@@ -171,7 +175,6 @@ export default function PurchaseOrdersPage() {
       creator ? `${creator.first_name} ${creator.last_name}` : null, ...(po.po_line_items ?? []).map(l => l.categories?.name)])) return false
     if (status !== 'all' && po.status !== status) return false
     if (dateFrom && po.created_at < dateFrom) return false
-    if (supplierId && po.supplier_id !== supplierId) return false
     if (categoryId) { const ids = categoryAndChildren(categoryId, categories); if (!po.po_line_items?.some(l => ids.has(l.category_id ?? ''))) return false }
     if (departmentId && po.department_id !== departmentId) return false
     if (creatorId && po.created_by !== creatorId) return false
@@ -183,7 +186,7 @@ export default function PurchaseOrdersPage() {
     { header: s.poNumber, get: p => p.po_number, kind: 'text', width: 14 },
     { header: s.supplier, get: p => p.suppliers?.name, kind: 'text', width: 32 },
     { header: s.location, get: p => p.locations?.name, kind: 'text', width: 26 },
-    { header: s.category, get: p => catLabel(p.po_line_items), kind: 'text', width: 24 },
+    { header: s.category, get: p => catLabel(p.po_line_items, categories), kind: 'text', width: 24 },
     { header: s.deliveryDate, get: p => p.expected_delivery_date, kind: 'date', width: 14 },
     { header: s.total, get: p => p.total_amount, kind: 'money', width: 14 },
     { header: t.common.status, get: p => t.status[p.status as keyof typeof t.status] ?? p.status, kind: 'text', width: 16 },
@@ -203,7 +206,7 @@ export default function PurchaseOrdersPage() {
           <div className="relative min-w-40 flex-1 max-w-[220px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
             <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder={s.poNumber + " / " + s.supplier}
+              placeholder={t.common.search + '…'}
               className="w-full pl-9 pr-3 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
           </div>
 
@@ -223,12 +226,6 @@ export default function PurchaseOrdersPage() {
             <option value="3m">{t.filters.last3Months}</option>
             <option value="6m">{t.filters.last6Months}</option>
             <option value="1y">{t.filters.last12Months}</option>
-          </FilterSelect>
-
-          {/* Supplier */}
-          <FilterSelect label={t.filters.labels.supplier} value={supplierId} onChange={e => setSupplierId(e.target.value)}>
-            <option value="">{t.filters.allM}</option>
-            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </FilterSelect>
 
           {/* Category */}
@@ -261,26 +258,19 @@ export default function PurchaseOrdersPage() {
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]">
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1100px]">
             <GridHead cols={[[s.poNumber, FileText], [s.supplier, Building2], [s.location, MapPin], [s.category, Tag], [s.deliveryDate, CalendarClock], [s.total, Coins], [t.common.status, CircleDot], [s.requestCol, ClipboardList], ['']]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
                 <TableEmptyState icon={FileText} colSpan={10} title={hasActiveFilters ? t.common.empty.noResults.title : t.common.empty.purchaseOrders.title} subtitle={hasActiveFilters ? t.common.empty.noResults.text : t.common.empty.purchaseOrders.text} />
               ) : paginated.map(po => (
                 <tr key={po.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/purchase-orders/${po.id}`)}>
-                  <td className="px-4 py-3">
-                    <Link to={`/purchase-orders/${po.id}`} onClick={e => e.stopPropagation()} className=" text-sm font-medium text-gray-400 hover:text-gray-600">
-                      {po.po_number}
-                    </Link>
-                    <p className="text-xs text-gray-400 mt-0.5">{format(new Date(po.created_at), 'dd.MM.yyyy')}</p>
-                  </td>
-                  <td className="px-4 py-3 font-medium text-ink">{po.suppliers?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-ink2">{po.locations?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{catLabel(po.po_line_items)}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
-                    {po.expected_delivery_date ? format(new Date(po.expected_delivery_date), 'dd.MM.yyyy') : '—'}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-ink">{fmt(po.total_amount ?? 0, company?.currency)}</td>
+                  <td className="px-4 py-3 text-ink2 whitespace-nowrap">{po.po_number}</td>
+                  <td className="px-4 py-3 font-medium text-ink max-w-[260px] truncate" title={po.suppliers?.name}>{po.suppliers?.name ?? '-'}</td>
+                  <td className="px-4 py-3 text-ink2 max-w-[220px] truncate">{po.locations?.name ?? '-'}</td>
+                  <td className="px-4 py-3 text-ink2">{catLabel(po.po_line_items, categories)}</td>
+                  <td className="px-4 py-3 text-ink whitespace-nowrap">{po.expected_delivery_date ? format(new Date(po.expected_delivery_date), 'dd.MM.yyyy') : '-'}</td>
+                  <td className="px-4 py-3 text-ink whitespace-nowrap tabular-nums">{fmt(po.total_amount ?? 0, company?.currency)}</td>
                   <td className="px-4 py-3">
                     {po.status === 'sent' && po.received_status === 'partial'
                       ? <span className="badge badge-warn">{t.receipts.rsPartial}</span>
@@ -292,8 +282,8 @@ export default function PurchaseOrdersPage() {
                   </td>
                   <td className="px-4 py-3">
                     {po.request_id
-                      ? <Link to={`/requests/${po.request_id}`} onClick={e => e.stopPropagation()} className=" text-xs font-medium text-gray-400 hover:text-gray-600">{reqNums[po.request_id] ?? '—'}</Link>
-                      : <span className="text-gray-300">—</span>}
+                      ? <Link to={`/requests/${po.request_id}`} onClick={e => e.stopPropagation()} className="text-ink2 hover:text-ink whitespace-nowrap">{reqNums[po.request_id] ?? '-'}</Link>
+                      : <span className="text-ink2">-</span>}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end" onClick={e => e.stopPropagation()}>

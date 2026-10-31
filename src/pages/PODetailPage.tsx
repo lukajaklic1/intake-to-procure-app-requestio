@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { ChevronLeft, Pencil, XCircle, CheckCircle, Download, FileText, RotateCcw, PackageCheck } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Pencil, XCircle, CheckCircle, Download, FileText, RotateCcw, PackageCheck, Eye, IdCard, Package, Tag, Hash, Ruler, Coins } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -11,6 +11,8 @@ import { usePODownload } from '../hooks/usePODownload'
 import { format } from 'date-fns'
 import type { PoActivityLog } from '../types/database'
 import { localizeCountry } from '../lib/countries'
+import GridHead from '../components/ui/GridHead'
+import { unitLabel } from '../lib/units'
 
 interface LineItem {
   id: string; position: number; name: string; long_description: string | null
@@ -43,11 +45,22 @@ const STATUS_BADGE: Record<string, string> = {
   cancelled: 'badge-danger',
 }
 
-function Field({ label, value }: { label: string; value?: string | null }) {
+/** A titled box of the page. */
+function Card({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <div>
-      <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-      <p className="text-sm text-gray-800 font-medium">{value || '—'}</p>
+    <section className={`bg-white rounded-lg border border-field ${className}`}>
+      <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{title}</h2>
+      {children}
+    </section>
+  )
+}
+
+/** Small grey label above a value. */
+function Field({ label, children }: { label: string; children?: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[12.5px] font-medium text-ink2 mb-1">{label}</p>
+      <div className="text-sm text-ink">{children || '-'}</div>
     </div>
   )
 }
@@ -156,246 +169,206 @@ export default function PODetailPage() {
   // Action buttons — shared between desktop and mobile
   const actionButtons = (
     <>
-      <Button variant="secondary" loading={downloading} onClick={() => downloadPO(po.id, po.company_id ?? '')}>
-        <Download className="w-4 h-4 mr-1.5" />{t.po.downloadPDF}
+      <Button variant="secondary" loading={downloading} onClick={() => downloadPO(po.id, po.company_id ?? '')} className="gap-2">
+        <Download className="w-4 h-4" />{t.po.downloadPDF}
       </Button>
       {canEdit && (
         <Link to={`/purchase-orders/${po.id}/edit`}>
-          <Button variant="secondary"><Pencil className="w-4 h-4 mr-1.5" />{t.common.edit}</Button>
+          <Button variant="secondary" className="gap-2"><Pencil className="w-4 h-4" />{t.common.edit}</Button>
         </Link>
       )}
       {po.status === 'issued' && (
-        <Button onClick={() => setConfirmTransition({ label: t.po.markSent, status: 'sent' })}>
-          <CheckCircle className="w-4 h-4 mr-1.5" />{t.po.markSent}
+        <Button onClick={() => setConfirmTransition({ label: t.po.markSent, status: 'sent' })} className="gap-2">
+          <CheckCircle className="w-4 h-4" />{t.po.markSent}
         </Button>
       )}
       {po.status === 'sent' && (hasPerm('receipts', 'create') || isAdmin) && (
         <Link to={`/receive/${po.id}`}>
-          <Button><PackageCheck className="w-4 h-4 mr-1.5" />{t.receipts.receive}</Button>
+          <Button className="gap-2"><PackageCheck className="w-4 h-4" />{t.receipts.receive}</Button>
         </Link>
       )}
       {po.status === 'sent' && po.received_status === 'partial' && (hasPerm('purchase_orders', 'create') || isAdmin) && (
-        <Button variant="secondary" onClick={() => setConfirmTransition({ label: t.po.finalize, status: 'closed' })}>
-          <CheckCircle className="w-4 h-4 mr-1.5" />{t.po.finalize}
+        <Button variant="secondary" onClick={() => setConfirmTransition({ label: t.po.finalize, status: 'closed' })} className="gap-2">
+          <CheckCircle className="w-4 h-4" />{t.po.finalize}
         </Button>
       )}
       {canCancel && (
-        <Button variant="danger" onClick={() => setConfirmCancel(true)}>
-          <XCircle className="w-4 h-4 mr-1.5" />{t.po.cancelPO}
+        <Button variant="secondary" onClick={() => setConfirmCancel(true)} className="gap-2 !text-danger !border-line">
+          <XCircle className="w-4 h-4" />{t.po.cancelPO}
         </Button>
       )}
       {(po.status === 'closed' || po.status === 'cancelled') && isAdmin && (
-        <Button variant="secondary" loading={actionLoading} onClick={reopen}>
-          <RotateCcw className="w-4 h-4 mr-1.5" />{s.reopen}
+        <Button variant="secondary" loading={actionLoading} onClick={reopen} className="gap-2">
+          <RotateCcw className="w-4 h-4" />{s.reopen}
         </Button>
       )}
     </>
   )
 
+  const statusBadge = po.status === 'sent' && po.received_status === 'partial'
+    ? <span className="badge badge-warn">{t.receipts.rsPartial}</span>
+    : po.status === 'closed' && po.received_status !== 'full'
+    ? <span className="badge badge-info">{t.po.statusFinalized}</span>
+    : <span className={`badge ${STATUS_BADGE[po.status]}`}>{t.status[po.status as keyof typeof t.status] ?? po.status}</span>
+  const contract = (po as unknown as { contracts?: { title: string; contract_number: string } | null }).contracts
+  const addressOf = (a: { address_street?: string | null; address_postal_code?: string | null; address_city?: string | null; address_country?: string | null } | null | undefined) =>
+    [a?.address_street, [a?.address_postal_code, a?.address_city].filter(Boolean).join(' '), a?.address_country ? localizeCountry(a.address_country, lang) : null].filter(Boolean)
+
   return (
-    <div className="p-4 lg:p-6 max-w-5xl mx-auto">
-      {/* Top bar */}
-      <div className="mb-5">
-        {/* Row 1: back + PO number + status + desktop buttons */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/purchase-orders')} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-surface rounded-lg transition-colors">
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-2xl font-bold text-gray-900 ">{po.po_number}</h1>
-                {po.status === 'sent' && po.received_status === 'partial'
-                  ? <span className="badge badge-warn">{t.receipts.rsPartial}</span>
-                  : po.status === 'closed' && po.received_status !== 'full'
-                  ? <span className="badge badge-info">{t.po.statusFinalized}</span>
-                  : <span className={`badge capitalize ${STATUS_BADGE[po.status]}`}>{t.status[po.status as keyof typeof t.status] ?? po.status}</span>}
-              </div>
-              <p className="text-xs text-gray-400 mt-0.5">{t.common.created}: {format(new Date(po.created_at), 'dd.MM.yyyy')}</p>
-            </div>
-          </div>
-          {/* Desktop buttons */}
-          <div className="hidden lg:flex items-center gap-2 flex-wrap">
-            {actionButtons}
-          </div>
-        </div>
-
-        {/* Mobile buttons — below header, 2-col grid */}
-        <div className="lg:hidden mt-3 grid grid-cols-2 gap-2">
-          {actionButtons}
-        </div>
-      </div>
-
-      {linkedReq && (
-        <button onClick={() => navigate(`/requests/${linkedReq.id}`)}
-          className="w-full flex items-center gap-3 p-4 mb-5 bg-accent-light border border-accent-border rounded-lg text-left hover:bg-accent-light transition-colors">
-          <FileText className="w-5 h-5 text-accent shrink-0" />
-          <div className="flex-1">
-            <p className="text-xs text-accent">{t.requests.fromRequest}</p>
-            <p className="text-sm font-semibold text-accent-hover ">{linkedReq.request_number}</p>
-          </div>
+    <div className="p-4 lg:p-6">
+      <nav className="flex items-center gap-2 text-sm text-ink2 mb-5">
+        <button type="button" onClick={() => navigate('/purchase-orders')} aria-label={t.nav.purchaseOrders} title={t.nav.purchaseOrders}
+          className="w-7 h-7 -ml-1.5 mr-1 inline-flex items-center justify-center rounded-lg text-icon hover:bg-selected hover:text-ink transition-colors">
+          <ArrowLeft className="w-4 h-4" strokeWidth={1.75} />
         </button>
-      )}
+        <Link to="/purchase-orders" className="hover:text-ink transition-colors">{t.nav.purchaseOrders}</Link>
+        <ChevronRight className="w-3.5 h-3.5 text-icon" />
+        <span className="text-ink font-medium">{po.po_number}</span>
+      </nav>
 
-      {/* Details grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
-        {/* Supplier */}
-        <div className="bg-white rounded-lg border border-field p-5">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">DOBAVITELJ</p>
-          <p className="font-semibold text-gray-900 mb-1">{po.suppliers?.name}</p>
-          {po.suppliers?.vat_number && <p className="text-xs text-gray-500">VAT: {po.suppliers.vat_number}</p>}
-          {po.suppliers?.email && <p className="text-xs text-gray-500">{po.suppliers.email}</p>}
-          {po.suppliers?.address_street && <p className="text-xs text-gray-500">{po.suppliers.address_street}</p>}
-          {(po.suppliers?.address_postal_code || po.suppliers?.address_city) && (
-            <p className="text-xs text-gray-500">{[po.suppliers.address_postal_code, po.suppliers.address_city].filter(Boolean).join(' ')}</p>
-          )}
-          {po.suppliers?.address_country && <p className="text-xs text-gray-500">{localizeCountry(po.suppliers.address_country, lang)}</p>}
-        </div>
-
-        {/* Delivery */}
-        <div className="bg-white rounded-lg border border-field p-5">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">LOKACIJA IN DATUM DOBAVE</p>
-          <p className="font-semibold text-gray-900 mb-1">{po.locations?.name}</p>
-          {po.locations?.address_street && <p className="text-xs text-gray-500">{po.locations.address_street}</p>}
-          {(po.locations?.address_postal_code || po.locations?.address_city) && (
-            <p className="text-xs text-gray-500">{[po.locations.address_postal_code, po.locations.address_city].filter(Boolean).join(' ')}</p>
-          )}
-          {po.expected_delivery_date && (
-            <p className="text-xs text-gray-500 mt-2">{s.desiredDelivery}: <span className="font-medium">{format(new Date(po.expected_delivery_date), 'dd.MM.yyyy')}</span></p>
-          )}
-        </div>
-
-        {/* Order info */}
-        <div className="bg-white rounded-lg border border-field p-5">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">{s.orderDetails}</p>
-          <div className="flex flex-col gap-2">
-            {po.departments && <Field label={s.department} value={po.departments.name} />}
-            <Field label={t.po.paymentTermsLabel} value={po.payment_terms} />
-            {po.incoterm && <Field label={t.po.incoterm} value={po.incoterm} />}
-            {(po as unknown as { contracts?: { title: string; contract_number: string } | null }).contracts && <Field label={t.contracts.linkedContract} value={`${(po as unknown as { contracts: { contract_number: string } }).contracts.contract_number} · ${(po as unknown as { contracts: { title: string } }).contracts.title}`} />}
-            {po.supplier_quote_ref && <Field label={t.po.quoteRef} value={po.supplier_quote_ref} />}
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-xl font-semibold text-ink tracking-tight">{po.po_number}</h1>
+            {statusBadge}
           </div>
+          <p className="mt-2 text-sm text-ink2">{po.suppliers?.name} · {format(new Date(po.created_at), 'dd.MM.yyyy')}</p>
         </div>
+        <div className="flex items-center gap-2 flex-wrap">{actionButtons}</div>
       </div>
 
-      {/* Line items */}
-      <div className="bg-white rounded-lg border border-field overflow-hidden mb-5">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h2 className="text-[15px] font-semibold text-ink">{s.lineItems}</h2>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+        {/* left: what is ordered */}
+        <div className="xl:col-span-2 flex flex-col gap-4">
+          <Card title={s.lineItems} className="overflow-hidden">
+            <div className="overflow-x-auto"><table className="table-grid w-full text-sm min-w-[760px]">
+              <GridHead cols={[[t.po.itemCode, IdCard], [t.po.description, Package], [s.category, Tag], [t.po.qty, Hash, 'right'], [t.po.unit, Ruler], [t.po.unitPrice, Coins, 'right'], [t.po.amount, Coins, 'right']]} />
+              <tbody className="divide-y divide-field">
+                {lines.map(line => (
+                  <tr key={line.id}>
+                    <td className="px-4 py-3 text-ink2 whitespace-nowrap">{(line as any).items?.item_number ?? '-'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-baseline gap-2 min-w-0">
+                        <span className="font-medium text-ink whitespace-nowrap">{line.name}</span>
+                        {line.long_description && <span className="text-xs text-gray-400 truncate max-w-[220px]">{line.long_description}</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-ink2">{(line as any).categories?.name ?? '-'}</td>
+                    <td className="px-4 py-3 text-right text-ink2 tabular-nums">{line.quantity}</td>
+                    <td className="px-4 py-3 text-ink2">{unitLabel(line.unit, lang) || '-'}</td>
+                    <td className="px-4 py-3 text-right text-ink2 tabular-nums">{fmt(line.unit_price)}</td>
+                    <td className="px-4 py-3 text-right text-ink tabular-nums">{fmt(line.line_total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>
+            <div className="flex justify-end px-5 py-4 border-t border-field">
+              <div className="w-72 flex flex-col gap-1.5 text-sm">
+                {(po.discount_amount ?? 0) > 0 && (
+                  <>
+                    <div className="flex justify-between"><span className="text-ink2">{s.subtotal}</span><span className="tabular-nums text-ink2">{fmt(po.total_amount + (po.discount_amount ?? 0))}</span></div>
+                    <div className="flex justify-between"><span className="text-ink2">{s.discount}</span><span className="tabular-nums">-{fmt(po.discount_amount ?? 0)}</span></div>
+                  </>
+                )}
+                <div className="flex justify-between items-baseline pt-2 border-t border-field"><span className="font-medium text-ink2">{s.totalExVat}</span><span className="text-lg font-semibold text-ink tabular-nums">{fmt(po.total_amount)}</span></div>
+              </div>
+            </div>
+          </Card>
+
+          {attachments.length > 0 && (
+            <Card title={t.po.attachQuotation}>
+              <ul className="divide-y divide-field">
+                {attachments.map(att => (
+                  <li key={att.id}>
+                    <button type="button" onClick={() => openAttachment(att.file_path)} className="w-full flex items-center gap-2.5 px-5 py-2.5 text-left hover:bg-surface transition-colors">
+                      <FileText className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
+                      <span className="text-sm font-medium text-ink flex-1 truncate">{att.file_name}</span>
+                      <Eye className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {activity.length > 0 && (
+            <Card title={s.auditTrail}>
+              <ol className="flex flex-col gap-4 p-5">
+                {activity.map((a, i) => {
+                  const dot = a.action === 'cancelled' ? 'bg-danger' : a.action === 'closed' ? 'bg-success' : a.action === 'sent' ? 'bg-primary' : a.action === 'issued' ? 'bg-warn' : 'bg-icon'
+                  return (
+                    <li key={a.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <span className={`w-2.5 h-2.5 rounded-full ${dot} mt-1.5`} />
+                        {i < activity.length - 1 && <span className="flex-1 w-px bg-line mt-1" />}
+                      </div>
+                      <div className="flex-1 -mt-0.5">
+                        <p className="text-sm text-ink"><span className="font-medium">{a.actor_id ? actNames[a.actor_id] ?? '-' : '-'}</span> {s.act[a.action]}</p>
+                        <p className="text-xs text-ink2">{format(new Date(a.created_at), 'dd.MM.yyyy HH:mm')}</p>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ol>
+            </Card>
+          )}
         </div>
-        <div className="overflow-x-auto"><table className="w-full text-sm min-w-[500px]">
-          <thead className="bg-surface border-b border-field">
-            <tr>
-              <th className="text-left px-5 py-2.5 text-xs font-medium text-gray-500 w-12">{t.po.position}</th>
-              <th className="text-left px-5 py-2.5 text-xs font-medium text-gray-500 w-24">{t.po.itemCode}</th>
-              <th className="text-left px-5 py-2.5 text-xs font-medium text-gray-500">{t.po.description}</th>
-              <th className="text-left px-5 py-2.5 text-xs font-medium text-gray-500 w-32">{s.category}</th>
-              <th className="text-right px-5 py-2.5 text-xs font-medium text-gray-500 w-24">{t.po.qty}</th>
-              <th className="text-left px-5 py-2.5 text-xs font-medium text-gray-500 w-20">{t.po.unit}</th>
-              <th className="text-right px-5 py-2.5 text-xs font-medium text-gray-500 w-28">{t.po.unitPrice}</th>
-              <th className="text-right px-5 py-2.5 text-xs font-medium text-gray-500 w-28">{t.po.amount}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-field">
-            {lines.map(line => (
-              <tr key={line.id}>
-                <td className="px-5 py-3 text-gray-400 text-xs">{line.position}</td>
-                <td className="px-5 py-3 text-gray-400 text-xs">{(line as any).items?.item_number ?? '—'}</td>
-                <td className="px-5 py-3">
-                  <p className="font-medium text-gray-900">{line.name}</p>
-                  {line.long_description && <p className="text-xs text-gray-400 mt-0.5">{line.long_description}</p>}
-                </td>
-                <td className="px-5 py-3 text-gray-500">{(line as any).categories?.name ?? '—'}</td>
-                <td className="px-5 py-3 text-right text-gray-700">{line.quantity}</td>
-                <td className="px-5 py-3 text-gray-500">{line.unit}</td>
-                <td className="px-5 py-3 text-right text-gray-700">{fmt(line.unit_price)}</td>
-                <td className="px-5 py-3 text-right font-medium text-gray-900">{fmt(line.line_total)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot className="border-t border-field bg-surface">
-            {(po.discount_amount ?? 0) > 0 && (
-              <tr>
-                <td colSpan={7} className="px-5 pt-3 pb-1 text-right text-sm text-gray-500">Vmesni znesek</td>
-                <td className="px-5 pt-3 pb-1 text-right text-sm text-gray-700">{fmt((po.total_amount) + (po.discount_amount ?? 0))}</td>
-              </tr>
-            )}
-            {(po.discount_amount ?? 0) > 0 && (
-              <tr>
-                <td colSpan={7} className="px-5 py-1 text-right text-sm text-gray-500">Popust</td>
-                <td className="px-5 py-1 text-right text-sm font-semibold text-accent">- {fmt(po.discount_amount ?? 0)}</td>
-              </tr>
-            )}
-            <tr className="border-t-2 border-field">
-              <td colSpan={7} className="px-5 py-3 text-right text-sm font-bold text-gray-900">Skupaj (brez DDV)</td>
-              <td className="px-5 py-3 text-right text-base font-bold text-accent-hover">{fmt(po.total_amount)}</td>
-            </tr>
-          </tfoot>
-        </table></div>
+
+        {/* right: with whom, where to, on what terms */}
+        <div className="flex flex-col gap-4 order-first xl:order-none">
+          <Card title={s.supplier}>
+            <div className="p-5 text-sm">
+              <p className="font-medium text-ink">{po.suppliers?.name}</p>
+              <div className="mt-1.5 flex flex-col gap-0.5 text-ink2">
+                {po.suppliers?.vat_number && <p>{t.suppliers.vatNumber}: {po.suppliers.vat_number}</p>}
+                {po.suppliers?.email && <p>{po.suppliers.email}</p>}
+                {addressOf(po.suppliers).map(l => <p key={l}>{l}</p>)}
+              </div>
+            </div>
+          </Card>
+
+          <Card title={s.location}>
+            <div className="p-5 text-sm">
+              <p className="font-medium text-ink">{po.locations?.name}</p>
+              <div className="mt-1.5 flex flex-col gap-0.5 text-ink2">
+                {addressOf(po.locations).map(l => <p key={l}>{l}</p>)}
+              </div>
+              <div className="mt-4"><Field label={s.desiredDelivery}>{po.expected_delivery_date ? format(new Date(po.expected_delivery_date), 'dd.MM.yyyy') : null}</Field></div>
+            </div>
+          </Card>
+
+          <Card title={s.orderDetails}>
+            <div className="p-5 grid grid-cols-2 gap-x-6 gap-y-5">
+              <Field label={s.department}>{po.departments?.name}</Field>
+              <Field label={s.incoterm}>{po.incoterm}</Field>
+              <div className="col-span-2"><Field label={s.paymentTermsLabel}>{po.payment_terms}</Field></div>
+              {contract && <div className="col-span-2"><Field label={t.contracts.linkedContract}>{contract.contract_number} · {contract.title}</Field></div>}
+              {po.supplier_quote_ref && <div className="col-span-2"><Field label={s.quoteRef}>{po.supplier_quote_ref}</Field></div>}
+              {linkedReq && (
+                <div className="col-span-2">
+                  <Field label={t.requests.fromRequest}><Link to={`/requests/${linkedReq.id}`} className="hover:underline">{linkedReq.request_number}</Link></Field>
+                </div>
+              )}
+              {po.notes && <div className="col-span-2"><Field label={s.notes}><span className="whitespace-pre-wrap">{po.notes}</span></Field></div>}
+            </div>
+          </Card>
+
+          {receipts.length > 0 && (
+            <Card title={t.receipts.title}>
+              <ul className="divide-y divide-field">
+                {receipts.map(r => (
+                  <li key={r.id}>
+                    <Link to={`/receipts/${r.id}`} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm hover:bg-surface transition-colors">
+                      <span className="inline-flex items-center gap-2 font-medium text-ink"><PackageCheck className="w-4 h-4 text-icon" strokeWidth={1.75} />{r.receipt_number}</span>
+                      <span className="text-xs text-ink2">{format(new Date(r.received_date), 'dd.MM.yyyy')}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+        </div>
       </div>
-
-      {/* Notes */}
-      {po.notes && (
-        <div className="bg-white rounded-lg border border-field p-5 mb-5">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{s.notes}</p>
-          <p className="text-sm text-gray-700 whitespace-pre-wrap">{po.notes}</p>
-        </div>
-      )}
-
-      {/* Attachments */}
-      {attachments.length > 0 && (
-        <div className="bg-white rounded-lg border border-field p-5 mb-5">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">{t.po.attachQuotation}</p>
-          <div className="flex flex-col gap-2">
-            {attachments.map(att => (
-              <button key={att.id} type="button" onClick={() => openAttachment(att.file_path)}
-                className="flex items-center gap-2.5 px-3 py-2.5 bg-accent-light border border-accent-border rounded-lg text-sm text-accent font-medium hover:bg-accent-light transition-colors text-left w-full">
-                <FileText className="w-4 h-4 shrink-0" />
-                <span className="truncate">{att.file_name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Receipts */}
-      {receipts.length > 0 && (
-        <div className="bg-white rounded-lg border border-field p-5 mb-5">
-          <p className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1.5"><PackageCheck className="w-4 h-4" />{t.receipts.title}</p>
-          <div className="flex flex-col gap-2">
-            {receipts.map(r => (
-              <Link key={r.id} to={`/receipts/${r.id}`} className="flex items-center justify-between text-sm border border-gray-100 rounded-lg px-3 py-2 hover:bg-surface">
-                <span className=" font-semibold text-accent">{r.receipt_number}</span>
-                <span className="text-gray-400 text-xs">{format(new Date(r.received_date), 'dd.MM.yyyy')}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Audit trail */}
-      {activity.length > 0 && (
-        <div className="bg-white rounded-lg border border-field p-5 mb-5">
-          <p className="text-sm font-semibold text-gray-900 mb-4">{s.auditTrail}</p>
-          <ol className="flex flex-col gap-4">
-            {activity.map(a => {
-              const dot = a.action === 'cancelled' ? 'bg-red-500' : a.action === 'closed' ? 'bg-green-500' : a.action === 'sent' ? 'bg-accent' : a.action === 'issued' ? 'bg-amber-500' : 'bg-gray-400'
-              return (
-                <li key={a.id} className="flex gap-3">
-                  <div className="flex flex-col items-center">
-                    <span className={`w-2.5 h-2.5 rounded-full ${dot} mt-1.5`} />
-                    <span className="flex-1 w-px bg-gray-100 mt-1" />
-                  </div>
-                  <div className="flex-1 -mt-0.5">
-                    <p className="text-sm text-gray-800"><span className="font-medium">{a.actor_id ? actNames[a.actor_id] ?? '—' : '—'}</span> {s.act[a.action]}</p>
-                    <p className="text-xs text-gray-400">{format(new Date(a.created_at), 'dd.MM.yyyy HH:mm')}</p>
-                  </div>
-                </li>
-              )
-            })}
-          </ol>
-        </div>
-      )}
 
       <ConfirmDialog open={!!confirmTransition} onClose={() => setConfirmTransition(null)}
         onConfirm={() => confirmTransition && transition(confirmTransition.status)}

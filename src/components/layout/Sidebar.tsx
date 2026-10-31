@@ -98,7 +98,7 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-3 px-2">
         {NAV_GROUPS.map((group, gi) => {
-          const items = group.items.filter(item => !item.adminOnly || isAdmin)
+          const items = group.items.filter(item => (!item.adminOnly || isAdmin) && (!item.module || isAdmin || hasPerm(item.module, 'view')))
           if (items.length === 0) return null
           return (
             <div key={gi} className={gi > 0 ? 'mt-3' : undefined}>

@@ -11,6 +11,8 @@ import OnboardingPage from './pages/OnboardingPage'
 import DashboardPage from './pages/DashboardPage'
 import SuppliersPage from './pages/SuppliersPage'
 import ContractsPage from './pages/ContractsPage'
+import BudgetsPage from './pages/BudgetsPage'
+import BudgetYearPage from './pages/BudgetYearPage'
 import InvoicesPage from './pages/InvoicesPage'
 import InvoiceFormPage from './pages/InvoiceFormPage'
 import InvoiceDetailPage from './pages/InvoiceDetailPage'
@@ -73,6 +75,8 @@ export default function Root() {
             <Route path="/invoices/:id"           element={<App><InvoiceDetailPage /></App>} />
             <Route path="/invoices/:id/edit"      element={<App><InvoiceFormPage /></App>} />
             <Route path="/contracts"              element={<App><ContractsPage /></App>} />
+            <Route path="/budgets"                element={<App><BudgetsPage /></App>} />
+            <Route path="/budgets/:year"          element={<App><BudgetYearPage /></App>} />
             <Route path="/contracts/:id"          element={<App><ContractDetailPage /></App>} />
             <Route path="/catalog"                element={<App><CatalogPage /></App>} />
             <Route path="/locations"              element={<App><LocationsPage /></App>} />

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, Trash2, ChevronLeft, X, Paperclip, FileText, UploadCloud } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Plus, Trash2, ArrowLeft, ChevronRight, Search, X, Paperclip, FileText, UploadCloud, Hash, IdCard, Package, Tag, Ruler, Coins } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useAuth } from '../hooks/useAuth'
@@ -9,12 +9,15 @@ import { toast } from '../components/ui/Toast'
 import Button from '../components/ui/Button'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Input from '../components/ui/Input'
+import Select from '../components/ui/Select'
+import GridHead from '../components/ui/GridHead'
 import CatalogPicker from '../components/ui/CatalogPicker'
+import BudgetStatus from '../components/budget/BudgetStatus'
 import LineCategoryCells from '../components/ui/LineCategoryCells'
 import { categoryScope, mainCategoryId } from '../lib/categories'
 import type { Supplier, Category, Location, Department, Item, Contract } from '../types/database'
-import { matchesSearch } from '../lib/search'
-import { unitLabel } from '../lib/units'
+import { unitLabel, unitCode, unitOptions } from '../lib/units'
+import { incotermOptions } from '../lib/incoterms'
 import { effectiveStatus } from '../lib/contracts'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -57,73 +60,6 @@ function newLine(position: number): LineItem {
   return { position, name: '', long_description: '', quantity: '1', unit: 'kos', unit_price: '0', item_id: null, category_id: '' }
 }
 
-// ─── Supplier search combobox ─────────────────────────────────────────────────
-
-function SupplierSearch({ suppliers, value, onChange, label, disabled, placeholder }: {
-  suppliers: Supplier[]
-  value: string
-  onChange: (id: string) => void
-  label: string
-  disabled?: boolean
-  placeholder: string
-}) {
-  const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
-  const selected = suppliers.find(s => s.id === value)
-
-  const filtered = query.length > 0
-    ? suppliers.filter(s => matchesSearch(query, [s.supplier_number, s.name, s.vat_number]))
-    : suppliers
-
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-gray-700">{label} *</label>
-      <div className="relative">
-        <input
-          value={open ? query : (selected?.name ?? '')}
-          onChange={e => { setQuery(e.target.value); setOpen(true) }}
-          onFocus={() => { setQuery(''); setOpen(true) }}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-          readOnly={disabled}
-          placeholder={placeholder}
-          className="w-full rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-gray-900 focus:outline-none focus:border-field-focus bg-white disabled:bg-gray-50"
-        />
-        {open && !disabled && filtered.length > 0 && (
-          <div className="absolute z-30 left-0 mt-1 w-full bg-white border border-field rounded-lg shadow-lg overflow-y-auto max-h-56">
-            {filtered.map(s => (
-              <button key={s.id} type="button"
-                onMouseDown={e => e.preventDefault()}
-                onClick={() => { onChange(s.id); setQuery(''); setOpen(false) }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-accent-light transition-colors ${s.id === value ? 'bg-accent-light font-medium text-accent-hover' : 'text-gray-800'}`}>
-                {s.name}
-                {s.vat_number && <span className="ml-2 text-xs text-gray-400">{s.vat_number}</span>}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ─── Dropdown helper ──────────────────────────────────────────────────────────
-
-function Select({ id, label, value, onChange, required, hint, children }: {
-  id: string; label: string; value: string; onChange: (v: string) => void; required?: boolean; hint?: string; children: React.ReactNode
-}) {
-  const { t } = useLanguage()
-  return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium text-gray-700">{label}{required && ' *'}</label>
-      <select id={id} value={value} onChange={e => onChange(e.target.value)}
-        className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm text-ink focus:outline-none focus:border-field-focus bg-white">
-        <option value="">{t.common.select}</option>
-        {children}
-      </select>
-      {hint && <p className="text-xs text-gray-400">{hint}</p>}
-    </div>
-  )
-}
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function POFormPage() {
@@ -308,6 +244,9 @@ export default function POFormPage() {
   const subtotal = lines.reduce((s, l) => s + lineTotal(l), 0)
   const discountAmount = parseNum(discount)
   const grandTotal = Math.max(0, subtotal - discountAmount)
+  // what the lines add to each main category (for the budget hint)
+  const budgetByCategory: Record<string, number> = {}
+  for (const l of lines) { const m = mainCategoryId(l.category_id, categories); if (m) budgetByCategory[m] = (budgetByCategory[m] ?? 0) + lineTotal(l) }
 
   function fmt(n: number) {
     return new Intl.NumberFormat('de-DE', { style: 'currency', currency: company?.currency ?? 'EUR' }).format(n)
@@ -458,346 +397,219 @@ export default function POFormPage() {
   }
 
   const title = isNew ? t.po.newPO : `${t.common.edit} ${poNumber}`
+  const supplierOptions = suppliers.map(x => ({ value: x.id, label: x.name }))
+  const contractOptions = [{ value: '', label: '-' }, ...usableContracts(header.supplier_id, header.contract_id).map(c => ({ value: c.id, label: `${c.contract_number} · ${c.title}` }))]
+  const issueTarget = isSent ? 'sent' : poStatus === 'draft' || isNew ? 'issued' : poStatus
+  const actionButtons = (
+    <>
+      {!isNew && poStatus === 'draft' && (
+        <Button variant="secondary" onClick={() => setConfirmDelete(true)} disabled={saving} className="gap-2 !text-danger !border-line"><Trash2 className="w-4 h-4" />{t.po.deleteDraft}</Button>
+      )}
+      <Button variant="secondary" onClick={() => navigate(-1)} disabled={saving}>{t.common.cancel}</Button>
+      {(poStatus === 'draft' || isNew) && <Button variant="secondary" onClick={() => save('draft')} loading={saving}>{t.po.saveDraft}</Button>}
+      <Button onClick={() => save(issueTarget)} loading={saving}>{poStatus === 'draft' || isNew ? t.po.issuePO : t.common.saveChanges}</Button>
+    </>
+  )
 
   return (
-    <div className="p-4 lg:p-6 max-w-6xl mx-auto pb-28 lg:pb-6 form-skin">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/purchase-orders')} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-surface rounded-lg transition-colors">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-            {isReadOnly && <p className="text-xs text-red-500 mt-0.5">{s.readOnlyNote}</p>}
-            {isSent && <p className="text-xs text-amber-600 mt-0.5">{s.sentNote}</p>}
-          </div>
-        </div>
+    <div className="p-4 lg:p-6 pb-28 lg:pb-6 form-skin">
+      <nav className="flex items-center gap-2 text-sm text-ink2 mb-5">
+        <button type="button" onClick={() => navigate('/purchase-orders')} aria-label={t.nav.purchaseOrders} title={t.nav.purchaseOrders}
+          className="w-7 h-7 -ml-1.5 mr-1 inline-flex items-center justify-center rounded-lg text-icon hover:bg-selected hover:text-ink transition-colors">
+          <ArrowLeft className="w-4 h-4" strokeWidth={1.75} />
+        </button>
+        <Link to="/purchase-orders" className="hover:text-ink transition-colors">{t.nav.purchaseOrders}</Link>
+        <ChevronRight className="w-3.5 h-3.5 text-icon" />
+        <span className="text-ink font-medium">{isNew ? t.po.newPO : (poNumber ?? title)}</span>
+      </nav>
 
-        {/* Desktop buttons */}
-        {!isReadOnly && (
-          <div className="hidden lg:flex items-center gap-2">
-            {!isNew && poStatus === 'draft' && (
-              <Button variant="secondary" onClick={() => setConfirmDelete(true)} disabled={saving} className="gap-1.5 text-red-600"><Trash2 className="w-3.5 h-3.5" />{t.po.deleteDraft}</Button>
-            )}
-            <Button variant="secondary" onClick={() => navigate(-1)} disabled={saving}>{t.common.cancel}</Button>
-            {(poStatus === 'draft' || isNew) && (
-              <Button variant="secondary" onClick={() => save('draft')} loading={saving}>
-                {t.po.saveDraft}
-              </Button>
-            )}
-            <Button onClick={() => save(isSent ? 'sent' : poStatus === 'draft' || isNew ? 'issued' : poStatus)} loading={saving}>
-              {poStatus === 'draft' || isNew ? t.po.issuePO : t.common.saveChanges}
-            </Button>
-          </div>
-        )}
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
+        <div>
+          <h1 className="text-xl font-semibold text-ink tracking-tight">{title}</h1>
+          {isReadOnly && <p className="text-sm text-danger mt-1">{s.readOnlyNote}</p>}
+          {isSent && <p className="text-sm text-ink2 mt-1">{s.sentNote}</p>}
+        </div>
+        {!isReadOnly && <div className="hidden lg:flex items-center gap-2">{actionButtons}</div>}
       </div>
 
       {/* Mobile sticky bottom bar */}
       {!isReadOnly && (
         <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-field px-4 py-3 flex gap-2 shadow-lg">
           <Button variant="secondary" onClick={() => navigate(-1)} disabled={saving} className="flex-1">{t.common.cancel}</Button>
-          {(poStatus === 'draft' || isNew) && (
-            <Button variant="secondary" onClick={() => save('draft')} loading={saving} className="flex-1">
-              {t.po.saveDraft}
-            </Button>
-          )}
-          <Button onClick={() => save(isSent ? 'sent' : poStatus === 'draft' || isNew ? 'issued' : poStatus)} loading={saving} className="flex-1">
-            {poStatus === 'draft' || isNew ? t.po.issuePO : t.common.saveChanges}
-          </Button>
+          {(poStatus === 'draft' || isNew) && <Button variant="secondary" onClick={() => save('draft')} loading={saving} className="flex-1">{t.po.saveDraft}</Button>}
+          <Button onClick={() => save(issueTarget)} loading={saving} className="flex-1">{poStatus === 'draft' || isNew ? t.po.issuePO : t.common.saveChanges}</Button>
         </div>
       )}
 
-      {/* Header fields */}
-      <div className="bg-white rounded-lg border border-field p-6 mb-5">
-        <h2 className="text-[15px] font-semibold text-ink mb-4">{t.po.orderDetails}</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <SupplierSearch
-            suppliers={suppliers}
-            value={header.supplier_id}
-            onChange={v => {
-              const sup = suppliers.find(su => su.id === v)
-              const usable = usableContracts(v)
-              setHeader(h => ({
-                ...h,
-                supplier_id: v,
-                // keep the contract if it is this supplier's, otherwise take the supplier's only usable contract
-                contract_id: contracts.find(c => c.id === h.contract_id)?.supplier_id === v ? h.contract_id : usable.length === 1 ? usable[0].id : '',
-                payment_terms: h.payment_terms || sup?.payment_terms || '',
-                incoterm: h.incoterm || sup?.incoterm || '',
-              }))
-            }}
-            label={s.supplier}
-            disabled={isReadOnly}
-            placeholder={t.common.search + '…'}
-          />
-          <Select id="contract" label={t.contracts.linkedContract} value={header.contract_id} onChange={v => setHeader(h => ({ ...h, contract_id: v }))}>
-            {usableContracts(header.supplier_id, header.contract_id)
-              .map(c => <option key={c.id} value={c.id}>{c.contract_number} · {c.title}</option>)}
-          </Select>
-          <Select id="location" label={s.location} required hint={locationHint} value={header.location_id} onChange={v => setHeader(h => ({ ...h, location_id: v }))}>
-            {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </Select>
-          <Select id="department" label={s.department} value={header.department_id} onChange={v => setHeader(h => ({ ...h, department_id: v }))}>
-            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </Select>
-          <Input id="payment_terms" label={s.paymentTermsLabel + ' *'}
-            value={header.payment_terms}
-            onChange={e => setHeader(h => ({ ...h, payment_terms: e.target.value }))}
-            readOnly={isReadOnly}
-          />
-          <Input id="delivery_date" label={s.desiredDelivery + ' *'} type="date"
-            value={header.expected_delivery_date}
-            onChange={e => setHeader(h => ({ ...h, expected_delivery_date: e.target.value }))}
-            readOnly={isReadOnly}
-          />
-          <Input id="incoterm" label={s.incoterm}
-            value={header.incoterm}
-            onChange={e => setHeader(h => ({ ...h, incoterm: e.target.value }))}
-            placeholder="CPT, FOB, EXW"
-            readOnly={isReadOnly}
-          />
-          <Input id="quote_ref" label={s.quoteRef}
-            value={header.supplier_quote_ref}
-            onChange={e => setHeader(h => ({ ...h, supplier_quote_ref: e.target.value }))}
-            readOnly={isReadOnly}
-          />
-        </div>
-
-        <div className="mt-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">{s.notes}</label>
-            <textarea rows={3} value={header.notes}
-              onChange={e => setHeader(h => ({ ...h, notes: e.target.value }))}
-              readOnly={isReadOnly}
-              placeholder={s.notesPlaceholder}
-              className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none"
-            />
+      <div className="flex flex-col gap-4">
+        {/* Order details */}
+        <section className="bg-white rounded-lg border border-field">
+          <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{t.po.orderDetails}</h2>
+          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Select id="po-supplier" label={s.supplier} required value={header.supplier_id} disabled={isReadOnly} placeholder={t.common.select} options={supplierOptions}
+              onChange={v => {
+                const sup = suppliers.find(su => su.id === v)
+                const usable = usableContracts(v)
+                setHeader(h => ({
+                  ...h,
+                  supplier_id: v,
+                  // keep the contract if it is this supplier's, otherwise take the supplier's only usable contract
+                  contract_id: contracts.find(c => c.id === h.contract_id)?.supplier_id === v ? h.contract_id : usable.length === 1 ? usable[0].id : '',
+                  payment_terms: h.payment_terms || sup?.payment_terms || '',
+                  incoterm: h.incoterm || sup?.incoterm || '',
+                }))
+              }} />
+            <Select id="po-contract" label={t.contracts.linkedContract} value={header.contract_id} disabled={isReadOnly || !header.supplier_id} placeholder="-" options={contractOptions}
+              onChange={v => setHeader(h => ({ ...h, contract_id: v }))} />
+            <div>
+              <Select id="po-location" label={s.location} required value={header.location_id} disabled={isReadOnly} placeholder={t.common.select}
+                options={locations.map(l => ({ value: l.id, label: l.name }))}
+                onChange={v => setHeader(h => ({ ...h, location_id: v }))} />
+              {locationHint && <p className="text-xs text-ink2 mt-1.5">{locationHint}</p>}
+            </div>
+            <Select id="po-department" label={s.department} value={header.department_id} disabled={isReadOnly} placeholder="-"
+              options={[{ value: '', label: '-' }, ...departments.map(d => ({ value: d.id, label: d.name }))]}
+              onChange={v => setHeader(h => ({ ...h, department_id: v }))} />
+            <Input id="payment_terms" label={s.paymentTermsLabel + ' *'}
+              value={header.payment_terms}
+              onChange={e => setHeader(h => ({ ...h, payment_terms: e.target.value }))}
+              readOnly={isReadOnly} />
+            <Input id="delivery_date" label={s.desiredDelivery + ' *'} type="date"
+              value={header.expected_delivery_date}
+              onChange={e => setHeader(h => ({ ...h, expected_delivery_date: e.target.value }))}
+              readOnly={isReadOnly} />
+            <Select id="po-incoterm" label={s.incoterm} value={header.incoterm} disabled={isReadOnly} placeholder="-" options={incotermOptions(header.incoterm)}
+              onChange={v => setHeader(h => ({ ...h, incoterm: v }))} />
+            <Input id="quote_ref" label={s.quoteRef}
+              value={header.supplier_quote_ref}
+              onChange={e => setHeader(h => ({ ...h, supplier_quote_ref: e.target.value }))}
+              readOnly={isReadOnly} />
+            <div className="sm:col-span-2 lg:col-span-4 flex flex-col gap-1">
+              <label htmlFor="po-notes" className="text-sm font-medium text-gray-700">{s.notes}</label>
+              <textarea id="po-notes" rows={3} value={header.notes}
+                onChange={e => setHeader(h => ({ ...h, notes: e.target.value }))}
+                readOnly={isReadOnly}
+                placeholder={s.notesPlaceholder}
+                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none" />
+            </div>
+            {header.department_id && (
+              <div className="sm:col-span-2 lg:col-span-4">
+                <BudgetStatus className="pt-4 border-t border-field" departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludePoId={id} />
+              </div>
+            )}
           </div>
-        </div>
+        </section>
+
+        {/* Line items */}
+        <section className="bg-white rounded-lg border border-field overflow-hidden">
+          <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{t.po.lineItems}</h2>
+          <div className="overflow-x-auto">
+            <table className="table-grid w-full text-sm min-w-[1300px]">
+              <GridHead cols={[[t.po.position, Hash], [s.catalog, Search], [s.code, IdCard], [t.po.itemName, Package], [s.category + ' *', Tag], [t.categories.subcategory + ' *', Tag], [t.po.qty, Hash, 'right'], [t.po.unit, Ruler], [t.po.unitPrice, Coins, 'right'], [t.po.amount, Coins, 'right'], ...(isReadOnly ? [] : [['']] as [string][])]} />
+              <tbody className="divide-y divide-field">
+                {lines.map((line, idx) => (
+                  <tr key={idx} className="align-top">
+                    <td className="px-4 py-2.5 text-ink2 pt-4 tabular-nums">{idx + 1}</td>
+                    <td className="px-3 py-2.5 min-w-[150px]">
+                      {!isReadOnly && <CatalogPicker items={itemsForLine(line)} allItems={items} onSelect={item => applyItem(idx, item)} placeholder={t.common.searchCatalog} />}
+                    </td>
+                    <td className="px-4 py-2.5 pt-4 text-ink2 whitespace-nowrap">{line.item_id ? items.find(i => i.id === line.item_id)?.item_number ?? '-' : '-'}</td>
+                    <td className="px-3 py-2.5 min-w-[220px]">
+                      <input value={line.name} onChange={e => setLine(idx, { name: e.target.value })} readOnly={isReadOnly} placeholder={s.itemNamePlaceholder}
+                        className="w-full h-9 px-3 text-sm font-medium rounded-lg border border-field hover:border-field-hover bg-white text-ink placeholder:text-placeholder placeholder:font-normal focus:outline-none focus:border-field-focus" />
+                      <input value={line.long_description} onChange={e => setLine(idx, { long_description: e.target.value })} readOnly={isReadOnly} placeholder={s.descPlaceholder}
+                        className="w-full h-9 px-3 mt-2.5 text-sm rounded-lg border border-field hover:border-field-hover bg-white text-ink placeholder:text-placeholder focus:outline-none focus:border-field-focus" />
+                    </td>
+                    <LineCategoryCells categories={categories} mainId={line.main_id} categoryId={line.category_id} disabled={isReadOnly} onChange={patch => setLine(idx, { ...patch, scoped: true })} />
+                    <td className="px-3 py-2.5 w-24">
+                      <input type="text" inputMode="decimal" {...numericInput(line.quantity, v => setLine(idx, { quantity: v }))} readOnly={isReadOnly}
+                        className="w-full text-sm tabular-nums border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right" />
+                    </td>
+                    <td className="px-3 py-2.5 w-28">
+                      <Select value={unitCode(line.unit) ?? line.unit} disabled={isReadOnly} options={unitOptions(line.unit, lang)}
+                        onChange={v => setLine(idx, { unit: v ? unitLabel(v, lang) : '' })} />
+                    </td>
+                    <td className="px-3 py-2.5 w-32">
+                      <input type="text" inputMode="decimal" {...numericInput(line.unit_price, v => setLine(idx, { unit_price: v }))} readOnly={isReadOnly}
+                        className="w-full text-sm tabular-nums border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right" />
+                      {(() => {
+                        const agreed = line.item_id ? contractPrices.get(line.item_id) : undefined
+                        if (agreed == null || isReadOnly) return null
+                        const current = parseNum(line.unit_price)
+                        if (Math.abs(current - agreed) < 0.005) return <p className="mt-1 text-[11px] leading-4 text-ink2 text-right">{s.fromContract}</p>
+                        return (
+                          <button type="button" onClick={() => setLine(idx, { unit_price: String(agreed).replace('.', ',') })}
+                            className={`mt-1 w-full text-right text-[11px] leading-4 hover:underline ${current > agreed ? 'text-danger' : 'text-ink2'}`}>
+                            {s.contractPriceIs}: {fmt(agreed)}
+                          </button>
+                        )
+                      })()}
+                    </td>
+                    <td className="px-4 py-2.5 pt-4 text-right text-ink tabular-nums whitespace-nowrap">{fmt(lineTotal(line))}</td>
+                    {!isReadOnly && (
+                      <td className="px-3 py-2.5 pt-3">
+                        <button type="button" onClick={() => removeLine(idx)} aria-label={t.common.deleteEntity}
+                          className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-icon hover:bg-selected hover:text-danger transition-colors"><Trash2 className="w-4 h-4" /></button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {!isReadOnly && (
+            <div className="px-5 py-3 border-t border-field">
+              <button type="button" onClick={addLine} className="inline-flex items-center gap-1.5 text-sm text-primary hover:text-primary-hover font-medium"><Plus className="w-4 h-4" />{s.addLine}</button>
+            </div>
+          )}
+          <div className="flex justify-end px-5 py-4 border-t border-field">
+            <div className="w-72 flex flex-col gap-2 text-sm">
+              {discountAmount > 0 && <div className="flex justify-between"><span className="text-ink2">{s.subtotal}</span><span className="tabular-nums text-ink2">{fmt(subtotal)}</span></div>}
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="po-discount" className="text-ink2">{s.discount} ({company?.currency ?? 'EUR'})</label>
+                {isReadOnly
+                  ? <span className="tabular-nums text-ink">{discountAmount > 0 ? `-${fmt(discountAmount)}` : '-'}</span>
+                  : <input id="po-discount" type="text" inputMode="decimal" {...numericInput(discount, setDiscount)} className="w-28 text-sm tabular-nums border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right" />}
+              </div>
+              <div className="flex justify-between items-baseline pt-2 border-t border-field"><span className="font-medium text-ink2">{s.totalExVat}</span><span className="text-lg font-semibold text-ink tabular-nums">{fmt(grandTotal)}</span></div>
+            </div>
+          </div>
+        </section>
 
         {/* Attachments */}
-        <div className="mt-4">
-          <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5 mb-2">
-            <Paperclip className="w-3.5 h-3.5" />
-            {t.po.attachQuotation}
-          </label>
+        <section className="bg-white rounded-lg border border-field">
+          <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink flex items-center gap-1.5"><Paperclip className="w-3.5 h-3.5" />{t.po.attachQuotation}</h2>
+          <div className="p-5 flex flex-col gap-2">
+            {attachments.map(att => (
+              <div key={att.id} className="flex items-center gap-2.5 px-3 py-2 bg-surface rounded-lg">
+                <FileText className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
+                <button type="button" onClick={() => openAttachment(att.file_path)} className="text-sm text-ink hover:text-primary font-medium flex-1 text-left truncate transition-colors">{att.file_name}</button>
+                {!isReadOnly && <button type="button" onClick={() => setAttToDelete(att)} aria-label={t.common.deleteEntity} className="text-icon hover:text-danger transition-colors shrink-0"><X className="w-4 h-4" /></button>}
+              </div>
+            ))}
+            {newFiles.map((f, i) => (
+              <div key={i} className="flex items-center gap-2.5 px-3 py-2 bg-accent-light rounded-lg">
+                <FileText className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
+                <span className="text-sm text-ink font-medium flex-1 truncate">{f.name}</span>
+                <span className="text-xs text-ink2 shrink-0 tabular-nums">{Math.max(1, Math.round(f.size / 1024))} KB</span>
+                <button type="button" onClick={() => setNewFiles(fs => fs.filter((_, j) => j !== i))} aria-label={t.common.cancel} className="text-icon hover:text-danger transition-colors shrink-0"><X className="w-4 h-4" /></button>
+              </div>
+            ))}
+            {!isReadOnly && (
+              <label className="flex items-center gap-2 h-10 px-3 rounded-lg border border-dashed border-field cursor-pointer text-sm text-ink2 hover:bg-surface transition-colors w-full">
+                <UploadCloud className="w-4 h-4 text-icon shrink-0" />
+                <span>{t.po.uploadQuotation}</span>
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple className="hidden" onChange={e => { addFiles(e.target.files); e.target.value = '' }} />
+              </label>
+            )}
+            {uploadingFiles && <p className="text-xs text-ink2">{s.uploading}</p>}
+          </div>
+        </section>
 
-          {/* Saved attachments */}
-          {attachments.map(att => (
-            <div key={att.id} className="flex items-center gap-2 p-2.5 bg-accent-light border border-accent-border rounded-lg mb-2">
-              <FileText className="w-4 h-4 text-accent shrink-0" />
-              <button type="button" onClick={() => openAttachment(att.file_path)}
-                className="text-sm text-accent hover:underline font-medium flex-1 text-left truncate">
-                {att.file_name}
-              </button>
-              {!isReadOnly && (
-                <button type="button" onClick={() => setAttToDelete(att)}
-                  className="text-gray-400 hover:text-red-500 transition-colors shrink-0">
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          ))}
-
-          {/* New files queued for upload */}
-          {newFiles.map((f, i) => (
-            <div key={i} className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-lg mb-2">
-              <FileText className="w-4 h-4 text-green-500 shrink-0" />
-              <span className="text-sm text-success font-medium flex-1 truncate">{f.name}</span>
-              <span className="text-xs text-green-500 shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
-              <button type="button" onClick={() => setNewFiles(fs => fs.filter((_, j) => j !== i))}
-                className="text-gray-400 hover:text-red-500 transition-colors shrink-0">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-
-          {/* Upload drop zone */}
-          {!isReadOnly && (
-            <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-accent hover:bg-accent-light transition-colors w-full">
-              <UploadCloud className="w-4 h-4 text-gray-400 shrink-0" />
-              <span className="text-sm text-gray-500">{t.po.uploadQuotation}</span>
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple className="hidden"
-                onChange={e => { addFiles(e.target.files); e.target.value = '' }} />
-            </label>
-          )}
-          {uploadingFiles && <p className="text-xs text-accent mt-1">{s.uploading}</p>}
-        </div>
+        {/* Bottom actions: hidden on mobile (the sticky bar handles it) */}
+        {!isReadOnly && <div className="hidden lg:flex justify-end gap-2">{actionButtons}</div>}
       </div>
 
-      {/* Line items */}
-      <div className="bg-white rounded-lg border border-field overflow-hidden mb-5">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h2 className="text-[15px] font-semibold text-ink">{t.po.lineItems}</h2>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[1250px]">
-            <thead className="bg-surface border-b border-field">
-              <tr>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-12">{t.po.position}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">{s.catalog}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">{s.code}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">{t.po.itemName}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-44">{s.category} *</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-48">{t.categories.subcategory} *</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-24">{t.po.qty}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-20">{t.po.unit}</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 w-28">{t.po.unitPrice}</th>
-                <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-500 w-28">{t.po.amount}</th>
-                {!isReadOnly && <th className="w-8" />}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-field">
-              {lines.map((line, idx) => (
-                <tr key={idx} className="align-top">
-                  <td className="px-4 py-2.5 text-gray-400 text-xs pt-4">{line.position}</td>
-                  <td className="px-4 py-2.5 pt-3">
-                    {!isReadOnly && <CatalogPicker items={itemsForLine(line)} allItems={items} onSelect={item => applyItem(idx, item)} placeholder={t.common.searchCatalog} />}
-                  </td>
-                  <td className="px-4 py-2.5 pt-3 text-xs text-gray-400">
-                    {line.item_id ? items.find(i => i.id === line.item_id)?.item_number ?? '—' : '—'}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <input
-                      value={line.name}
-                      onChange={e => setLine(idx, { name: e.target.value })}
-                      readOnly={isReadOnly}
-                      placeholder={s.itemNamePlaceholder}
-                      className="w-full h-9 px-3 text-sm font-medium rounded-lg border border-field hover:border-field-hover bg-white text-ink placeholder:text-placeholder placeholder:font-normal focus:outline-none focus:border-field-focus"
-                    />
-                    <input
-                      value={line.long_description}
-                      onChange={e => setLine(idx, { long_description: e.target.value })}
-                      readOnly={isReadOnly}
-                      placeholder={s.descPlaceholder}
-                      className="w-full h-9 px-3 mt-2.5 text-sm rounded-lg border border-field hover:border-field-hover bg-white text-ink placeholder:text-placeholder focus:outline-none focus:border-field-focus"
-                    />
-                  </td>
-                  <LineCategoryCells categories={categories} mainId={line.main_id} categoryId={line.category_id} disabled={isReadOnly} onChange={patch => setLine(idx, { ...patch, scoped: true })} />
-                  <td className="px-4 py-2.5 pt-3">
-                    <input
-                      type="text" inputMode="decimal"
-                      {...numericInput(line.quantity, v => setLine(idx, { quantity: v }))}
-                      readOnly={isReadOnly}
-                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right"
-                    />
-                  </td>
-                  <td className="px-4 py-2.5 pt-3">
-                    <input
-                      value={line.unit}
-                      onChange={e => setLine(idx, { unit: e.target.value })}
-                      readOnly={isReadOnly}
-                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus"
-                    />
-                  </td>
-                  <td className="px-4 py-2.5 pt-3">
-                    <input
-                      type="text" inputMode="decimal"
-                      {...numericInput(line.unit_price, v => setLine(idx, { unit_price: v }))}
-                      readOnly={isReadOnly}
-                      className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right"
-                    />
-                    {(() => {
-                      const agreed = line.item_id ? contractPrices.get(line.item_id) : undefined
-                      if (agreed == null || isReadOnly) return null
-                      const current = parseNum(line.unit_price)
-                      if (Math.abs(current - agreed) < 0.005) return <p className="mt-1 text-[11px] leading-4 text-ink2 text-right">{s.fromContract}</p>
-                      return (
-                        <button type="button" onClick={() => setLine(idx, { unit_price: String(agreed).replace('.', ',') })}
-                          className={`mt-1 w-full text-right text-[11px] leading-4 hover:underline ${current > agreed ? 'text-danger' : 'text-ink2'}`}>
-                          {s.contractPriceIs}: {fmt(agreed)}
-                        </button>
-                      )
-                    })()}
-                  </td>
-                  <td className="px-4 py-2.5 pt-3 text-right font-medium text-gray-800">
-                    {fmt(lineTotal(line))}
-                  </td>
-                  {!isReadOnly && (
-                    <td className="px-2 py-2.5 pt-3">
-                      <button type="button" onClick={() => removeLine(idx)}
-                        className="p-1 text-gray-300 hover:text-red-500 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-              {!isReadOnly && (
-                <tr>
-                  <td colSpan={9} className="px-4 py-2 border-t border-gray-100 text-right">
-                    <button type="button" onClick={addLine} className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover font-medium">
-                      <Plus className="w-4 h-4" />{s.addLine}
-                    </button>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-            <tfoot className="border-t border-field bg-surface">
-              {/* Subtotal */}
-              {discountAmount > 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 pt-3 pb-1 text-right text-sm text-gray-500">
-                    {s.subtotal}
-                  </td>
-                  <td className="px-4 pt-3 pb-1 text-right text-sm text-gray-700">
-                    {fmt(subtotal)}
-                  </td>
-                  {!isReadOnly && <td />}
-                </tr>
-              )}
-              {/* Discount row */}
-              <tr>
-                <td colSpan={7} className="px-4 py-2 text-right text-sm text-gray-500">
-                  {s.discount} (€)
-                </td>
-                <td className="px-4 py-2 text-right">
-                  {isReadOnly ? (
-                    <span className="text-sm font-semibold text-accent">
-                      {discountAmount > 0 ? `- ${fmt(discountAmount)}` : '—'}
-                    </span>
-                  ) : (
-                    <input
-                      type="text" inputMode="decimal"
-                      {...numericInput(discount, setDiscount)}
-                      className="w-28 text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right ml-auto block"
-                    />
-                  )}
-                </td>
-                {!isReadOnly && <td />}
-              </tr>
-              {/* Grand total */}
-              <tr className="border-t-2 border-field">
-                <td colSpan={7} className="px-4 py-3 text-right text-sm font-bold text-gray-900">
-                  {s.totalExVat}
-                </td>
-                <td className="px-4 py-3 text-right text-base font-bold text-accent-hover">
-                  {fmt(grandTotal)}
-                </td>
-                {!isReadOnly && <td />}
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-
-      </div>
-
-      {/* Bottom actions — hidden on mobile (sticky bar handles it) */}
-      {!isReadOnly && (
-        <div className="hidden lg:flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => navigate(-1)} disabled={saving}>{t.common.cancel}</Button>
-          {(poStatus === 'draft' || isNew) && (
-            <Button variant="secondary" onClick={() => save('draft')} loading={saving}>
-              {t.po.saveDraft}
-            </Button>
-          )}
-          <Button onClick={() => save(isSent ? 'sent' : poStatus === 'draft' || isNew ? 'issued' : poStatus)} loading={saving}>
-            {poStatus === 'draft' || isNew ? t.po.issuePO : t.common.saveChanges}
-          </Button>
-        </div>
-      )}
       <ConfirmDialog open={confirmDelete} onClose={() => setConfirmDelete(false)} onConfirm={deleteDraft}
         title={t.po.deleteTitle} message={t.po.deleteQuestion} name={poNumber ?? ''} danger loading={deleting} confirmLabel={t.common.deleteEntity} />
       <ConfirmDialog open={!!attToDelete} onClose={() => setAttToDelete(null)}

@@ -12,6 +12,7 @@ import Select from '../components/ui/Select'
 import GridHead from '../components/ui/GridHead'
 import { categoryScope, mainCategoryId } from '../lib/categories'
 import CatalogPicker from '../components/ui/CatalogPicker'
+import BudgetStatus from '../components/budget/BudgetStatus'
 import LineCategoryCells from '../components/ui/LineCategoryCells'
 import Modal from '../components/ui/Modal'
 import type { Item } from '../types/database'
@@ -164,6 +165,9 @@ export default function RequestFormPage() {
   const subtotal = lines.reduce((sum, l) => sum + lineTotal(l), 0)
   const discountAmount = parseNum(discount)
   const grandTotal = Math.max(0, subtotal - discountAmount)
+  // what the lines add to each main category (for the budget hint)
+  const budgetByCategory: Record<string, number> = {}
+  for (const l of lines) { const m = mainCategoryId(l.category_id, categories); if (m) budgetByCategory[m] = (budgetByCategory[m] ?? 0) + lineTotal(l) }
   const fmt = (n: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: company?.currency ?? 'EUR' }).format(n)
 
   const selectedLoc = locations.find(l => l.id === header.location_id)
@@ -255,7 +259,7 @@ export default function RequestFormPage() {
 
   return (
     <div className="p-4 lg:p-6 form-skin">
-      <nav className="flex items-center gap-1.5 text-[13px] text-ink2 mb-4">
+      <nav className="flex items-center gap-2 text-sm text-ink2 mb-5">
         <button type="button" onClick={() => navigate('/requests')} aria-label={s.title} title={s.title}
           className="w-7 h-7 -ml-1.5 mr-1 inline-flex items-center justify-center rounded-lg text-icon hover:bg-selected hover:text-ink transition-colors">
           <ArrowLeft className="w-4 h-4" strokeWidth={1.75} />
@@ -300,6 +304,9 @@ export default function RequestFormPage() {
             </div>
             {approverName && (
               <p className="mt-4 text-[13px] text-ink2">{s.goesTo} <span className="font-medium text-ink">{approverName}</span></p>
+            )}
+            {header.department_id && (
+              <BudgetStatus className="mt-5 pt-4 border-t border-field" departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludeRequestId={id} />
             )}
           </div>
         </section>

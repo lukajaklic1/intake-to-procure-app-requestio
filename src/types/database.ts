@@ -11,6 +11,15 @@ export interface Company {
   email: string | null
   phone: string | null
   tax_id: string | null
+  room_count: number | null
+  registration_number: string | null
+  share_capital: string | null
+  register_court: string | null
+  director_name: string | null
+  website: string | null
+  bank_swift: string | null
+  po_terms_sl: string | null
+  po_terms_en: string | null
   logo_url: string | null
   bank_name: string | null
   bank_iban: string | null
@@ -95,6 +104,20 @@ export interface Location {
   address_postal_code: string | null
   address_country: string | null
   status: 'active' | 'inactive'
+  created_at: string
+  updated_at: string
+}
+
+/** A yearly budget of a department, optionally limited to one main category (null = the whole department). */
+export interface Budget {
+  id: string
+  company_id: string
+  year: number
+  department_id: string
+  category_id: string | null
+  amount: number
+  /** optional split of the yearly amount into 12 months (adds up to amount) */
+  months: number[] | null
   created_at: string
   updated_at: string
 }

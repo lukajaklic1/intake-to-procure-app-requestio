@@ -119,16 +119,17 @@ export default function SettingsPage() {
         </Section>
 
         <Section title={s.companyProfile} description={s.companyProfileHint} saving={saving === 'profile'}
-          onSave={() => save('profile', ['name', 'email', 'phone', 'tax_id', 'address_street', 'address_city', 'address_postal_code', 'address_country'])}>
+          onSave={() => save('profile', ['name', 'email', 'phone', 'tax_id', 'room_count', 'address_street', 'address_city', 'address_postal_code', 'address_country'])}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <Input id="name" label={s.companyName} {...field('name')} />
             </div>
             <Input id="email" label={t.common.email} type="email" {...field('email')} />
             <Input id="phone" label={t.common.phone} {...field('phone')} />
-            <div className="sm:col-span-2">
-              <Input id="tax_id" label={s.vatTaxId} {...field('tax_id')} />
-            </div>
+            <Input id="tax_id" label={s.vatTaxId} {...field('tax_id')} />
+            <Input id="room_count" label={s.roomCount} type="number" inputMode="numeric" min={0}
+              value={form.room_count?.toString() ?? ''}
+              onChange={e => setForm(f => ({ ...f, room_count: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value) || 0) }))} />
             <div className="sm:col-span-2">
               <Input id="address_street" label={t.common.streetAddress} {...field('address_street')} />
             </div>
@@ -137,6 +138,19 @@ export default function SettingsPage() {
             <div className="sm:col-span-2">
               <CountrySelect id="address_country" label={t.common.country} value={(form.address_country as string) ?? ''} onChange={v => setForm(f => ({ ...f, address_country: v }))} />
             </div>
+          </div>
+        </Section>
+
+        <Section title={s.legalData} description={s.legalDataHint} saving={saving === 'legal'}
+          onSave={() => save('legal', ['registration_number', 'share_capital', 'register_court', 'director_name', 'website'])}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input id="registration_number" label={s.registrationNumber} {...field('registration_number')} />
+            <Input id="share_capital" label={s.shareCapital} placeholder="7.500,00 EUR" {...field('share_capital')} />
+            <div className="sm:col-span-2">
+              <Input id="register_court" label={s.registerCourt} placeholder={s.registerCourtPh} {...field('register_court')} />
+            </div>
+            <Input id="director_name" label={s.directorName} {...field('director_name')} />
+            <Input id="website" label={s.website} placeholder="www.hotel-jezero.si" {...field('website')} />
           </div>
         </Section>
 
@@ -156,10 +170,11 @@ export default function SettingsPage() {
         </Section>
 
         <Section title={s.bankDetails} description={s.bankHint} saving={saving === 'bank'}
-          onSave={() => save('bank', ['bank_name', 'bank_iban'])}>
+          onSave={() => save('bank', ['bank_name', 'bank_iban', 'bank_swift'])}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input id="bank_name" label={s.bankName} {...field('bank_name')} />
             <Input id="bank_iban" label={s.iban} {...field('bank_iban')} />
+            <Input id="bank_swift" label={s.bankSwift} {...field('bank_swift')} />
           </div>
         </Section>
 
@@ -188,6 +203,22 @@ export default function SettingsPage() {
             </div>
           </Section>
         )}
+
+        <Section title={s.poTerms} description={s.poTermsHint} saving={saving === 'terms'}
+          onSave={() => save('terms', ['po_terms_sl', 'po_terms_en'])}>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="po_terms_sl" className="text-sm font-medium text-gray-700">{s.termsSl}</label>
+              <textarea id="po_terms_sl" rows={7} value={form.po_terms_sl ?? ''} onChange={e => setForm(f => ({ ...f, po_terms_sl: e.target.value }))}
+                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-y" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="po_terms_en" className="text-sm font-medium text-gray-700">{s.termsEn}</label>
+              <textarea id="po_terms_en" rows={7} value={form.po_terms_en ?? ''} onChange={e => setForm(f => ({ ...f, po_terms_en: e.target.value }))}
+                className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-y" />
+            </div>
+          </div>
+        </Section>
       </div>
     </div>
   )
