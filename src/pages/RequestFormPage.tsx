@@ -12,6 +12,7 @@ import CategoryOptions from '../components/ui/CategoryOptions'
 import Modal from '../components/ui/Modal'
 import type { Item } from '../types/database'
 import { matchesSearch } from '../lib/search'
+import { unitLabel } from '../lib/units'
 import ModalActions from '../components/ui/ModalActions'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 
@@ -127,7 +128,7 @@ export default function RequestFormPage() {
   const { id } = useParams()
   const isNew = !id
   const { company, profile } = useCompany()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const s = t.requests
   const navigate = useNavigate()
 
@@ -198,7 +199,7 @@ export default function RequestFormPage() {
   function applyItem(idx: number, item: Item) {
     setLine(idx, {
       item_id: item.id, category_id: item.category_id ?? '', name: item.name, long_description: item.long_description ?? '',
-      unit: item.default_unit ?? lines[idx].unit,
+      unit: item.default_unit ? unitLabel(item.default_unit, lang) : lines[idx].unit,
       est_unit_price: item.default_unit_price != null ? String(item.default_unit_price).replace('.', ',') : lines[idx].est_unit_price,
     })
   }

@@ -21,7 +21,7 @@ import { useRequired } from '../lib/useRequired'
 import { dbError } from '../lib/dbError'
 import { USAGE, loadUsage, usageFor, recheckUsage, isUsed, usageMessage, type UsageMaps } from '../lib/usage'
 import { buildCategoryTree } from '../lib/categories'
-import { unitOptions } from '../lib/units'
+import { unitOptions, unitLabel, unitCode, unitToStore } from '../lib/units'
 import GridHead from '../components/ui/GridHead'
 import { matchesSearch } from '../lib/search'
 import StatusSelect from '../components/ui/StatusSelect'
@@ -39,7 +39,7 @@ const EMPTY: Partial<Item> = { name: '', long_description: '', category_id: unde
 
 export default function CatalogPage() {
   const { company } = useCompany()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const s = t.items
   const [items, setItems] = useState<ItemWithCategory[]>([])
   const [allCategories, setAllCategories] = useState<Category[]>([])
@@ -185,7 +185,7 @@ export default function CatalogPage() {
         name: editing.name,
         long_description: editing.long_description || null,
         category_id: categoryId,
-        default_unit: editing.default_unit || null,
+        default_unit: unitToStore(editing.default_unit),
         default_unit_price: editing.default_unit_price ?? null,
         status: editing.status,
         updated_at: new Date().toISOString(),
@@ -200,7 +200,7 @@ export default function CatalogPage() {
         name: editing.name,
         long_description: editing.long_description || null,
         category_id: categoryId,
-        default_unit: editing.default_unit || null,
+        default_unit: unitToStore(editing.default_unit),
         default_unit_price: editing.default_unit_price ?? null,
         status: 'active',
       })
@@ -250,7 +250,7 @@ export default function CatalogPage() {
     { value: 'oldest', label: t.sort.oldest, cmp: date(i => i.created_at) },
   ]
   const filteredItems = applySort(items, sortDefs, sort).filter(i =>
-    matchesSearch(search, [i.item_number, i.name, i.long_description, i.default_unit, ...categoryNames(i.category_id)])
+    matchesSearch(search, [i.item_number, i.name, i.long_description, unitLabel(i.default_unit, lang), ...categoryNames(i.category_id)])
     && (statusFilter === 'all' || i.status === statusFilter))
 
   // Sections: a header per category and per subcategory, each followed by its own items.
@@ -310,7 +310,7 @@ export default function CatalogPage() {
   const exportCols: ExportColumn<ItemWithCategory>[] = [
     { header: s.itemNumber, get: i => i.item_number, width: 12 }, { header: s.nameCol, get: i => i.name, width: 36 }, { header: s.longDescription, get: i => i.long_description, width: 40 },
     { header: t.categories.single, get: i => pathOf(i.category_id).top, width: 22 }, { header: t.categories.subcategory, get: i => pathOf(i.category_id).sub, width: 26 },
-    { header: s.defaultUnit, get: i => i.default_unit, width: 12 }, { header: s.defaultUnitPrice, get: i => i.default_unit_price, kind: 'money', width: 14 },
+    { header: s.defaultUnit, get: i => unitLabel(i.default_unit, lang), width: 12 }, { header: s.defaultUnitPrice, get: i => i.default_unit_price, kind: 'money', width: 14 },
     { header: t.common.status, get: i => (i.status === 'active' ? t.common.active : t.common.inactive), width: 12 }, { header: t.common.created, get: i => i.created_at, kind: 'date', width: 14 },
   ]
 
@@ -371,7 +371,7 @@ export default function CatalogPage() {
                         <div className={`flex items-center gap-2 ${g.level === 1 ? 'ml-6' : ''}`}>
                           {headerOpen(g) ? <ChevronDown className="w-4 h-4 text-icon shrink-0" /> : <ChevronRight className="w-4 h-4 text-icon shrink-0" />}
                           <span className={`${g.level === 0 ? 'font-medium' : ''} ${g.inactive ? 'text-muted' : 'text-ink'}`}>{g.name}</span>
-                          <span className="text-xs text-gray-400">{g.total}</span>
+                          <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-md bg-white border border-field text-[12px] font-medium text-ink2 leading-none">{g.total}</span>
                           {g.inactive && <span className="badge badge-neutral">{t.common.inactiveF}</span>}
 
                           <div className="ml-auto flex items-center gap-1">
@@ -402,7 +402,7 @@ export default function CatalogPage() {
                               {item.long_description && <span className="text-xs text-gray-400 truncate max-w-[260px]">{item.long_description}</span>}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-ink2">{item.default_unit ?? '-'}</td>
+                          <td className="px-4 py-3 text-ink2">{unitLabel(item.default_unit, lang) || '-'}</td>
                           <td className="px-4 py-3 text-ink2">{item.default_unit_price != null ? `${item.default_unit_price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '-'}</td>
                           <td className="px-4 py-3">
                             <span className={`badge ${item.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>{item.status === 'active' ? t.common.active : t.common.inactive}</span>
@@ -449,7 +449,7 @@ export default function CatalogPage() {
                       </td>
                       <td className="px-4 py-3 text-ink2">{path.top}</td>
                       <td className="px-4 py-3 text-ink2">{path.sub}</td>
-                      <td className="px-4 py-3 text-ink2">{item.default_unit ?? '-'}</td>
+                      <td className="px-4 py-3 text-ink2">{unitLabel(item.default_unit, lang) || '-'}</td>
                       <td className="px-4 py-3 text-ink2">{item.default_unit_price != null ? `${item.default_unit_price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '-'}</td>
                       <td className="px-4 py-3">
                         <span className={`badge ${item.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>{item.status === 'active' ? t.common.active : t.common.inactive}</span>
@@ -503,7 +503,7 @@ export default function CatalogPage() {
           { key: 'name', label: t.common.import.cols.name, required: true, example: 'Olivno olje 1 L' },
           { key: 'category', label: t.common.import.cols.category, required: true, example: 'Hrana' },
           { key: 'subcategory', label: t.common.import.cols.subcategory, required: true, example: 'Začimbe, olja in omake' },
-          { key: 'unit', label: t.common.import.cols.unit, example: 'kos' },
+          { key: 'unit', label: t.common.import.cols.unit, example: lang === 'sl' ? 'kos' : 'pcs' },
           { key: 'price', label: t.common.import.cols.price, example: '5,90' },
           { key: 'description', label: t.common.import.cols.description, example: 'Ekstra deviško' },
         ]}
@@ -525,7 +525,7 @@ export default function CatalogPage() {
             company_id: company!.id, item_number: String(last + 1 + i), name: r.name,
             long_description: r.description || null,
             category_id: sub.get(`${top.get(r.category.toLowerCase())}|${r.subcategory.toLowerCase()}`),
-            default_unit: r.unit || null,
+            default_unit: unitToStore(r.unit),
             default_unit_price: r.price ? Number(r.price.replace(',', '.')) : null,
             status: 'active',
           }))
@@ -570,7 +570,7 @@ export default function CatalogPage() {
             <Select id="i-sub" label={t.categories.subcategory} required value={subSel} disabled={!catSel} error={req.errors.sub}
               options={(tree.find(n => n.category.id === catSel)?.children ?? []).filter(x => x.status === 'active' || x.id === subSel).map(x => ({ value: x.id, label: x.name }))}
               onChange={v => { req.clear('sub'); setSubSel(v) }} />
-            <Select id="i-unit" label={s.defaultUnit} value={editing.default_unit ?? ''} options={unitOptions(editing.default_unit)}
+            <Select id="i-unit" label={s.defaultUnit} value={unitCode(editing.default_unit) ?? editing.default_unit ?? ''} options={unitOptions(editing.default_unit, lang)}
               onChange={v => setEditing(f => ({ ...f, default_unit: v }))} />
             <Input id="i-price" label={s.defaultUnitPrice}
               placeholder="0,00"
@@ -593,14 +593,18 @@ export default function CatalogPage() {
       </Modal>
 
       <Modal open={catModalOpen} onClose={closeCategoryModal} title={catEditing.id ? (catEditing.parent_id ? t.categories.editSub : t.categories.edit) : catEditing.parent_id ? t.categories.newSub : t.categories.new} size="sm" icon={Tag}>
-        <Input id="cat-name" placeholder={t.common.ph.categoryName} label={(catEditing.parent_id ? t.categories.subcategory : t.categories.categoryName) + ' *'} value={catEditing.name} error={catReq.errors.name} onChange={e => { catReq.clear('name'); setCatEditing(f => ({ ...f, name: e.target.value })) }} />
-        {catEditing.parent_id && (
-          <p className="text-sm text-ink2 mt-3">{t.categories.parent}: <span className="text-ink font-medium">{allCategories.find(c => c.id === catEditing.parent_id)?.name}</span></p>
-        )}
-        {catEditing.id && (
-          <StatusSelect active={catEditing.status === 'active'} activeLabel={t.common.statusActiveF} inactiveLabel={t.common.statusInactiveF}
-            onChange={on => setCatEditing(f => ({ ...f, status: on ? 'active' : 'inactive' }))} />
-        )}
+        <div className="flex flex-col gap-4">
+          <Input id="cat-name" placeholder={t.common.ph.categoryName} label={(catEditing.parent_id ? t.categories.subcategory : t.categories.categoryName) + ' *'} value={catEditing.name} error={catReq.errors.name} onChange={e => { catReq.clear('name'); setCatEditing(f => ({ ...f, name: e.target.value })) }} />
+          {catEditing.parent_id && (
+            <Select id="cat-parent" label={t.categories.single} value={catEditing.parent_id}
+              options={tree.filter(n => n.category.status === 'active' || n.category.id === catEditing.parent_id).map(n => ({ value: n.category.id, label: n.category.name }))}
+              onChange={v => setCatEditing(f => ({ ...f, parent_id: v }))} />
+          )}
+          {catEditing.id && (
+            <StatusSelect active={catEditing.status === 'active'} activeLabel={t.common.statusActiveF} inactiveLabel={t.common.statusInactiveF}
+              onChange={on => setCatEditing(f => ({ ...f, status: on ? 'active' : 'inactive' }))} />
+          )}
+        </div>
         <ModalFooter onCancel={closeCategoryModal} onSave={saveCategory} saving={catSaving} saveLabel={catEditing.id ? t.common.saveChanges : t.common.create}
           onDelete={catEditing.id ? () => { const c = allCategories.find(x => x.id === catEditing.id); closeCategoryModal(); if (c) setConfirmDeleteCat(c) } : undefined}
           deleteBlocked={catEditing.id && categoryInUse(catEditing.id) ? t.categories.deleteBlockedMsg : null} />

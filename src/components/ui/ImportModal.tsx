@@ -29,11 +29,15 @@ interface ImportModalProps {
   /** Duplicate key(s) of a row (lower-cased), e.g. its name. A row counts as a duplicate when ANY of its keys already exists. */
   keyOf: (row: ImportRow) => string | string[]
   /** Wording of the rule in the intro text: by name only (default) or by name or VAT number. */
-  duplicateRule?: 'name' | 'nameVat' | 'nameCode' | 'contract'
+  duplicateRule?: 'name' | 'nameVat' | 'nameCode' | 'contract' | 'priceList'
   /** Names the field behind a key prefix ("v:" -> "VAT number"), so a skipped row can say why. */
   keyLabels?: Record<string, string>
   /** Extra per-row check; return an error message or null. */
   validate?: (row: ImportRow) => string | null
+  /** Rows that return true are ignored altogether (not counted, no error): e.g. a price list row left without a price. */
+  skip?: (row: ImportRow) => boolean
+  /** Replaces the download of the empty template, e.g. with a file already filled with the existing records. */
+  onTemplate?: () => void | Promise<void>
   onImport: (rows: ImportRow[]) => Promise<void>
 }
 
@@ -51,7 +55,7 @@ const EMPTY: Parsed = { valid: [], duplicates: 0, errors: [], preview: [] }
 const cell = (v: unknown) => (v == null ? '' : String(v).trim())
 
 /** Excel (.xlsx) import: download a template, upload a filled one, review, import. */
-export default function ImportModal({ open, onClose, title, columns, templateName, existing, keyOf, duplicateRule = 'name', keyLabels, validate, onImport }: ImportModalProps) {
+export default function ImportModal({ open, onClose, title, columns, templateName, existing, keyOf, duplicateRule = 'name', keyLabels, validate, skip, onTemplate, onImport }: ImportModalProps) {
   const { t } = useLanguage()
   const s = t.common.import
   const fileRef = useRef<HTMLInputElement>(null)
@@ -63,6 +67,7 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
   function close() { reset(); onClose() }
 
   async function downloadTemplate() {
+    if (onTemplate) { await onTemplate(); return }
     const header = columns.map(c => ({ value: c.label + (c.required ? ' *' : ''), fontWeight: 'bold' as const }))
     const example = columns.map(c => ({ value: c.example ?? '' }))
     await writeExcelFile([header, example]).toFile(templateName + '.xlsx')
@@ -86,6 +91,7 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
         if (r.every(v => cell(v) === '')) return
         const row: ImportRow = {}
         columns.forEach((c, ci) => { row[c.key] = idx[ci] >= 0 ? cell(r[idx[ci]]) : '' })
+        if (skip?.(row)) return
         const empty = columns.find(c => c.required && !row[c.key])
         if (empty) { const message = `${s.missingValue}: ${empty.label}`; out.errors.push({ line, message }); out.preview.push({ line, data: row, status: 'error', message }); return }
         const err = validate?.(row)
@@ -123,7 +129,7 @@ export default function ImportModal({ open, onClose, title, columns, templateNam
 
   return (
     <Modal open={open} onClose={close} title={title} size="lg" icon={Upload}>
-      <p className="text-sm text-ink2 mb-4">{duplicateRule === 'nameVat' ? s.introNameVat : duplicateRule === 'nameCode' ? s.introNameCode : duplicateRule === 'contract' ? s.introContract : s.intro}</p>
+      <p className="text-sm text-ink2 mb-4">{duplicateRule === 'nameVat' ? s.introNameVat : duplicateRule === 'nameCode' ? s.introNameCode : duplicateRule === 'contract' ? s.introContract : duplicateRule === 'priceList' ? s.introPriceList : s.intro}</p>
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <Button variant="secondary" onClick={downloadTemplate} className="gap-2"><Download className="w-4 h-4" />{s.downloadTemplate}</Button>

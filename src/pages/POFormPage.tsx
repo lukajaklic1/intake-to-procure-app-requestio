@@ -10,8 +10,10 @@ import Button from '../components/ui/Button'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import Input from '../components/ui/Input'
 import CategoryOptions from '../components/ui/CategoryOptions'
-import type { Supplier, Category, Location, Department, Item } from '../types/database'
+import type { Supplier, Category, Location, Department, Item, Contract } from '../types/database'
 import { matchesSearch } from '../lib/search'
+import { unitLabel } from '../lib/units'
+import { effectiveStatus } from '../lib/contracts'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +54,7 @@ function newLine(position: number): LineItem {
 // ─── Item search component ────────────────────────────────────────────────────
 
 function ItemSearch({ items, onSelect, placeholder }: { items: Item[]; onSelect: (item: Item) => void; placeholder: string }) {
+  const { lang } = useLanguage()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
 
@@ -81,7 +84,7 @@ function ItemSearch({ items, onSelect, placeholder }: { items: Item[]; onSelect:
               className="w-full text-left px-3 py-2 hover:bg-accent-light transition-colors">
               <span className=" text-xs text-gray-400 mr-2">{item.item_number}</span>
               <span className="text-sm font-medium text-gray-800">{item.name}</span>
-              {item.default_unit && <span className="ml-2 text-xs text-gray-400">{item.default_unit}</span>}
+              {item.default_unit && <span className="ml-2 text-xs text-gray-400">{unitLabel(item.default_unit, lang)}</span>}
             </button>
           ))}
         </div>
@@ -163,7 +166,7 @@ export default function POFormPage() {
   const { id } = useParams<{ id?: string }>()
   const navigate = useNavigate()
   const { company } = useCompany()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const s = t.po
   const { session } = useAuth()
 
@@ -191,12 +194,29 @@ export default function POFormPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
-  const [contracts, setContracts] = useState<{ id: string; title: string; contract_number: string; supplier_id: string; status: string; end_date: string | null }[]>([])
+  const [contracts, setContracts] = useState<Pick<Contract, 'id' | 'title' | 'contract_number' | 'supplier_id' | 'status' | 'end_date' | 'notice_days' | 'notice_given_at' | 'auto_renew'>[]>([])
   const [items, setItems] = useState<Item[]>([])
+  // Agreed prices of the selected contract (item id -> price): they take the place of the catalog price.
+  const [contractPrices, setContractPrices] = useState<Map<string, number>>(new Map())
 
   useEffect(() => {
     if (company) { loadRefs(); if (!isNew) loadPO() }
   }, [company, id])
+
+  useEffect(() => {
+    if (!header.contract_id) { setContractPrices(new Map()); return }
+    let cancelled = false
+    supabase.from('contract_items').select('item_id, agreed_price').eq('contract_id', header.contract_id).then(({ data }) => {
+      if (!cancelled) setContractPrices(new Map((data ?? []).map(r => [r.item_id as string, Number(r.agreed_price)])))
+    })
+    return () => { cancelled = true }
+  }, [header.contract_id])
+
+  /** Contracts of a supplier that can still be used for an order: active and not past their end date. */
+  function usableContracts(supplierId: string, keepId?: string) {
+    // valid contracts, also while in their notice period or close to expiry; not drafts, terminated ones or those that have ended (also by notice)
+    return contracts.filter(c => c.supplier_id === supplierId && (c.id === keepId || ['active', 'expiring', 'in_notice'].includes(effectiveStatus(c))))
+  }
 
   async function loadRefs() {
     if (!company) return
@@ -215,7 +235,7 @@ export default function POFormPage() {
     if (isNew && loc.data?.length === 1) setHeader(h => ({ ...h, location_id: h.location_id || loc.data![0].id }))
     setDepartments(dept.data ?? [])
     setItems(itm.data ?? [])
-    const { data: ctr } = await supabase.from('contracts').select('id, title, contract_number, supplier_id, status, end_date').eq('company_id', cid)
+    const { data: ctr } = await supabase.from('contracts').select('id, title, contract_number, supplier_id, status, end_date, notice_days, notice_given_at, auto_renew').eq('company_id', cid)
     setContracts(ctr ?? [])
   }
 
@@ -281,8 +301,12 @@ export default function POFormPage() {
       category_id: item.category_id ?? '',
       name: item.name,
       long_description: item.long_description ?? '',
-      unit: item.default_unit ?? lines[idx].unit,
-      unit_price: item.default_unit_price != null ? String(item.default_unit_price).replace('.', ',') : lines[idx].unit_price,
+      unit: item.default_unit ? unitLabel(item.default_unit, lang) : lines[idx].unit,
+      // the price agreed in the selected contract comes before the catalog price
+      unit_price: (() => {
+        const price = contractPrices.get(item.id) ?? item.default_unit_price
+        return price != null ? String(price).replace('.', ',') : lines[idx].unit_price
+      })(),
     })
   }
 
@@ -517,10 +541,12 @@ export default function POFormPage() {
             value={header.supplier_id}
             onChange={v => {
               const sup = suppliers.find(su => su.id === v)
+              const usable = usableContracts(v)
               setHeader(h => ({
                 ...h,
                 supplier_id: v,
-                contract_id: contracts.find(c => c.id === h.contract_id)?.supplier_id === v ? h.contract_id : '',
+                // keep the contract if it is this supplier's, otherwise take the supplier's only usable contract
+                contract_id: contracts.find(c => c.id === h.contract_id)?.supplier_id === v ? h.contract_id : usable.length === 1 ? usable[0].id : '',
                 payment_terms: h.payment_terms || sup?.payment_terms || '',
                 incoterm: h.incoterm || sup?.incoterm || '',
               }))
@@ -530,8 +556,7 @@ export default function POFormPage() {
             placeholder={t.common.search + '…'}
           />
           <Select id="contract" label={t.contracts.linkedContract} value={header.contract_id} onChange={v => setHeader(h => ({ ...h, contract_id: v }))}>
-            {contracts
-              .filter(c => c.supplier_id === header.supplier_id && (c.id === header.contract_id || (c.status === 'active' && !(c.end_date && c.end_date < new Date().toISOString().slice(0, 10)))))
+            {usableContracts(header.supplier_id, header.contract_id)
               .map(c => <option key={c.id} value={c.id}>{c.contract_number} · {c.title}</option>)}
           </Select>
           <Select id="location" label={s.location} required hint={locationHint} value={header.location_id} onChange={v => setHeader(h => ({ ...h, location_id: v }))}>
@@ -703,6 +728,18 @@ export default function POFormPage() {
                       readOnly={isReadOnly}
                       className="w-full text-sm border border-field rounded-lg hover:border-field-hover px-2 py-1.5 focus:outline-none focus:border-field-focus text-right"
                     />
+                    {(() => {
+                      const agreed = line.item_id ? contractPrices.get(line.item_id) : undefined
+                      if (agreed == null || isReadOnly) return null
+                      const current = parseNum(line.unit_price)
+                      if (Math.abs(current - agreed) < 0.005) return <p className="mt-1 text-[11px] leading-4 text-ink2 text-right">{s.fromContract}</p>
+                      return (
+                        <button type="button" onClick={() => setLine(idx, { unit_price: String(agreed).replace('.', ',') })}
+                          className={`mt-1 w-full text-right text-[11px] leading-4 hover:underline ${current > agreed ? 'text-danger' : 'text-ink2'}`}>
+                          {s.contractPriceIs}: {fmt(agreed)}
+                        </button>
+                      )
+                    })()}
                   </td>
                   <td className="px-4 py-2.5 pt-3 text-right font-medium text-gray-800">
                     {fmt(lineTotal(line))}

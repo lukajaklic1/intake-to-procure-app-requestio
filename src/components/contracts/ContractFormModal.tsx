@@ -12,13 +12,13 @@ import ModalFooter from '../ui/ModalFooter'
 import Input from '../ui/Input'
 import type { Contract, ContractAttachment } from '../../types/database'
 import Select from '../ui/Select'
-import { STATUS_BADGE } from '../../lib/contracts'
+import { STATUS_BADGE, effectiveStatus, type EffectiveStatus } from '../../lib/contracts'
 
 export interface SupplierLite { id: string; name: string; payment_terms: string | null }
 export interface PersonLite { id: string; first_name: string; last_name: string }
 
 const EMPTY = {
-  number: '', title: '', supplier_id: '', status: 'draft' as Contract['status'], start_date: '', end_date: '',
+  number: '', title: '', supplier_id: '', status: 'draft' as Contract['status'], notice_given_at: '', start_date: '', end_date: '',
   auto_renew: false, renewal_months: '', notice_days: '', total_value: '', payment_terms: '', owner_id: '', description: '',
 }
 type Form = typeof EMPTY
@@ -45,23 +45,35 @@ export default function ContractFormModal({ open, onClose, contract, suppliers, 
   const [saving, setSaving] = useState(false)
   const [newFiles, setNewFiles] = useState<File[]>([])
   const [docs, setDocs] = useState<ContractAttachment[]>([])
+  // existing documents the user took out of the list: deleted only when the dialog is saved
+  const [removedDocs, setRemovedDocs] = useState<string[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
   const currency = company?.currency ?? 'EUR'
 
   useEffect(() => {
     if (!open) return
-    req.reset(); setNewFiles([]); setDocs([])
+    req.reset(); setNewFiles([]); setDocs([]); setRemovedDocs([])
     if (contract) supabase.from('contract_attachments').select('*').eq('contract_id', contract.id).order('created_at').then(({ data }) => setDocs((data as ContractAttachment[]) ?? []))
     if (!contract) { setForm(EMPTY); return }
     setForm({
-      number: contract.contract_number, title: contract.title, supplier_id: contract.supplier_id, status: contract.status, start_date: contract.start_date, end_date: contract.end_date ?? '',
+      number: contract.contract_number, title: contract.title, supplier_id: contract.supplier_id, status: contract.status, notice_given_at: contract.notice_given_at ?? '', start_date: contract.start_date, end_date: contract.end_date ?? '',
       auto_renew: contract.auto_renew, renewal_months: contract.renewal_months?.toString() ?? '', notice_days: contract.notice_days?.toString() ?? '',
       total_value: contract.total_value?.toString().replace('.', ',') ?? '', payment_terms: contract.payment_terms ?? '', owner_id: contract.owner_id ?? '', description: contract.description ?? '',
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, contract])
 
+  async function openDoc(d: ContractAttachment) {
+    const { data } = await supabase.storage.from('quotations').createSignedUrl(d.file_path, 3600)
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+  }
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm(f => ({ ...f, [k]: v }))
+  // the status as shown everywhere else (an active contract can be "before expiry", "in notice period" or "expired")
+  const uiStatus: EffectiveStatus = form.status === 'active'
+    ? effectiveStatus({ status: 'active', end_date: form.end_date || null, notice_days: form.notice_days ? Number(form.notice_days) : null, notice_given_at: form.notice_given_at || null, auto_renew: form.auto_renew })
+    : form.status
+  const statusOptions: EffectiveStatus[] = ['draft', 'active', 'in_notice', 'terminated']
+  if (!statusOptions.includes(uiStatus)) statusOptions.splice(2, 0, uiStatus)
   const num = (v: string) => (v.trim() === '' ? null : Number(v.replace(',', '.')))
 
   async function save() {
@@ -71,6 +83,7 @@ export default function ContractFormModal({ open, onClose, contract, suppliers, 
     setSaving(true)
     const payload = {
       title: form.title.trim(), supplier_id: form.supplier_id, status: form.status,
+      notice_given_at: form.status === 'active' && form.notice_given_at ? form.notice_given_at : null,
       start_date: form.start_date, end_date: form.end_date || null,
       auto_renew: form.auto_renew, renewal_months: form.auto_renew ? num(form.renewal_months) : null,
       notice_days: num(form.notice_days), total_value: num(form.total_value),
@@ -85,6 +98,12 @@ export default function ContractFormModal({ open, onClose, contract, suppliers, 
       setSaving(false)
       if (/contract_number|unique|duplicate/i.test(error.message)) { req.setError('number', t.common.alreadyExists, 'c-number'); return }
       toast.error(dbError(error, t)); return
+    }
+    // documents taken out of the list: the record first, then the file, so nothing is left behind in storage
+    for (const d of docs.filter(x => removedDocs.includes(x.id))) {
+      const { error: delErr } = await supabase.from('contract_attachments').delete().eq('id', d.id)
+      if (delErr) { toast.error(dbError(delErr, t)); continue }
+      await supabase.storage.from('quotations').remove([d.file_path])
     }
     // files chosen in the dialog are uploaded now that the contract has an id
     for (const file of newFiles) {
@@ -107,8 +126,20 @@ export default function ContractFormModal({ open, onClose, contract, suppliers, 
 
         <Input id="c-number" label={s.number} placeholder="POG-0001" value={form.number} error={req.errors.number}
           onChange={e => { req.clear('number'); set('number', e.target.value) }} />
-        <Select id="c-status" label={s.status} value={form.status} onChange={v => set('status', v as Contract['status'])}
-          options={(['draft', 'active', 'terminated'] as const).map(v => ({ value: v, label: s.st[v], badge: STATUS_BADGE[v] }))} />
+        {/* Shows the status as the lists do: "in notice period" follows from the notice date, "before expiry" / "expired" from the dates.
+            Those two can't be picked, they only appear while they apply. */}
+        <Select id="c-status" label={s.status} value={uiStatus}
+          onChange={v => {
+            if (v === 'in_notice') setForm(f => ({ ...f, status: 'active', notice_given_at: f.notice_given_at || new Date().toISOString().slice(0, 10) }))
+            else if (v === 'active' || v === 'draft' || v === 'terminated') setForm(f => ({ ...f, status: v, notice_given_at: v === 'active' && uiStatus !== 'in_notice' && uiStatus !== 'cancelled' ? f.notice_given_at : '' }))
+          }}
+          options={statusOptions.map(v => ({ value: v, label: s.st[v], badge: STATUS_BADGE[v] }))} />
+        {form.status === 'active' && form.notice_given_at && (
+          <div className="sm:col-span-2">
+            <Input id="c-notice-given" type="date" label={s.noticeGivenOn} value={form.notice_given_at} onChange={e => set('notice_given_at', e.target.value)} />
+            <p className="text-xs text-ink2 mt-1.5">{s.noticeGivenHint}</p>
+          </div>
+        )}
 
         <Select className="sm:col-span-2" id="c-supplier" label={s.supplier} required value={form.supplier_id} error={req.errors.supplier_id}
           options={suppliers.map(x => ({ value: x.id, label: x.name }))}
@@ -149,10 +180,14 @@ export default function ContractFormModal({ open, onClose, contract, suppliers, 
             className="flex items-center gap-2 h-9 px-3 rounded-[0.625rem] border border-dashed border-field text-sm text-ink2 hover:bg-surface transition-colors text-left">
             <Paperclip className="w-4 h-4 text-icon" />{s.upload}
           </button>
-          {(docs.length > 0 || newFiles.length > 0) && (
+          {(docs.some(d => !removedDocs.includes(d.id)) || newFiles.length > 0) && (
             <ul className="flex flex-col gap-1">
-              {docs.map(d => (
-                <li key={d.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-surface text-sm text-ink"><FileText className="w-4 h-4 text-icon shrink-0" /><span className="truncate">{d.file_name}</span></li>
+              {docs.filter(d => !removedDocs.includes(d.id)).map(d => (
+                <li key={d.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-surface text-sm text-ink">
+                  <FileText className="w-4 h-4 text-icon shrink-0" />
+                  <button type="button" onClick={() => openDoc(d)} title={s.preview} className="truncate flex-1 text-left hover:text-primary transition-colors">{d.file_name}</button>
+                  <button type="button" onClick={() => setRemovedDocs(r => [...r, d.id])} className="p-0.5 text-icon hover:text-ink shrink-0" aria-label="Remove"><X className="w-3.5 h-3.5" /></button>
+                </li>
               ))}
               {newFiles.map((f, i) => (
                 <li key={f.name + i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-accent-light text-sm text-ink">

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, Plus, Search, Pencil, IdCard, FileSignature, Building2, CircleDot, CalendarClock, Coins, User } from 'lucide-react'
+import { Upload, Plus, Search, Pencil, IdCard, FileSignature, Building2, CircleDot, CalendarClock, Timer, Coins, User, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
@@ -16,7 +16,7 @@ import TableEmptyState from '../components/ui/TableEmptyState'
 import type { Contract } from '../types/database'
 import { useLanguage } from '../hooks/useLanguage'
 import { dbError } from '../lib/dbError'
-import { daysUntil, deleteContractCompletely, effectiveStatus, noticeDate, STATUS_BADGE, type EffectiveStatus } from '../lib/contracts'
+import { closingDate, daysUntil, deleteContractCompletely, effectiveStatus, STATUS_BADGE, type EffectiveStatus } from '../lib/contracts'
 import PersonCell from '../components/ui/PersonCell'
 import GridHead from '../components/ui/GridHead'
 import RowMenu from '../components/ui/RowMenu'
@@ -155,27 +155,29 @@ export default function ContractsPage() {
   const filtering = q !== '' || statusFilter !== 'all' || supplierFilter !== 'all' || expiresFilter !== 'all'
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
 
-  function validity(c: Row) {
+  const validity = (c: Row) => `${fmtDate(c.start_date)} - ${c.end_date ? fmtDate(c.end_date) : s.openEnded}`
+
+  /** Days until the end date; the notice deadline is only on the contract page. */
+  function remainingCell(c: Row) {
     const st = effectiveStatus(c)
-    const d = daysUntil(c.end_date)
-    return (
-      <>
-        <p className="text-sm text-ink">{fmtDate(c.start_date)} - {c.end_date ? fmtDate(c.end_date) : s.openEnded}</p>
-        {(st === 'active' || st === 'expiring' || st === 'in_notice') && d != null && d >= 0 && d <= 90 && <p className="text-xs text-warn mt-0.5">{d} {s.daysLeft}</p>}
-        {st === 'expired' && <p className="text-xs text-danger mt-0.5">{s.expiredOn}</p>}
-      </>
-    )
+    // a contract in notice ends on notice date + notice period
+    const d = daysUntil(st === 'in_notice' ? closingDate(c) : c.end_date)
+    if (st === 'expired') return <span className="text-ink2">{s.expiredOn}</span>
+    if ((st !== 'active' && st !== 'expiring' && st !== 'in_notice') || d == null || d < 0) return <span className="text-ink2">-</span>
+    return <span className="text-ink">{d} {s.daysShort}</span>
   }
 
+  /** Spent / contract value, a slim progress bar and the share spent. */
   function valueCell(c: Row) {
     const used = spent.get(c.id) ?? 0
     if (c.total_value == null) return <span className="text-ink2">{used > 0 ? fmt(used) : '-'}</span>
-    const pct = c.total_value > 0 ? Math.min(100, Math.round((used / c.total_value) * 100)) : 0
+    const pct = c.total_value > 0 ? Math.round((used / c.total_value) * 100) : 0
     const over = used > c.total_value
     return (
-      <div className="min-w-[150px]">
-        <p className="text-sm text-ink">{fmt(used)} <span className="text-ink2">/ {fmt(c.total_value)}</span></p>
-        <div className="h-1 rounded-full bg-selected mt-1.5 overflow-hidden"><div className={`h-full rounded-full ${over ? 'bg-danger' : pct >= 80 ? 'bg-warn' : 'bg-primary'}`} style={{ width: `${pct}%` }} /></div>
+      <div className="flex items-center gap-3 whitespace-nowrap">
+        <span className="tabular-nums text-ink">{fmt(used)} <span className="text-ink2">/ {fmt(c.total_value)}</span></span>
+        <div className="w-12 h-1 rounded-full bg-selected overflow-hidden shrink-0"><div className={`h-full rounded-full ${over ? 'bg-danger' : 'bg-primary'}`} style={{ width: `${Math.min(100, pct)}%` }} /></div>
+        <span className={`text-xs tabular-nums ${over ? 'text-danger' : 'text-ink2'}`}>{pct} %</span>
       </div>
     )
   }
@@ -192,7 +194,7 @@ export default function ContractsPage() {
         <SortFilter defs={sortDefs} value={sort} onChange={setSort} />
         <FilterSelect label={s.status} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="all">{t.filters.allM}</option>
-          {(['draft', 'active', 'expiring', 'in_notice', 'expired', 'terminated'] as EffectiveStatus[]).map(v => <option key={v} value={v}>{s.st[v]}</option>)}
+          {(['draft', 'active', 'expiring', 'in_notice', 'cancelled', 'expired', 'terminated'] as EffectiveStatus[]).map(v => <option key={v} value={v}>{s.st[v]}</option>)}
         </FilterSelect>
         <FilterSelect label={s.supplier} value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)}>
           <option value="all">{t.filters.allM}</option>
@@ -211,17 +213,15 @@ export default function ContractsPage() {
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1040px]">
-            <GridHead cols={[[s.number, IdCard], [s.contractTitle, FileSignature], [s.supplier, Building2], [s.status, CircleDot], [s.validity, CalendarClock], [`${s.spent} / ${s.totalValue}`, Coins], [s.owner, User], ['']]} />
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1160px]">
+            <GridHead cols={[[s.number, IdCard], [s.contractTitle, FileSignature], [s.supplier, Building2], [s.status, CircleDot], [s.validity, CalendarClock], [s.timeLeft, Timer], [`${s.spent} / ${s.totalValue}`, Coins], [s.owner, User], ['']]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={FileSignature} colSpan={8}
+                <TableEmptyState icon={FileSignature} colSpan={9}
                   title={filtering ? t.common.empty.noResults.title : t.common.empty.contracts.title}
                   subtitle={filtering ? t.common.empty.noResults.text : t.common.empty.contracts.text} />
               ) : paginated.map(c => {
                 const st = effectiveStatus(c)
-                const nd = noticeDate(c)
-                const noticeIn = daysUntil(nd)
                 return (
                   <tr key={c.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/contracts/${c.id}`)}>
                     <td className="px-4 py-3 text-ink2 whitespace-nowrap">{c.contract_number}</td>
@@ -230,10 +230,20 @@ export default function ContractsPage() {
                     </td>
                     <td className="px-4 py-3 text-ink2 max-w-[200px] truncate">{c.suppliers?.name ?? '-'}</td>
                     <td className="px-4 py-3"><span className={`badge ${STATUS_BADGE[st]}`}>{s.st[st]}</span></td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {validity(c)}
-                      {c.status === 'active' && noticeIn != null && noticeIn >= 0 && noticeIn <= 30 && <p className="text-xs text-warn mt-0.5">{s.noticeDue}: {fmtDate(nd)}</p>}
+                    <td className="px-4 py-3 whitespace-nowrap text-ink">
+                      <span className="inline-flex items-center gap-1.5">
+                        {validity(c)}
+                        {c.auto_renew && (
+                          <span className="group relative inline-flex">
+                            <RefreshCw className="w-3.5 h-3.5 text-icon shrink-0" strokeWidth={1.75} aria-label={s.autoRenew} />
+                            <span role="tooltip" className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 z-20 whitespace-nowrap rounded-lg bg-ink px-3 py-1.5 text-[13px] leading-5 font-normal text-white shadow-[0_8px_30px_rgba(16,17,18,0.25)] opacity-0 transition-opacity group-hover:opacity-100">
+                              {c.renewal_months ? `${s.autoRenew}: ${c.renewal_months} ${s.monthsShort}` : s.autoRenew}
+                            </span>
+                          </span>
+                        )}
+                      </span>
                     </td>
+                    <td className="px-4 py-3 whitespace-nowrap">{remainingCell(c)}</td>
                     <td className="px-4 py-3">{valueCell(c)}</td>
                     <td className="px-4 py-3 whitespace-nowrap"><PersonCell name={personName(c.owner_id)} /></td>
                     <td className="px-4 py-3">

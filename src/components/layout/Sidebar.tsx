@@ -41,14 +41,14 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
           .eq('company_id', company!.id).eq('status', 'approved').is('po_id', null),
         supabase.from('purchase_orders').select('*', { count: 'exact', head: true })
           .eq('company_id', company!.id).eq('status', 'sent').neq('received_status', 'full'),
-        supabase.from('contracts').select('status, end_date, notice_days').eq('company_id', company!.id).eq('status', 'active'),
+        supabase.from('contracts').select('status, end_date, notice_days, auto_renew').eq('company_id', company!.id).eq('status', 'active'),
         supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('company_id', company!.id).eq('status', 'in_review'),
       ])
       setPendingApprovals(pending ?? 0)
       setReadyForPO(noPo ?? 0)
       setOpenReceipts(receiptsOpen ?? 0)
       setInvoicesToApprove(isAdmin || hasPerm('invoices', 'approve') ? (invReview ?? 0) : 0)
-      setExpiringContracts((ctr ?? []).filter(c => needsAttention(c as { status: 'active'; end_date: string | null; notice_days: number | null }, 60)).length)
+      setExpiringContracts((ctr ?? []).filter(c => needsAttention(c as { status: 'active'; end_date: string | null; notice_days: number | null; auto_renew: boolean }, 60)).length)
     }
     loadCounts()
     return onRefreshCounts(loadCounts)
