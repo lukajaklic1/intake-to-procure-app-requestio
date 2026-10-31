@@ -438,7 +438,7 @@ export default function ContractDetailPage() {
           )}
           <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
             <div className="overflow-x-auto"><table className="w-full text-sm min-w-[560px]">
-              <GridHead cols={[[t.common.name, FileText], ['KB', Ruler], [t.common.created, CalendarClock], ['']]} />
+              <GridHead cols={[[t.common.name, FileText], [s.fileSize, Ruler], [t.common.created, CalendarClock], ['']]} />
               <tbody className="divide-y divide-field">
                 {attachments.length === 0 ? (
                   <TableEmptyState icon={Paperclip} colSpan={4} title={s.documents} subtitle={s.noDocuments} />
@@ -511,7 +511,7 @@ export default function ContractDetailPage() {
         }} />
 
       <ContractFormModal open={editOpen} onClose={() => setEditOpen(false)} contract={contract} suppliers={suppliers} people={people} onSaved={load}
-        onDelete={() => setConfirm('delete')} deleteBlocked={orders.length > 0 ? s.deleteBlockedMsg : null} />
+        onDelete={isAdmin ? () => setConfirm('delete') : undefined} deleteBlocked={orders.length > 0 ? s.deleteBlockedMsg : null} />
       <Modal open={noticeOpen} onClose={() => setNoticeOpen(false)} title={s.noticeTitle} size="sm" icon={BellRing}>
         <Input id="c-notice-on" type="date" label={s.noticeGivenOn} value={noticeOn} onChange={e => setNoticeOn(e.target.value)} />
         <p className="text-xs text-ink2 mt-1.5">{s.noticeGivenHint}</p>

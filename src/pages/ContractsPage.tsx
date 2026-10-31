@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, Plus, Search, Pencil, IdCard, FileSignature, Building2, CircleDot, CalendarClock, Timer, Coins, User, RefreshCw } from 'lucide-react'
+import { Upload, Plus, Search, Pencil, IdCard, FileSignature, Building2, CircleDot, CalendarClock, Timer, Coins, User, RefreshCw, Paperclip } from 'lucide-react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
@@ -58,6 +58,7 @@ export default function ContractsPage() {
   const [rows, setRows] = useState<Row[]>([])
   const [spent, setSpent] = useState<Map<string, number>>(new Map())
   const [orderCount, setOrderCount] = useState<Map<string, number>>(new Map())
+  const [docCount, setDocCount] = useState<Map<string, number>>(new Map())
   const [suppliers, setSuppliers] = useState<{ id: string; name: string; payment_terms: string | null }[]>([])
   const [people, setPeople] = useState<Person[]>([])
   const [loading, setLoading] = useState(true)
@@ -80,12 +81,16 @@ export default function ContractsPage() {
   async function load() {
     if (!company) return
     // spinner only on the first load: later reloads refresh the data in place
-    const [{ data: c }, { data: sup }, { data: us }, { data: pos }] = await Promise.all([
+    const [{ data: c }, { data: sup }, { data: us }, { data: pos }, { data: docs }] = await Promise.all([
       supabase.from('contracts').select('*, suppliers(name, payment_terms)').eq('company_id', company.id).order('created_at', { ascending: false }),
       supabase.from('suppliers').select('id, name, payment_terms').eq('company_id', company.id).eq('status', 'active').order('name'),
       supabase.from('users').select('id, first_name, last_name').eq('company_id', company.id).order('first_name'),
       supabase.from('purchase_orders').select('contract_id, total_amount, status').eq('company_id', company.id).not('contract_id', 'is', null),
+      supabase.from('contract_attachments').select('contract_id').eq('company_id', company.id),
     ])
+    const dc = new Map<string, number>()
+    for (const d of docs ?? []) dc.set(d.contract_id as string, (dc.get(d.contract_id as string) ?? 0) + 1)
+    setDocCount(dc)
     setRows((c as Row[]) ?? [])
     setSuppliers(sup ?? [])
     setPeople(us ?? [])
@@ -226,7 +231,14 @@ export default function ContractsPage() {
                   <tr key={c.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/contracts/${c.id}`)}>
                     <td className="px-4 py-3 text-ink2 whitespace-nowrap">{c.contract_number}</td>
                     <td className="px-4 py-3 max-w-[300px]">
-                      <p className="font-medium text-ink truncate" title={c.title}>{c.title}</p>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="font-medium text-ink truncate" title={c.title}>{c.title}</p>
+                        {(docCount.get(c.id) ?? 0) > 0 && (
+                          <span className="inline-flex items-center gap-0.5 text-xs text-ink2 shrink-0" title={`${s.documents}: ${docCount.get(c.id)}`}>
+                            <Paperclip className="w-3.5 h-3.5 text-icon" strokeWidth={1.75} />{docCount.get(c.id)}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-ink2 max-w-[200px] truncate">{c.suppliers?.name ?? '-'}</td>
                     <td className="px-4 py-3"><span className={`badge ${STATUS_BADGE[st]}`}>{s.st[st]}</span></td>
@@ -305,7 +317,7 @@ export default function ContractsPage() {
         }} />
 
       <ContractFormModal open={modalOpen} onClose={() => setModalOpen(false)} contract={editing} suppliers={suppliers} people={people} onSaved={load}
-        onDelete={editing ? () => setConfirmDelete(editing) : undefined}
+        onDelete={editing && isAdmin ? () => setConfirmDelete(editing) : undefined}
         deleteBlocked={editing && (orderCount.get(editing.id) ?? 0) > 0 ? s.deleteBlockedMsg : null} />
 
       <ConfirmDialog open={!!confirmDelete} onClose={() => setConfirmDelete(null)}
