@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { CheckCircle2, Search, X, ClipboardList, MapPin, User, UserCheck, CalendarClock, Coins, MessageSquare } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { CheckCircle2, Search, X, ClipboardList, IdCard, MapPin, User, UserCheck, CalendarClock, Coins, MessageSquare, Eye } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -11,6 +11,7 @@ import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import { format, subMonths, startOfMonth } from 'date-fns'
 import PersonCell from '../components/ui/PersonCell'
+import RowMenu from '../components/ui/RowMenu'
 import GridHead, { type GridCol } from '../components/ui/GridHead'
 import { matchesSearch } from '../lib/search'
 import SortFilter from '../components/ui/SortFilter'
@@ -142,7 +143,7 @@ export default function ApprovalsPage() {
       <PageToolbar attached actions={<ExportButton fileName="odobritve" columns={exportCols} rows={sortedRows} />}>
             <div className="relative min-w-40 flex-1 max-w-[220px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={s.requestNumber + ' / ' + a.requestedBy}
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
                 className="w-full pl-9 pr-3 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
             </div>
             <SortFilter defs={sortDefs} value={sort} onChange={setSort} />
@@ -171,32 +172,24 @@ export default function ApprovalsPage() {
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[900px]">
-            <GridHead cols={[[s.requestNumber, ClipboardList], [s.location, MapPin], [t.requests.commentCol, MessageSquare], [a.requestedBy, User], ...(isAdmin ? [[s.approver, UserCheck] as GridCol] : []), [s.neededBy, CalendarClock], [s.estTotalCol, Coins], ['']]} />
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1100px]">
+            <GridHead cols={[[s.requestNumber, IdCard], [s.requestTitle, ClipboardList], [s.location, MapPin], [t.requests.commentCol, MessageSquare], [a.requestedBy, User], ...(isAdmin ? [[s.approver, UserCheck] as GridCol] : []), [s.neededBy, CalendarClock], [s.estTotalCol, Coins], ['']]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={CheckCircle2} colSpan={isAdmin ? 9 : 8} title={hasActiveFilters ? t.common.empty.noResults.title : t.common.empty.approvals.title} subtitle={hasActiveFilters ? t.common.empty.noResults.text : t.common.empty.approvals.text} />
+                <TableEmptyState icon={CheckCircle2} colSpan={isAdmin ? 10 : 9} title={hasActiveFilters ? t.common.empty.noResults.title : t.common.empty.approvals.title} subtitle={hasActiveFilters ? t.common.empty.noResults.text : t.common.empty.approvals.text} />
               ) : paginated.map(r => (
-                <tr key={r.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/requests/${r.id}`)}>
-                  <td className="px-4 py-3 max-w-[300px]">
-                    {r.title && <p className="text-sm font-medium text-ink truncate" title={r.title}>{r.title}</p>}
-                    <div className="flex items-center gap-2 whitespace-nowrap">
-                      <Link to={`/requests/${r.id}`} onClick={e => e.stopPropagation()} className={`font-medium hover:text-ink ${r.title ? 'text-xs text-gray-400' : 'text-sm text-gray-400'}`}>{r.request_number}</Link>
-                      <span className="text-xs text-gray-400">{format(new Date(r.created_at), 'dd.MM.yyyy')}</span>
-                    </div>
-                  </td>
+                <tr key={r.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/requests/${r.id}`, { state: { from: '/approvals' } })}>
+                  <td className="px-4 py-3 text-ink2 whitespace-nowrap">{r.request_number}</td>
+                  <td className="px-4 py-3 max-w-[300px]"><p className="font-medium text-ink truncate" title={r.title ?? undefined}>{r.title || '-'}</p></td>
                   <td className="px-4 py-3 text-ink2">{r.locations?.name ?? '-'}</td>
                   <td className="px-4 py-3 text-ink2 max-w-[260px] truncate" title={comments[r.id]}>{comments[r.id] ?? '-'}</td>
                   <td className="px-4 py-3"><PersonCell name={names[r.created_by]} /></td>
                   {isAdmin && <td className="px-4 py-3"><PersonCell name={r.approver_id ? names[r.approver_id] : null} /></td>}
-                  <td className="px-4 py-3 text-gray-500 text-xs">{r.needed_by_date ? format(new Date(r.needed_by_date), 'dd.MM.yyyy') : '—'}</td>
-                  <td className="px-4 py-3 font-medium text-ink">{fmt(r.total_estimate ?? 0, company?.currency)}</td>
+                  <td className="px-4 py-3 text-ink whitespace-nowrap">{r.needed_by_date ? format(new Date(r.needed_by_date), 'dd.MM.yyyy') : '-'}</td>
+                  <td className="px-4 py-3 text-ink whitespace-nowrap tabular-nums">{fmt(r.total_estimate ?? 0, company?.currency)}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end">
-                      <Link to={`/requests/${r.id}`} onClick={e => e.stopPropagation()}
-                        className="badge badge-warn hover:brightness-95 transition-all whitespace-nowrap">
-                        {a.review}
-                      </Link>
+                    <div className="flex justify-end" onClick={e => e.stopPropagation()}>
+                      <RowMenu items={[{ label: a.review, icon: Eye, onClick: () => navigate(`/requests/${r.id}`, { state: { from: '/approvals' } }) }]} />
                     </div>
                   </td>
                 </tr>

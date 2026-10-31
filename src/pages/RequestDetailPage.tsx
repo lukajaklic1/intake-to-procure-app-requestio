@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ChevronRight, Pencil, XCircle, Check, X, FileText, ShoppingCart, Send, Trash2, Package, Tag, Hash, Ruler, Coins, Eye } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { refreshCounts } from '../lib/refreshCounts'
@@ -57,6 +57,10 @@ export default function RequestDetailPage() {
   const { t, lang } = useLanguage()
   const s = t.requests
   const navigate = useNavigate()
+  // opened from the approvals list: back and the breadcrumb lead there, not to all requests
+  const fromApprovals = (useLocation().state as { from?: string } | null)?.from === '/approvals'
+  const backTo = fromApprovals ? '/approvals' : '/requests'
+  const backLabel = fromApprovals ? t.nav.approvals : s.title
 
   const [req, setReq] = useState<ReqFull | null>(null)
   const [lines, setLines] = useState<(RequestLineItem & { categories?: { name: string } | null })[]>([])
@@ -174,6 +178,10 @@ export default function RequestDetailPage() {
   const myPending = approvals.find(a => a.status === 'pending' && (a.approver_id === profile?.id || isAdmin))
   const st = req.status as RequestStatus
 
+  // The step is only worth naming when a second approver is involved: "(Approver)" / "(Second approver)", nothing for a single approval
+  const hasSecondStep = approvals.some(x => x.step === 2)
+  const stepNote = (step?: number) => (!step || !hasSecondStep ? '' : ` (${step === 2 ? s.roleDirector : s.roleManager})`)
+
   type FlowState = 'done' | 'current' | 'upcoming' | 'rejected' | 'cancelled'
   const flowSteps: { label: string; name?: string; note?: string | null; state: FlowState }[] = (() => {
     if (st === 'draft') return []
@@ -226,11 +234,11 @@ export default function RequestDetailPage() {
   return (
     <div className="p-4 lg:p-6">
       <nav className="flex items-center gap-1.5 text-[13px] text-ink2 mb-4">
-        <button type="button" onClick={() => navigate('/requests')} aria-label={s.title} title={s.title}
+        <button type="button" onClick={() => navigate(backTo)} aria-label={backLabel} title={backLabel}
           className="w-7 h-7 -ml-1.5 mr-1 inline-flex items-center justify-center rounded-lg text-icon hover:bg-selected hover:text-ink transition-colors">
           <ArrowLeft className="w-4 h-4" strokeWidth={1.75} />
         </button>
-        <Link to="/requests" className="hover:text-ink transition-colors">{s.title}</Link>
+        <Link to={backTo} className="hover:text-ink transition-colors">{backLabel}</Link>
         <ChevronRight className="w-3.5 h-3.5 text-icon" />
         <span className="text-ink font-medium">{req.request_number}</span>
       </nav>
@@ -330,7 +338,7 @@ export default function RequestDetailPage() {
                       <div className="flex-1 -mt-0.5">
                         <p className="text-sm text-ink">
                           <span className="font-medium">{a.actor_id ? names[a.actor_id] ?? '-' : '-'}</span>{' '}
-                          {s.act[a.action]}{a.meta?.step ? ` (${s.step} ${a.meta.step})` : ''}{a.meta?.po_number ? ` ${a.meta.po_number}` : ''}
+                          {s.act[a.action]}{stepNote(a.meta?.step)}{a.meta?.po_number ? ` ${a.meta.po_number}` : ''}
                         </p>
                         <p className="text-xs text-ink2">{format(new Date(a.created_at), 'dd.MM.yyyy HH:mm')}</p>
                         {a.note && <p className="text-sm text-ink mt-1 pl-3 border-l-2 border-line whitespace-pre-wrap">{a.note}</p>}
