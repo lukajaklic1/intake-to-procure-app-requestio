@@ -68,6 +68,7 @@ export default function POFormPage() {
   const navigate = useNavigate()
   // an order opened from an approved request is prefilled from it and only created when it is saved
   const fromRequestId = useSearchParams()[0].get('fromRequest')
+  const fromSourcingId = useSearchParams()[0].get('fromSourcing')   // an awarded sourcing event: supplier, items and prices come from it
   const { company } = useCompany()
   const { t, lang } = useLanguage()
   const s = t.po
@@ -136,6 +137,35 @@ export default function POFormPage() {
       setRequestAtts(at ?? [])
     })()
   }, [isNew, fromRequestId, refsLoaded, company])
+
+  // from an awarded sourcing event: the winner's supplier, the items and the prices of the offer
+  useEffect(() => {
+    if (!isNew || !fromSourcingId || !refsLoaded || !company || prefilled.current) return
+    prefilled.current = true
+    ;(async () => {
+      const { data: ev } = await supabase.from('sourcing_events').select('*').eq('id', fromSourcingId).single()
+      if (!ev || ev.status !== 'awarded' || !ev.awarded_invitation_id) { toast.error(t.common.notFound); navigate('/sourcing'); return }
+      const [{ data: inv }, { data: its }, { data: bid }] = await Promise.all([
+        supabase.from('sourcing_invitations').select('supplier_id').eq('id', ev.awarded_invitation_id).single(),
+        supabase.from('sourcing_items').select('*').eq('event_id', ev.id).order('position'),
+        supabase.from('sourcing_bids').select('id, delivery_days, payment_terms').eq('invitation_id', ev.awarded_invitation_id).eq('round', ev.current_round).maybeSingle(),
+      ])
+      const { data: bl } = bid ? await supabase.from('sourcing_bid_lines').select('item_id, unit_price').eq('bid_id', bid.id) : { data: [] as { item_id: string; unit_price: number | null }[] }
+      const sup = suppliers.find(x => x.id === inv?.supplier_id)
+      const usable = inv?.supplier_id ? usableContracts(inv.supplier_id) : []
+      const days = bid?.delivery_days
+      setHeader({
+        ...EMPTY_HEADER, supplier_id: inv?.supplier_id ?? '', location_id: ev.location_id ?? '', department_id: ev.department_id ?? '',
+        payment_terms: bid?.payment_terms ?? sup?.payment_terms ?? '', incoterm: sup?.incoterm ?? '',
+        expected_delivery_date: days != null ? new Date(Date.now() + days * 86400000).toISOString().slice(0, 10) : '',
+        notes: ev.event_number + ' - ' + ev.title, contract_id: usable.length === 1 ? usable[0].id : '',
+      })
+      setLines((its ?? []).filter(i => (bl ?? []).some(l => l.item_id === i.id && l.unit_price != null)).map((i, idx) => ({
+        item_id: i.item_id, category_id: i.category_id ?? '', position: (idx + 1) * 10, name: i.name, long_description: i.description ?? '',
+        quantity: String(i.quantity), unit: i.unit ?? '', unit_price: String((bl ?? []).find(l => l.item_id === i.id)?.unit_price ?? 0).replace('.', ','),
+      })))
+    })()
+  }, [isNew, fromSourcingId, refsLoaded, company])
 
   useEffect(() => {
     if (!header.contract_id) { setContractPrices(new Map()); return }
@@ -385,6 +415,7 @@ export default function POFormPage() {
         status: targetStatus,
         total_amount: grandTotal,
         ...header,
+        sourcing_event_id: fromSourcingId || null,
         contract_id: header.contract_id || null,
         department_id: header.department_id || null,
         incoterm: header.incoterm || null,

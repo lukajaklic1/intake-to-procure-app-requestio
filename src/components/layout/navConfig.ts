@@ -1,13 +1,13 @@
 import {
   LayoutDashboard, FileText, FileSignature, Building2, Package,
-  MapPin, Users, UserCog, Settings, Wallet, Boxes,
+  MapPin, Users, UserCog, Settings, Wallet, Boxes, FileSearch,
   ClipboardList, CheckCircle2, PackageCheck, ReceiptText,
 } from 'lucide-react'
 
-export type NavKey = 'dashboard' | 'myRequests' | 'approvals' | 'purchaseOrders' | 'receipts' | 'stock' | 'invoices'
+export type NavKey = 'dashboard' | 'myRequests' | 'approvals' | 'purchaseOrders' | 'receipts' | 'stock' | 'sourcing' | 'invoices'
   | 'suppliers' | 'contracts' | 'catalog' | 'locations' | 'departments' | 'budgets' | 'users' | 'settings'
 
-export type SectionKey = 'sectionWorkflow' | 'sectionCatalog' | 'sectionOrganization' | 'sectionAdmin'
+export type SectionKey = 'sectionWorkflow' | 'sectionCatalog' | 'sectionOrganization' | 'sectionSourcing' | 'sectionAdmin'
 
 export interface NavItem {
   to: string
@@ -15,7 +15,7 @@ export interface NavItem {
   key: NavKey
   adminOnly?: boolean
   /** shown to admins and to users who may view this module */
-  module?: 'budgets' | 'stock'
+  module?: 'budgets' | 'stock' | 'purchase_orders'
 }
 
 export const NAV_GROUPS: { section?: SectionKey; items: NavItem[] }[] = [
@@ -48,6 +48,11 @@ export const NAV_GROUPS: { section?: SectionKey; items: NavItem[] }[] = [
       { to: '/departments', icon: Users, key: 'departments' },
       { to: '/budgets', icon: Wallet, key: 'budgets', module: 'budgets' },
     ],
+  },
+  {
+    // sourcing is a separate area, not a step of every purchase
+    section: 'sectionSourcing',
+    items: [{ to: '/sourcing', icon: FileSearch, key: 'sourcing', module: 'purchase_orders' }],
   },
   {
     section: 'sectionAdmin',

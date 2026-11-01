@@ -14,15 +14,18 @@ export const USAGE = {
     { key: 'orders', table: 'purchase_orders', column: 'supplier_id' },
     { key: 'contracts', table: 'contracts', column: 'supplier_id' },
     { key: 'invoices', table: 'invoices', column: 'supplier_id' },
+    { key: 'sourcing', table: 'sourcing_invitations', column: 'supplier_id' },
   ],
   location: [
     { key: 'requests', table: 'requests', column: 'location_id' },
     { key: 'orders', table: 'purchase_orders', column: 'location_id' },
     { key: 'stock', table: 'stock_movements', column: 'location_id' },
+    { key: 'sourcing', table: 'sourcing_events', column: 'location_id' },
   ],
   department: [
     { key: 'requests', table: 'requests', column: 'department_id' },
     { key: 'orders', table: 'purchase_orders', column: 'department_id' },
+    { key: 'sourcing', table: 'sourcing_events', column: 'department_id' },
     { key: 'users', table: 'users', column: 'department_id' },
     { key: 'invitations', table: 'user_invitations', column: 'department_id' },
   ],
@@ -31,6 +34,7 @@ export const USAGE = {
     { key: 'poLines', table: 'po_line_items', column: 'item_id', parent: 'purchase_orders' },
     { key: 'contractItems', table: 'contract_items', column: 'item_id', parent: 'contracts' },
     { key: 'stock', table: 'stock_movements', column: 'item_id' },
+    { key: 'sourcing', table: 'sourcing_items', column: 'item_id' },
   ],
   category: [
     { key: 'subcategories', table: 'categories', column: 'parent_id' },

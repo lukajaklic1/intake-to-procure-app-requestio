@@ -21,6 +21,8 @@ interface Line {
   received: number
   receiveNow: string
   rejectNow: string
+  /** the line is already fully received: it stays locked until the user adds a surplus on purpose */
+  unlocked?: boolean
 }
 
 const parseNum = (v: string) => parseFloat(v.replace(',', '.')) || 0
@@ -70,6 +72,7 @@ export default function ReceiveFormPage() {
   }
 
   const remaining = (l: Line) => Math.max(0, l.ordered - l.received)
+  const isLocked = (l: Line) => l.received >= l.ordered && !l.unlocked
   const afterOf = (l: Line) => l.ordered - l.received - parseNum(l.receiveNow)   // negative = more than ordered
   function setField(idx: number, key: 'receiveNow' | 'rejectNow', v: string) {
     if (!NUM.test(v)) return
@@ -77,6 +80,7 @@ export default function ReceiveFormPage() {
     if (key === 'rejectNow') req.clear('note')
     setLines(ls => ls.map((l, i) => i === idx ? { ...l, [key]: v } : l))
   }
+  function unlock(idx: number) { setLines(ls => ls.map((l, i) => i === idx ? { ...l, unlocked: true } : l)) }
   function receiveAll() {
     setTableError('')
     setLines(ls => ls.map(l => { const rem = remaining(l); return { ...l, receiveNow: rem > 0 ? String(rem).replace('.', ',') : '' } }))
@@ -148,8 +152,9 @@ export default function ReceiveFormPage() {
                 {lines.map((l, idx) => {
                   const after = afterOf(l)
                   const rejNow = parseNum(l.rejectNow)
+                  const locked = isLocked(l)
                   return (
-                    <tr key={l.po_line_id}>
+                    <tr key={l.po_line_id} className={locked ? 'bg-surface/60' : undefined}>
                       <td className="px-4 py-2 text-ink">
                         <span className="font-medium">{l.name}</span>
                         <span className="text-ink2"> · {unitLabel(l.unit, lang) || l.unit}</span>
@@ -157,15 +162,17 @@ export default function ReceiveFormPage() {
                       <td className="px-4 py-2 text-right text-ink2 tabular-nums">{l.ordered}</td>
                       <td className="px-4 py-2 text-right text-ink2 tabular-nums">{l.received}</td>
                       <td className="px-3 py-1.5 w-32">
-                        <input value={l.receiveNow} onChange={e => setField(idx, 'receiveNow', e.target.value)} inputMode="decimal" placeholder="0" aria-label={s.acceptedNow}
-                          className="w-full text-right rounded-lg border border-field hover:border-field-hover px-2.5 h-8 text-sm tabular-nums focus:outline-none focus:border-field-focus" />
+                        <input value={l.receiveNow} onChange={e => setField(idx, 'receiveNow', e.target.value)} inputMode="decimal" placeholder="0" aria-label={s.acceptedNow} disabled={locked}
+                          className="w-full text-right rounded-lg border border-field hover:border-field-hover px-2.5 h-8 text-sm tabular-nums focus:outline-none focus:border-field-focus disabled:bg-surface disabled:text-ink2 disabled:cursor-not-allowed" />
                       </td>
                       <td className="px-3 py-1.5 w-32">
-                        <input value={l.rejectNow} onChange={e => setField(idx, 'rejectNow', e.target.value)} inputMode="decimal" placeholder="0" aria-label={s.rejectNow}
-                          className={`w-full text-right rounded-lg border px-2.5 h-8 text-sm tabular-nums focus:outline-none ${rejNow > 0 ? 'border-danger text-danger' : 'border-field hover:border-field-hover focus:border-field-focus'}`} />
+                        <input value={l.rejectNow} onChange={e => setField(idx, 'rejectNow', e.target.value)} inputMode="decimal" placeholder="0" aria-label={s.rejectNow} disabled={locked}
+                          className={`w-full text-right rounded-lg border px-2.5 h-8 text-sm tabular-nums focus:outline-none disabled:bg-surface disabled:text-ink2 disabled:cursor-not-allowed ${rejNow > 0 ? 'border-danger text-danger' : 'border-field hover:border-field-hover focus:border-field-focus'}`} />
                       </td>
                       <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
-                        {after < 0
+                        {locked
+                          ? <span className="inline-flex items-center gap-2 justify-end"><span className="inline-flex items-center gap-1 text-success"><Check className="w-3.5 h-3.5" strokeWidth={2} />{s.lineComplete}</span><button type="button" onClick={() => unlock(idx)} className="text-[12px] text-ink2 hover:text-ink underline underline-offset-2">{s.allowExtra}</button></span>
+                          : after < 0
                           ? <span className="badge badge-warn">{s.overBy.replace('{n}', String(Math.round(-after * 1000) / 1000))}</span>
                           : after === 0
                           ? <span className="inline-flex items-center gap-1 text-success"><Check className="w-3.5 h-3.5" strokeWidth={2} />0</span>

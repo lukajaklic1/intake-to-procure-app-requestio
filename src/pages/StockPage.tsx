@@ -57,7 +57,7 @@ export default function StockPage() {
     ])
     setItems((it.data as StockItem[]) ?? [])
     setLocations((lo.data as StockLocation[]) ?? [])
-    setRows(((ov.data ?? []) as StockRow[]).map(r => ({ ...r, on_hand: Number(r.on_hand), on_order: Number(r.on_order), min_qty: r.min_qty != null ? Number(r.min_qty) : null, target_qty: r.target_qty != null ? Number(r.target_qty) : null })))
+    setRows(((ov.data ?? []) as StockRow[]).map(r => ({ ...r, on_hand: Number(r.on_hand), on_order: Number(r.on_order), min_qty: r.min_qty != null ? Number(r.min_qty) : null, moq: r.moq != null ? Number(r.moq) : null })))
     setLoading(false)
   }
   useEffect(() => { if (company && canView) load() }, [company, canView])
@@ -65,13 +65,20 @@ export default function StockPage() {
   const views: View[] = useMemo(() => {
     const itemById = new Map(items.map(i => [i.id, i]))
     const locById = new Map(locations.map(l => [l.id, l]))
-    return rows.flatMap(r => {
+    const base: View[] = rows.flatMap(r => {
       const item = itemById.get(r.item_id); const loc = locById.get(r.location_id)
       return item && loc ? [{ key: `${r.item_id}:${r.location_id}`, item, loc, row: r, state: stockState(r) }] : []
     })
+    // a tracked item that is not in stock anywhere yet still shows up, once, so it does not seem to be missing
+    const withRows = new Set(rows.map(r => r.item_id))
+    const missing: View[] = items.filter(i => !withRows.has(i.id)).map(item => ({
+      key: `${item.id}:-`, item, loc: { id: '', name: '-' },
+      row: { item_id: item.id, location_id: '', on_hand: 0, min_qty: null, moq: null, on_order: 0 }, state: 'missing' as StockState,
+    }))
+    return [...base, ...missing]
   }, [rows, items, locations])
 
-  const rank: Record<StockState, number> = { low: 0, ordered: 1, ok: 2, none: 3 }
+  const rank: Record<StockState, number> = { low: 0, ordered: 1, ok: 2, none: 3, missing: 4 }
   const sortDefs: SortDef<View>[] = [
     { value: 'low', label: `${s.state}: ${s.st.low}`, cmp: (a, b) => rank[a.state] - rank[b.state] || a.item.name.localeCompare(b.item.name) },
     { value: 'nameAsc', label: t.sort.nameAsc, cmp: text(v => v.item.name) },
@@ -158,16 +165,22 @@ export default function StockPage() {
                     <td className="px-4 py-3 text-ink2 whitespace-nowrap">{v.item.item_number}</td>
                     <td className="px-4 py-3 font-medium text-ink max-w-[320px] truncate" title={v.item.name}>{v.item.name}</td>
                     <td className="px-4 py-3 text-ink2 whitespace-nowrap">{v.loc.name}</td>
-                    <td className={`px-4 py-3 text-right whitespace-nowrap tabular-nums ${v.row.on_hand < 0 || v.state === 'low' ? 'text-danger font-medium' : 'text-ink'}`}>{fmtQty(v.row.on_hand)} <span className="text-ink2 font-normal">{unit}</span></td>
+                    <td className={`px-4 py-3 text-right whitespace-nowrap tabular-nums ${v.row.on_hand < 0 || v.state === 'low' ? 'text-danger font-medium' : 'text-ink'}`}>{v.state === 'missing' ? <span className="text-ink2">-</span> : <>{fmtQty(v.row.on_hand)} <span className="text-ink2 font-normal">{unit}</span></>}</td>
                     <td className="px-4 py-3 text-right text-ink2 whitespace-nowrap tabular-nums">{min > 0 ? fmtQty(min) : '-'}</td>
                     <td className="px-4 py-3 text-right text-ink2 whitespace-nowrap tabular-nums">{v.row.on_order > 0 ? fmtQty(v.row.on_order) : '-'}</td>
                     <td className="px-4 py-3"><span className={`badge ${STATE_BADGE[v.state]}`}>{s.st[v.state]}</span></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
+                        {v.state === 'missing' && canEdit && (
+                          <button onClick={() => setDialog({ kind: 'add', itemId: v.item.id })} className="inline-flex items-center gap-1 badge badge-warn hover:brightness-95 transition-all whitespace-nowrap"><Plus className="w-3 h-3" />{s.addToLocation}</button>
+                        )}
+                        {v.state !== 'missing' && canEdit && (
+                          <button onClick={() => open('usage', v)} className="inline-flex items-center gap-1 badge badge-neutral hover:brightness-95 transition-all whitespace-nowrap"><ArrowDownToLine className="w-3 h-3" />{s.usageShort}</button>
+                        )}
                         {v.state === 'low' && (
                           <button onClick={() => reorder(v)} className="inline-flex items-center gap-1 badge badge-warn hover:brightness-95 transition-all whitespace-nowrap"><ShoppingCart className="w-3 h-3" />{s.order}</button>
                         )}
-                        <RowMenu items={[
+                        {v.state !== 'missing' && <RowMenu items={[
                           ...(canEdit ? [
                             { label: s.usage, icon: ArrowDownToLine, onClick: () => open('usage', v) },
                             { label: s.count, icon: ClipboardCheck, onClick: () => open('count', v) },
@@ -175,7 +188,7 @@ export default function StockPage() {
                           ] : []),
                           { label: s.history, icon: History, onClick: () => open('history', v) },
                           ...(v.state !== 'low' ? [{ label: s.order, icon: ShoppingCart, onClick: () => reorder(v) }] : []),
-                        ]} />
+                        ]} />}
                       </div>
                     </td>
                   </tr>
@@ -189,7 +202,7 @@ export default function StockPage() {
 
       <MovementModal {...common} open={dialog?.kind === 'usage'} onClose={() => setDialog(null)} preset={preset} />
       <CountModal {...common} open={dialog?.kind === 'count'} onClose={() => setDialog(null)} preset={preset} />
-      <LimitsModal {...common} open={dialog?.kind === 'limits' || dialog?.kind === 'add'} onClose={() => setDialog(null)} preset={dialog?.kind === 'limits' ? preset : undefined} />
+      <LimitsModal {...common} open={dialog?.kind === 'limits' || dialog?.kind === 'add'} onClose={() => setDialog(null)} preset={dialog?.kind === 'limits' || (dialog?.kind === 'add' && dialog.itemId) ? preset : undefined} />
       <HistoryModal open={dialog?.kind === 'history'} onClose={() => setDialog(null)} item={dialogView?.item} location={dialogView?.loc} />
     </div>
   )

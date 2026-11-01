@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronRight, Pencil, XCircle, Check, X, FileText, ShoppingCart, Send, Trash2, Package, Tag, Hash, Ruler, Coins, Eye } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Pencil, XCircle, Check, X, FileText, ShoppingCart, Send, Trash2, Package, Tag, Hash, Ruler, Coins, Eye, FileSearch } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { refreshCounts } from '../lib/refreshCounts'
 import { useCompany } from '../hooks/useCompany'
@@ -244,6 +244,9 @@ export default function RequestDetailPage() {
           <p className="mt-2 text-sm text-ink2">{req.title ? `${req.request_number} · ` : ''}{format(new Date(req.created_at), 'dd.MM.yyyy')}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {st === 'approved' && !req.po_id && (hasPerm('purchase_orders', 'create') || isAdmin) && (
+            <Button variant="secondary" onClick={() => navigate(`/sourcing/new?fromRequest=${id}`)} className="gap-2"><FileSearch className="w-4 h-4" />{t.sourcing.newFromRequest}</Button>
+          )}
           {st === 'approved' && !req.po_id && (hasPerm('purchase_orders', 'create') || isAdmin) && (
             <Button onClick={doCreatePo} className="gap-2"><ShoppingCart className="w-4 h-4" />{s.createPO}</Button>
           )}

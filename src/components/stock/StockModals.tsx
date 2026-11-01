@@ -61,6 +61,7 @@ export function MovementModal({ open, onClose, items, locations, rows, onSaved, 
   const have = Number(rowOf(rows, itemId, locationId)?.on_hand ?? 0)
   const after = have - toNum(qty)
   const unit = item ? unitLabel(item.default_unit, lang) : ''
+  const itemRows = rows.filter(r => r.item_id === itemId && locations.some(l => l.id === r.location_id))
 
   async function save() {
     if (!itemId) { req.setError('item', t.common.fieldRequired, 'mv-item'); return }
@@ -77,8 +78,29 @@ export function MovementModal({ open, onClose, items, locations, rows, onSaved, 
     <Modal open={open} onClose={onClose} title={s.usageTitle} size="sm" icon={ArrowDownToLine}>
       <div className="flex flex-col gap-4">
         <Select id="mv-type" label={s.type} value={type} options={[{ value: 'usage', label: s.mt.usage }, { value: 'waste', label: s.mt.waste }]} onChange={v => setType(v as 'usage' | 'waste')} />
-        <Select id="mv-item" label={s.item} required value={itemId} placeholder={s.selectItem} disabled={!!preset?.itemId} error={req.errors.item}
+        <Select id="mv-item" label={s.item} required searchable value={itemId} placeholder={s.selectItem} disabled={!!preset?.itemId} error={req.errors.item}
           options={items.map(i => ({ value: i.id, label: `${i.name} (${i.item_number})` }))} onChange={v => { req.clear('item'); setItemId(v) }} />
+        {itemId && locations.length > 1 && (
+          <div>
+            <p className="text-[13px] font-medium text-ink2 mb-1.5">{s.stockByLocation}</p>
+            {itemRows.length === 0 ? (
+              <p className="text-[13px] text-ink2">{s.notInStockAnywhere}</p>
+            ) : (
+              <div className="rounded-lg border border-field divide-y divide-field overflow-hidden">
+                {itemRows.map(r => {
+                  const picked = r.location_id === locationId
+                  return (
+                    <button key={r.location_id} type="button" disabled={!!preset?.locationId} onClick={() => { req.clear('location'); setLocationId(r.location_id) }}
+                      className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-sm text-left transition-colors ${picked ? 'bg-selected' : 'hover:bg-surface'} disabled:cursor-default`}>
+                      <span className="text-ink truncate">{locations.find(l => l.id === r.location_id)?.name}</span>
+                      <span className={`tabular-nums whitespace-nowrap ${Number(r.on_hand) < 0 ? 'text-danger font-medium' : 'text-ink'}`}>{fmtQty(Number(r.on_hand))} <span className="text-ink2">{unit}</span></span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
         {locations.length > 1 && (
           <Select id="mv-location" label={s.location} required value={locationId} placeholder={t.common.select} disabled={!!preset?.locationId} error={req.errors.location}
             options={locations.map(l => ({ value: l.id, label: l.name }))} onChange={v => { req.clear('location'); setLocationId(v) }} />
@@ -149,7 +171,7 @@ export function CountModal({ open, onClose, items, locations, rows, onSaved, pre
   )
 }
 
-/** Minimum (safety) stock and the "order up to" quantity of an item at a location. With no preset it adds a new item to the stock. */
+/** Minimum stock and minimum order quantity (MOQ) of an item at a location. With no preset it adds a new item to the stock. */
 export function LimitsModal({ open, onClose, items, locations, rows, onSaved, preset }: Common & { preset?: Preset }) {
   const { t, lang } = useLanguage()
   const s = t.stock
@@ -157,16 +179,17 @@ export function LimitsModal({ open, onClose, items, locations, rows, onSaved, pr
   const req = useRequired(t.common.fieldRequired)
   const { itemId, setItemId, locationId, setLocationId } = useDefaults(open, locations, preset)
   const [min, setMin] = useState('')
-  const [target, setTarget] = useState('')
+  const [moq, setMoq] = useState('')
   const [saving, setSaving] = useState(false)
-  const adding = !preset?.itemId
+  // adding = the item and the location are not both known yet (the item may be known when it comes from a "not in stock" row)
+  const adding = !(preset?.itemId && preset?.locationId)
 
   useEffect(() => {
     if (!open) return
     req.reset()
     const r = preset?.itemId && preset?.locationId ? rowOf(rows, preset.itemId, preset.locationId) : undefined
     setMin(r?.min_qty ? String(r.min_qty).replace('.', ',') : '')
-    setTarget(r?.target_qty ? String(r.target_qty).replace('.', ',') : '')
+    setMoq(r?.moq ? String(r.moq).replace('.', ',') : '')
   }, [open, preset?.itemId, preset?.locationId])
 
   const item = items.find(i => i.id === itemId)
@@ -179,7 +202,7 @@ export function LimitsModal({ open, onClose, items, locations, rows, onSaved, pr
     if (adding && rowOf(rows, itemId, locationId)) { req.setError('item', s.alreadyThere, 'lm-item'); return }
     setSaving(true)
     const { error } = await supabase.from('stock_limits').upsert(
-      { company_id: company.id, item_id: itemId, location_id: locationId, min_qty: toNum(min), target_qty: target.trim() === '' ? null : toNum(target) },
+      { company_id: company.id, item_id: itemId, location_id: locationId, min_qty: toNum(min), moq: moq.trim() === '' ? null : toNum(moq) },
       { onConflict: 'item_id,location_id' })
     setSaving(false)
     if (error) { toast.error(error.message); return }
@@ -192,10 +215,10 @@ export function LimitsModal({ open, onClose, items, locations, rows, onSaved, pr
         {adding && (items.length === 0
           ? <p className="text-sm text-ink2">{s.noTracked}</p>
           : <p className="text-[13px] text-ink2 -mt-1">{s.addHint}</p>)}
-        <Select id="lm-item" label={s.item} required value={itemId} placeholder={s.selectItem} disabled={!adding} error={req.errors.item}
+        <Select id="lm-item" label={s.item} required searchable value={itemId} placeholder={s.selectItem} disabled={!!preset?.itemId} error={req.errors.item}
           options={items.map(i => ({ value: i.id, label: `${i.name} (${i.item_number})` }))} onChange={v => { req.clear('item'); setItemId(v) }} />
         {locations.length > 1 && (
-          <Select id="lm-location" label={s.location} required value={locationId} placeholder={t.common.select} disabled={!adding} error={req.errors.location}
+          <Select id="lm-location" label={s.location} required value={locationId} placeholder={t.common.select} disabled={!!preset?.locationId} error={req.errors.location}
             options={locations.map(l => ({ value: l.id, label: l.name }))} onChange={v => { req.clear('location'); setLocationId(v) }} />
         )}
         <div>
@@ -204,9 +227,9 @@ export function LimitsModal({ open, onClose, items, locations, rows, onSaved, pr
           <p className="text-[13px] text-ink2 mt-1.5">{s.minimumHint}</p>
         </div>
         <div>
-          <Input id="lm-target" label={`${s.orderUpTo}${unit ? ` (${unit})` : ''}`} inputMode="decimal" placeholder="0" value={target}
-            onChange={e => { if (NUM.test(e.target.value)) setTarget(e.target.value) }} />
-          <p className="text-[13px] text-ink2 mt-1.5">{s.orderUpToHint}</p>
+          <Input id="lm-moq" label={`${s.moq}${unit ? ` (${unit})` : ''}`} inputMode="decimal" placeholder="0" value={moq}
+            onChange={e => { if (NUM.test(e.target.value)) setMoq(e.target.value) }} />
+          <p className="text-[13px] text-ink2 mt-1.5">{s.moqHint}</p>
         </div>
       </div>
       <ModalActions className="justify-end">

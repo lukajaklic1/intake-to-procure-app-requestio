@@ -31,6 +31,9 @@ import RequestDetailPage from './pages/RequestDetailPage'
 import ApprovalsPage from './pages/ApprovalsPage'
 import ReceiptsPage from './pages/ReceiptsPage'
 import StockPage from './pages/StockPage'
+import SourcingPage from './pages/SourcingPage'
+import SourcingFormPage from './pages/SourcingFormPage'
+import SourcingDetailPage from './pages/SourcingDetailPage'
 import ReceiveFormPage from './pages/ReceiveFormPage'
 import ReceiptDetailPage from './pages/ReceiptDetailPage'
 import PrivacyPage from './pages/PrivacyPage'
@@ -89,6 +92,10 @@ export default function Root() {
             <Route path="/approvals"              element={<App><ApprovalsPage /></App>} />
             <Route path="/receipts"               element={<App><ReceiptsPage /></App>} />
             <Route path="/stock"                  element={<App><StockPage /></App>} />
+            <Route path="/sourcing"               element={<App><SourcingPage /></App>} />
+            <Route path="/sourcing/new"           element={<App><SourcingFormPage /></App>} />
+            <Route path="/sourcing/:id"           element={<App><SourcingDetailPage /></App>} />
+            <Route path="/sourcing/:id/edit"      element={<App><SourcingFormPage /></App>} />
             <Route path="/receipts/:id"           element={<App><ReceiptDetailPage /></App>} />
             <Route path="/receive/:poId"          element={<App><ReceiveFormPage /></App>} />
             <Route path="/users"                  element={<App><UsersPage /></App>} />

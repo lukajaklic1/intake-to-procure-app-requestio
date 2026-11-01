@@ -18,6 +18,8 @@ interface SelectProps {
   error?: string
   disabled?: boolean
   className?: string
+  /** always show the search box (otherwise only for long lists); for lists that grow, like items */
+  searchable?: boolean
 }
 
 const ROW = 36
@@ -25,7 +27,7 @@ const ROW = 36
 /** Form dropdown that replaces the browser's native <select>: same look as the text fields, a rounded menu
  *  with a grey hover row and a check on the chosen one, and a search box for long lists. An option with `badge`
  *  is shown as that badge (used for statuses). The menu is portalled, so popups and cards can't clip it. */
-export default function Select({ id, label, required, value, onChange, options, placeholder, error, disabled, className }: SelectProps) {
+export default function Select({ id, label, required, value, onChange, options, placeholder, error, disabled, className, searchable: forceSearch }: SelectProps) {
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -35,7 +37,7 @@ export default function Select({ id, label, required, value, onChange, options, 
   const listRef = useRef<HTMLDivElement>(null)
 
   const selected = options.find(o => o.value === value)
-  const searchable = options.length > 8
+  const searchable = forceSearch || options.length > 8
   const shown = useMemo(() => (query ? options.filter(o => matchesSearch(query, [o.label])) : options), [options, query])
 
   function close() { setOpen(false); setQuery('') }
