@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, ReceiptText, Building2, FileText, CalendarClock, Coins, Scale, CircleDot } from 'lucide-react'
+import { Plus, Search, ReceiptText, Building2, FileText, CalendarClock, Coins, Scale, CircleDot, Eye, Pencil, FileCheck } from 'lucide-react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
@@ -14,6 +14,7 @@ import TableEmptyState from '../components/ui/TableEmptyState'
 import { INVOICE_BADGE, MATCH_BADGE, dueState, type InvoiceStatus } from '../lib/invoices'
 import { daysUntil } from '../lib/contracts'
 import GridHead from '../components/ui/GridHead'
+import RowMenu from '../components/ui/RowMenu'
 import { matchesSearch } from '../lib/search'
 import SortFilter from '../components/ui/SortFilter'
 import { applySort, text, num, date, dateLast, rev, docNumber, type SortDef } from '../lib/sort'
@@ -26,7 +27,7 @@ interface Row {
   suppliers: { name: string } | null; purchase_orders: { po_number: string } | null
 }
 
-const fmtDate = (d: string | null) => (d ? format(new Date(d + 'T00:00:00'), 'dd.MM.yyyy') : '—')
+const fmtDate = (d: string | null) => (d ? format(new Date(d + 'T00:00:00'), 'dd.MM.yyyy') : '-')
 
 export default function InvoicesPage() {
   const { company, isAdmin, hasPerm } = useCompany()
@@ -93,8 +94,9 @@ export default function InvoicesPage() {
   useEffect(() => { setPage(1) }, [search, statusFilter, supplierFilter, matchFilter, dueFilter])
   const sortedRows = applySort(filtered, sortDefs, sort)
   const exportCols: ExportColumn<Row>[] = [
-    { header: s.invoiceNo, get: r => r.supplier_invoice_number, kind: 'text', width: 18 },
-    { header: "Št.", get: r => r.invoice_number, kind: 'text', width: 12 },
+    { header: s.invoiceNo, get: r => r.invoice_number, kind: 'text', width: 14 },
+    { header: s.supplierInvoiceNo, get: r => r.supplier_invoice_number, kind: 'text', width: 20 },
+    
     { header: s.supplier, get: r => r.suppliers?.name, kind: 'text', width: 32 },
     { header: s.po, get: r => r.purchase_orders?.po_number, kind: 'text', width: 14 },
     { header: s.invoiceDate, get: r => r.invoice_date, kind: 'date', width: 14 },
@@ -141,32 +143,38 @@ export default function InvoicesPage() {
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[980px]">
-            <GridHead cols={[[s.invoiceNo, ReceiptText], [s.supplier, Building2], [s.po, FileText], [s.invoiceDate, CalendarClock], [s.dueDate, CalendarClock], [s.amount, Coins, 'right'], [s.match, Scale], [s.status, CircleDot]]} />
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1180px]">
+            <GridHead cols={[[s.invoiceNo, ReceiptText], [s.supplierInvoiceNo, FileCheck], [s.supplier, Building2], [s.po, FileText], [s.invoiceDate, CalendarClock], [s.dueDate, CalendarClock], [s.amount, Coins, 'right'], [s.match, Scale], [s.status, CircleDot], ['']]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={ReceiptText} colSpan={8}
+                <TableEmptyState icon={ReceiptText} colSpan={10}
                   title={filtering ? t.common.empty.noResults.title : t.common.empty.invoices.title}
                   subtitle={filtering ? t.common.empty.noResults.text : t.common.empty.invoices.text} />
               ) : paged.map(r => {
                 const ds = dueState(r)
+                const dLeft = daysUntil(r.due_date)
+                const dueTitle = ds === 'overdue' ? s.overdueBy.replace('{n}', String(Math.abs(dLeft ?? 0))) : ds === 'soon' ? (dLeft === 0 ? s.dueToday : s.dueInDays.replace('{n}', String(dLeft))) : undefined
+                const editable = (r.status === 'draft' || r.status === 'rejected') && canCreate
                 return (
                   <tr key={r.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/invoices/${r.id}`)}>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-ink">{r.supplier_invoice_number}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{r.invoice_number}</p>
-                    </td>
-                    <td className="px-4 py-3 text-ink2 max-w-[220px] truncate">{r.suppliers?.name ?? '—'}</td>
-                    <td className="px-4 py-3 text-ink2">{r.purchase_orders?.po_number ?? '—'}</td>
-                    <td className="px-4 py-3 text-ink2 whitespace-nowrap">{fmtDate(r.invoice_date)}</td>
+                    <td className="px-4 py-3 text-ink2 whitespace-nowrap">{r.invoice_number}</td>
+                    <td className="px-4 py-3 font-medium text-ink whitespace-nowrap">{r.supplier_invoice_number}</td>
+                    <td className="px-4 py-3 text-ink2 max-w-[240px] truncate" title={r.suppliers?.name}>{r.suppliers?.name ?? '-'}</td>
+                    <td className="px-4 py-3 text-ink2 whitespace-nowrap">{r.purchase_orders?.po_number ?? '-'}</td>
+                    <td className="px-4 py-3 text-ink whitespace-nowrap">{fmtDate(r.invoice_date)}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <p className="text-sm text-ink2">{fmtDate(r.due_date)}</p>
-                      {ds === 'overdue' && <p className="text-xs text-danger mt-0.5">{s.overdue}</p>}
-                      {ds === 'soon' && <p className="text-xs text-warn mt-0.5">{s.dueSoon}</p>}
+                      <span className={ds === 'overdue' ? 'text-danger font-medium' : ds === 'soon' ? 'text-warn font-medium' : 'text-ink'} title={dueTitle}>{fmtDate(r.due_date)}</span>
                     </td>
-                    <td className="px-4 py-3 text-right text-ink whitespace-nowrap">{money(Number(r.total_amount))}</td>
+                    <td className="px-4 py-3 text-right text-ink whitespace-nowrap tabular-nums">{money(Number(r.total_amount))}</td>
                     <td className="px-4 py-3"><span className={`badge ${MATCH_BADGE[r.match_status] ?? 'badge-neutral'}`}>{s.matchSt[r.match_status as keyof typeof s.matchSt] ?? r.match_status}</span></td>
                     <td className="px-4 py-3"><span className={`badge ${INVOICE_BADGE[r.status]}`}>{s.st[r.status]}</span></td>
+                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                      <div className="flex justify-end">
+                        <RowMenu items={editable
+                          ? [{ label: t.common.editEntity, icon: Pencil, onClick: () => navigate(`/invoices/${r.id}/edit`) }]
+                          : [{ label: t.common.view, icon: Eye, onClick: () => navigate(`/invoices/${r.id}`) }]} />
+                      </div>
+                    </td>
                   </tr>
                 )
               })}

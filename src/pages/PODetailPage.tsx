@@ -14,6 +14,7 @@ import { localizeCountry } from '../lib/countries'
 import GridHead from '../components/ui/GridHead'
 import BudgetStatus from '../components/budget/BudgetStatus'
 import { unitLabel } from '../lib/units'
+import { INVOICE_BADGE, type InvoiceStatus } from '../lib/invoices'
 
 interface LineItem {
   id: string; position: number; name: string; long_description: string | null
@@ -85,6 +86,7 @@ export default function PODetailPage() {
   const [activity, setActivity] = useState<PoActivityLog[]>([])
   const [actNames, setActNames] = useState<Record<string, string>>({})
   const [receipts, setReceipts] = useState<{ id: string; receipt_number: string; received_date: string }[]>([])
+  const [invoices, setInvoices] = useState<{ id: string; supplier_invoice_number: string; total_amount: number; status: InvoiceStatus }[]>([])
 
   async function openAttachment(path: string) {
     const { data } = await supabase.storage.from('quotations').createSignedUrl(path, 3600)
@@ -115,6 +117,10 @@ export default function PODetailPage() {
 
     const { data: recs } = await supabase.from('receipts').select('id, receipt_number, received_date').eq('po_id', id!).order('received_date', { ascending: false })
     setReceipts(recs ?? [])
+
+    // invoices entered against this order (empty for people who may not see invoices)
+    const { data: invs } = await supabase.from('invoices').select('id, supplier_invoice_number, total_amount, status').eq('po_id', id!).order('invoice_date', { ascending: false })
+    setInvoices((invs as typeof invoices) ?? [])
 
     const { data: acts } = await supabase.from('po_activity_log').select('*').eq('po_id', id!).order('created_at', { ascending: true })
     const aList = (acts as PoActivityLog[]) ?? []
@@ -287,6 +293,24 @@ export default function PODetailPage() {
                       <span className="text-sm font-medium text-ink flex-1 truncate">{att.file_name}</span>
                       <Eye className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
                     </button>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {invoices.length > 0 && (
+            <Card title={t.invoices.title}>
+              <ul className="divide-y divide-field">
+                {invoices.map(i => (
+                  <li key={i.id}>
+                    <Link to={`/invoices/${i.id}`} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm hover:bg-surface transition-colors">
+                      <span className="inline-flex items-center gap-2 font-medium text-ink min-w-0"><FileText className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} /><span className="truncate">{i.supplier_invoice_number}</span></span>
+                      <span className="inline-flex items-center gap-2.5 shrink-0">
+                        <span className="text-xs text-ink2 tabular-nums">{fmt(Number(i.total_amount))}</span>
+                        <span className={`badge ${INVOICE_BADGE[i.status]}`}>{t.invoices.st[i.status]}</span>
+                      </span>
+                    </Link>
                   </li>
                 ))}
               </ul>

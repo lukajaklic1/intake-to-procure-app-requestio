@@ -96,6 +96,15 @@ export default function RequestFormPage() {
     // Only one delivery location? Pre-select it for new requests.
     if (!id && l.data?.length === 1) setHeader(h => ({ ...h, location_id: h.location_id || l.data![0].id }))
     setDepartments(d.data ?? []); setItems((itm.data as Item[]) ?? [])
+    // opened from the stock page ("Order"): the item, the location and the suggested quantity are already filled in
+    const sp = new URLSearchParams(window.location.search)
+    const stockItem = !id ? ((itm.data as Item[]) ?? []).find(x => x.id === sp.get('stockItem')) : undefined
+    if (stockItem) {
+      setHeader(h => ({ ...h, location_id: sp.get('location') || h.location_id, title: h.title || t.stock.replenishTitle.replace('{name}', stockItem.name) }))
+      setLines([{ ...newLine(10), item_id: stockItem.id, category_id: stockItem.category_id ?? '', main_id: mainCategoryId(stockItem.category_id, c.data ?? []), name: stockItem.name, long_description: stockItem.long_description ?? '',
+        quantity: sp.get('qty') ?? '1', unit: stockItem.default_unit ? unitLabel(stockItem.default_unit, lang) : 'kos',
+        est_unit_price: stockItem.default_unit_price != null ? String(stockItem.default_unit_price).replace('.', ',') : '0' }])
+    }
     const { data: us } = await supabase.from('users').select('id, first_name, last_name').eq('company_id', cid)
     setMembers(us ?? [])
   }

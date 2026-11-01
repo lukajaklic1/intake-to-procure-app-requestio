@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { PackageCheck, Eye, Search, X, FileText, Building2, Coins, CircleDot, CalendarClock, User } from 'lucide-react'
+import { PackageCheck, Eye, Search, X, FileText, Building2, Coins, CircleDot, CalendarClock, User, MapPin } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
-import Button from '../components/ui/Button'
 import Pagination from '../components/ui/Pagination'
 import PageToolbar from '../components/layout/PageToolbar'
 import { useHeaderTabs } from '../components/layout/HeaderCounts'
 import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
-import { format, subMonths, startOfMonth } from 'date-fns'
+import { format, subMonths, startOfMonth, differenceInCalendarDays } from 'date-fns'
 import PersonCell from '../components/ui/PersonCell'
 import GridHead from '../components/ui/GridHead'
 import RowMenu from '../components/ui/RowMenu'
@@ -31,7 +30,9 @@ interface QueueRow {
   po_number: string
   total_amount: number
   received_status: 'none' | 'partial' | 'full'
+  expected_delivery_date: string | null
   suppliers: { name: string } | null
+  locations: { name: string } | null
 }
 
 interface ReceiptRow {
@@ -47,6 +48,9 @@ interface ReceiptRow {
 function fmt(n: number, currency = 'EUR') {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(n)
 }
+
+/** How many days a delivery is late (0 when it is on time or has no date). */
+const daysLate = (due: string | null) => (due ? Math.max(0, differenceInCalendarDays(new Date(), new Date(due + 'T00:00:00'))) : 0)
 
 function getDateFrom(range: string): string | null {
   if (range === 'all') return null
@@ -67,7 +71,7 @@ export default function ReceiptsPage() {
 
   const [search, setSearch] = useState('')
   const [sortH, setSortH] = useState('receivedDesc')
-  const [sortQ, setSortQ] = useState('numberDesc')
+  const [sortQ, setSortQ] = useState('dueAsc')
   useEffect(() => { setHistPage(1) }, [sortH])
   useEffect(() => { setQueuePage(1) }, [sortQ])
   const [dateRange, setDateRange] = useState('all')
@@ -83,7 +87,7 @@ export default function ReceiptsPage() {
     // spinner only on the first load: later reloads refresh the data in place
     const [{ data: q }, { data: r }] = await Promise.all([
       supabase.from('purchase_orders')
-        .select('id, po_number, total_amount, received_status, suppliers(name)')
+        .select('id, po_number, total_amount, received_status, expected_delivery_date, suppliers(name), locations(name)')
         .eq('company_id', company.id).eq('status', 'sent').neq('received_status', 'full')
         .order('created_at', { ascending: false }),
       supabase.from('receipts')
@@ -121,6 +125,7 @@ export default function ReceiptsPage() {
     { value: 'supplier', label: t.sort.supplierAsc, cmp: text(r => r.purchase_orders?.suppliers?.name) },
   ]
   const queueDefs: SortDef<QueueRow>[] = [
+    { value: 'dueAsc', label: t.sort.dueAsc, cmp: date(r => r.expected_delivery_date ?? '9999-12-31') },
     { value: 'numberDesc', label: t.sort.numberDesc, cmp: rev(text(r => r.po_number)) },
     { value: 'numberAsc', label: t.sort.numberAsc, cmp: text(r => r.po_number) },
     { value: 'amountDesc', label: t.sort.amountDesc, cmp: rev(num(r => r.total_amount)) },
@@ -135,6 +140,7 @@ export default function ReceiptsPage() {
   ]
   const queueCols: ExportColumn<QueueRow>[] = [
     { header: t.po.poNumber, get: r => r.po_number, width: 14 }, { header: t.po.supplier, get: r => r.suppliers?.name, width: 32 },
+    { header: s.location, get: r => r.locations?.name, width: 26 }, { header: s.deliveryDue, get: r => r.expected_delivery_date, kind: 'date', width: 14 }, { header: s.lateDays, get: r => daysLate(r.expected_delivery_date) || null, width: 12 },
     { header: t.po.total, get: r => r.total_amount, kind: 'money', width: 14 }, { header: t.common.status, get: r => (r.received_status === 'partial' ? s.rsPartial : s.rsNone), width: 16 },
   ]
   const filteredQueue = queue.filter(r => matchesSearch(search, [r.po_number, r.suppliers?.name]))
@@ -179,19 +185,33 @@ export default function ReceiptsPage() {
         <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
       ) : tab === 'queue' ? (
         <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
-              <GridHead cols={[[t.po.poNumber, FileText], [t.po.supplier, Building2], [t.po.total, Coins], [t.common.status, CircleDot], ['']]} />
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1000px]">
+              <GridHead cols={[[t.po.poNumber, FileText], [t.po.supplier, Building2], [s.location, MapPin], [s.deliveryDue, CalendarClock], [t.po.total, Coins], [t.common.status, CircleDot], ['']]} />
               <tbody className="divide-y divide-field">
                 {filteredQueue.length === 0 ? (
-                  <TableEmptyState icon={PackageCheck} colSpan={6} title={t.common.empty.toReceive.title} subtitle={t.common.empty.toReceive.text} />
+                  <TableEmptyState icon={PackageCheck} colSpan={7} title={t.common.empty.toReceive.title} subtitle={t.common.empty.toReceive.text} />
                 ) : paginatedQueue.map(po => (
                   <tr key={po.id} className="hover:bg-surface transition-colors">
-                    <td className="px-4 py-3"><Link to={`/purchase-orders/${po.id}`} className=" text-sm font-medium text-gray-400 hover:text-gray-600">{po.po_number}</Link></td>
-                    <td className="px-4 py-3 text-ink2">{po.suppliers?.name ?? '—'}</td>
-                    <td className="px-4 py-3 font-medium text-ink">{fmt(po.total_amount ?? 0, company?.currency)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap"><Link to={`/purchase-orders/${po.id}`} className="text-ink2 hover:text-ink">{po.po_number}</Link></td>
+                    <td className="px-4 py-3 font-medium text-ink max-w-[260px] truncate" title={po.suppliers?.name}>{po.suppliers?.name ?? '-'}</td>
+                    <td className="px-4 py-3 text-ink2 max-w-[220px] truncate">{po.locations?.name ?? '-'}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {po.expected_delivery_date ? (() => {
+                        const late = daysLate(po.expected_delivery_date)
+                        const lateText = late === 1 ? s.lateOne : late === 2 ? s.lateTwo : s.lateMany.replace('{n}', String(late))
+                        return (
+                          <span className={late > 0 ? 'text-danger' : 'text-ink'}>
+                            <span className={late > 0 ? 'font-medium' : ''}>{format(new Date(po.expected_delivery_date), 'dd.MM.yyyy')}</span>
+                            {late > 0 && <span> · {lateText}</span>}
+                          </span>
+                        )
+                      })() : <span className="text-ink2">-</span>}
+                    </td>
+                    <td className="px-4 py-3 text-ink whitespace-nowrap tabular-nums">{fmt(po.total_amount ?? 0, company?.currency)}</td>
                     <td className="px-4 py-3"><span className={`badge ${RS_BADGE[po.received_status]}`}>{po.received_status === 'partial' ? s.rsPartial : s.rsNone}</span></td>
                     <td className="px-4 py-3 text-right">
-                      <Button onClick={() => navigate(`/receive/${po.id}`)} className="gap-1.5"><PackageCheck className="w-3.5 h-3.5" />{s.receive}</Button>
+                      <button onClick={() => navigate(`/receive/${po.id}`)}
+                        className="inline-flex items-center gap-1 badge badge-warn hover:brightness-95 transition-all whitespace-nowrap"><PackageCheck className="w-3 h-3" />{s.receive}</button>
                     </td>
                   </tr>
                 ))}
@@ -209,10 +229,10 @@ export default function ReceiptsPage() {
                     <TableEmptyState icon={PackageCheck} colSpan={6} title={hasFilters ? t.common.empty.noResults.title : t.common.empty.receipts.title} subtitle={hasFilters ? t.common.empty.noResults.text : t.common.empty.receipts.text} />
                   ) : paginatedReceipts.map(r => (
                     <tr key={r.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/receipts/${r.id}`)}>
-                      <td className="px-4 py-3"><Link to={`/receipts/${r.id}`} onClick={e => e.stopPropagation()} className=" text-sm font-medium text-gray-400 hover:text-gray-600">{r.receipt_number}</Link></td>
-                      <td className="px-4 py-3 text-xs text-ink2">{r.purchase_orders?.po_number ?? '—'}</td>
-                      <td className="px-4 py-3 text-ink2">{r.purchase_orders?.suppliers?.name ?? '—'}</td>
-                      <td className="px-4 py-3 text-ink2">{format(new Date(r.received_date), 'dd.MM.yyyy')}</td>
+                      <td className="px-4 py-3 whitespace-nowrap"><Link to={`/receipts/${r.id}`} onClick={e => e.stopPropagation()} className="text-ink2 hover:text-ink">{r.receipt_number}</Link></td>
+                      <td className="px-4 py-3 text-ink2 whitespace-nowrap">{r.purchase_orders?.po_number ?? '-'}</td>
+                      <td className="px-4 py-3 font-medium text-ink max-w-[260px] truncate">{r.purchase_orders?.suppliers?.name ?? '-'}</td>
+                      <td className="px-4 py-3 text-ink whitespace-nowrap">{format(new Date(r.received_date), 'dd.MM.yyyy')}</td>
                       <td className="px-4 py-3"><PersonCell name={names[r.received_by]} /></td>
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-end"><RowMenu items={[{ label: t.common.view, icon: Eye, onClick: () => navigate(`/receipts/${r.id}`) }]} /></div>

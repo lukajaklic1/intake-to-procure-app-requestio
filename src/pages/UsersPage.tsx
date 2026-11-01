@@ -26,7 +26,7 @@ import { applySort, text, date, rev, type SortDef } from '../lib/sort'
 import ExportButton from '../components/ui/ExportButton'
 import type { ExportColumn } from '../lib/exportExcel'
 
-const MODULES: UserPermission['module'][] = ['requests', 'purchase_orders', 'receipts', 'invoices', 'budgets', 'reports']
+const MODULES: UserPermission['module'][] = ['requests', 'purchase_orders', 'receipts', 'invoices', 'stock', 'budgets', 'reports']
 const ACTIONS: ('view' | 'create' | 'approve' | 'pay')[] = ['view', 'create', 'approve', 'pay']
 
 type PermMap = Record<string, { can_view: boolean; can_create: boolean; can_approve: boolean; can_pay: boolean }>

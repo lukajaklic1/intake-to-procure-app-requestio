@@ -1,10 +1,10 @@
 import {
   LayoutDashboard, FileText, FileSignature, Building2, Package,
-  MapPin, Users, UserCog, Settings, Wallet,
+  MapPin, Users, UserCog, Settings, Wallet, Boxes,
   ClipboardList, CheckCircle2, PackageCheck, ReceiptText,
 } from 'lucide-react'
 
-export type NavKey = 'dashboard' | 'myRequests' | 'approvals' | 'purchaseOrders' | 'receipts' | 'invoices'
+export type NavKey = 'dashboard' | 'myRequests' | 'approvals' | 'purchaseOrders' | 'receipts' | 'stock' | 'invoices'
   | 'suppliers' | 'contracts' | 'catalog' | 'locations' | 'departments' | 'budgets' | 'users' | 'settings'
 
 export type SectionKey = 'sectionWorkflow' | 'sectionCatalog' | 'sectionOrganization' | 'sectionAdmin'
@@ -15,7 +15,7 @@ export interface NavItem {
   key: NavKey
   adminOnly?: boolean
   /** shown to admins and to users who may view this module */
-  module?: 'budgets'
+  module?: 'budgets' | 'stock'
 }
 
 export const NAV_GROUPS: { section?: SectionKey; items: NavItem[] }[] = [
@@ -29,6 +29,7 @@ export const NAV_GROUPS: { section?: SectionKey; items: NavItem[] }[] = [
       { to: '/approvals', icon: CheckCircle2, key: 'approvals' },
       { to: '/purchase-orders', icon: FileText, key: 'purchaseOrders' },
       { to: '/receipts', icon: PackageCheck, key: 'receipts' },
+      { to: '/stock', icon: Boxes, key: 'stock', module: 'stock' },
       { to: '/invoices', icon: ReceiptText, key: 'invoices' },
     ],
   },

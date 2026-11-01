@@ -10,6 +10,7 @@ import { cn } from '../../lib/cn'
 import AppLogo from '../ui/AppLogo'
 import { NAV_GROUPS } from './navConfig'
 import { needsAttention } from '../../lib/contracts'
+import { isLow, type StockRow } from '../../lib/stock'
 
 interface SidebarProps {
   onClose?: () => void
@@ -28,6 +29,7 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
   const [openReceipts, setOpenReceipts] = useState(0)
   const [expiringContracts, setExpiringContracts] = useState(0)
   const [invoicesToApprove, setInvoicesToApprove] = useState(0)
+  const [stockLow, setStockLow] = useState(0)
 
   useEffect(() => {
     if (!company || !profile) return
@@ -35,7 +37,8 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
       let approvalsQuery = supabase.from('requests').select('*', { count: 'exact', head: true })
         .eq('company_id', company!.id).eq('status', 'pending')
       if (!isAdmin) approvalsQuery = approvalsQuery.eq('approver_id', profile!.id)
-      const [{ count: pending }, { count: noPo }, { count: receiptsOpen }, { data: ctr }, { count: invReview }] = await Promise.all([
+      const canSeeStock = isAdmin || hasPerm('stock', 'view')
+      const [{ count: pending }, { count: noPo }, { count: receiptsOpen }, { data: ctr }, { count: invReview }, stock] = await Promise.all([
         approvalsQuery,
         supabase.from('requests').select('*', { count: 'exact', head: true })
           .eq('company_id', company!.id).eq('status', 'approved').is('po_id', null),
@@ -43,7 +46,10 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
           .eq('company_id', company!.id).eq('status', 'sent').neq('received_status', 'full'),
         supabase.from('contracts').select('status, end_date, notice_days, auto_renew').eq('company_id', company!.id).eq('status', 'active'),
         supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('company_id', company!.id).eq('status', 'in_review'),
+        canSeeStock ? supabase.rpc('stock_overview') : Promise.resolve({ data: [] as StockRow[] }),
       ])
+      // under the minimum and not covered by what is already on order
+      setStockLow(canSeeStock ? ((stock.data ?? []) as StockRow[]).filter(isLow).length : 0)
       setPendingApprovals(pending ?? 0)
       setReadyForPO(noPo ?? 0)
       setOpenReceipts(receiptsOpen ?? 0)
@@ -133,7 +139,7 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
                 </p>
               )}
               {items.map(({ to, icon: Icon, key }) => {
-                const badge = key === 'approvals' ? pendingApprovals : key === 'myRequests' ? readyForPO : key === 'receipts' ? openReceipts : key === 'contracts' ? expiringContracts : key === 'invoices' ? invoicesToApprove : 0
+                const badge = key === 'approvals' ? pendingApprovals : key === 'myRequests' ? readyForPO : key === 'receipts' ? openReceipts : key === 'contracts' ? expiringContracts : key === 'invoices' ? invoicesToApprove : key === 'stock' ? stockLow : 0
                 return (
                   <NavLink key={to} to={to} onClick={handleNavClick} className={navLinkCls}>
                     {() => (

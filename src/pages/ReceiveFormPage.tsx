@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams, Navigate } from 'react-router-dom'
-import { ChevronLeft, Paperclip, FileText, UploadCloud, X } from 'lucide-react'
+import { useNavigate, useParams, Navigate, Link } from 'react-router-dom'
+import { ArrowLeft, ChevronRight, FileText, UploadCloud, X, Check, Package, Hash, Ruler, PackageCheck, PackageX, CircleAlert } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
 import { toast } from '../components/ui/Toast'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import GridHead from '../components/ui/GridHead'
+import { Card, Field } from '../components/ui/DetailCard'
+import { useRequired } from '../lib/useRequired'
+import { unitLabel } from '../lib/units'
 import { format } from 'date-fns'
 
 interface Line {
@@ -19,32 +23,37 @@ interface Line {
   rejectNow: string
 }
 
+const parseNum = (v: string) => parseFloat(v.replace(',', '.')) || 0
+const NUM = /^[0-9]*[,.]?[0-9]*$/
+
 export default function ReceiveFormPage() {
   const { poId } = useParams()
   const { company, profile, isAdmin, hasPerm } = useCompany()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const s = t.receipts
   const navigate = useNavigate()
   const canReceive = isAdmin || hasPerm('receipts', 'create')
+  const req = useRequired(t.common.fieldRequired)
+  const today = format(new Date(), 'yyyy-MM-dd')
 
-  const [poNumber, setPoNumber] = useState('')
-  const [supplierName, setSupplierName] = useState('')
+  const [po, setPo] = useState<{ po_number: string; supplier: string; location: string | null; due: string | null } | null>(null)
   const [lines, setLines] = useState<Line[]>([])
-  const [receivedDate, setReceivedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [receivedDate, setReceivedDate] = useState(today)
   const [supplierReceiptNo, setSupplierReceiptNo] = useState('')
   const [note, setNote] = useState('')
   const [newFiles, setNewFiles] = useState<File[]>([])
+  const [tableError, setTableError] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { if (company && poId) load() }, [company, poId])
 
   async function load() {
-    const { data: po } = await supabase.from('purchase_orders').select('po_number, status, suppliers(name)').eq('id', poId!).single()
-    if (!po) { toast.error(t.common.notFound); navigate('/receipts'); return }
-    if ((po as any).status !== 'sent') { navigate('/receipts'); return }
-    setPoNumber((po as any).po_number)
-    setSupplierName((po as any).suppliers?.name ?? '—')
+    const { data } = await supabase.from('purchase_orders').select('po_number, status, expected_delivery_date, suppliers(name), locations(name)').eq('id', poId!).single()
+    const row = data as unknown as { po_number: string; status: string; expected_delivery_date: string | null; suppliers: { name: string } | null; locations: { name: string } | null } | null
+    if (!row) { toast.error(t.common.notFound); navigate('/receipts'); return }
+    if (row.status !== 'sent') { navigate('/receipts'); return }
+    setPo({ po_number: row.po_number, supplier: row.suppliers?.name ?? '-', location: row.locations?.name ?? null, due: row.expected_delivery_date })
 
     const { data: poLines } = await supabase.from('po_line_items').select('id, name, unit, quantity').eq('po_id', poId!).order('position')
     const ids = (poLines ?? []).map(l => l.id)
@@ -60,26 +69,34 @@ export default function ReceiveFormPage() {
     setLoading(false)
   }
 
-  const parseNum = (v: string) => parseFloat(v.replace(',', '.')) || 0
   const remaining = (l: Line) => Math.max(0, l.ordered - l.received)
-  function setReceiveNow(idx: number, v: string) {
-    if (!/^[0-9]*[,.]?[0-9]*$/.test(v)) return
-    setLines(ls => ls.map((l, i) => i === idx ? { ...l, receiveNow: v } : l))
-  }
-  function setRejectNow(idx: number, v: string) {
-    if (!/^[0-9]*[,.]?[0-9]*$/.test(v)) return
-    setLines(ls => ls.map((l, i) => i === idx ? { ...l, rejectNow: v } : l))
+  const afterOf = (l: Line) => l.ordered - l.received - parseNum(l.receiveNow)   // negative = more than ordered
+  function setField(idx: number, key: 'receiveNow' | 'rejectNow', v: string) {
+    if (!NUM.test(v)) return
+    setTableError('')
+    if (key === 'rejectNow') req.clear('note')
+    setLines(ls => ls.map((l, i) => i === idx ? { ...l, [key]: v } : l))
   }
   function receiveAll() {
+    setTableError('')
     setLines(ls => ls.map(l => { const rem = remaining(l); return { ...l, receiveNow: rem > 0 ? String(rem).replace('.', ',') : '' } }))
   }
 
+  // what the order looks like once this receipt is saved
+  const openAfter = lines.filter(l => afterOf(l) > 0).length
+  const anyAccepted = lines.some(l => parseNum(l.receiveNow) > 0)
+  const anyRejected = lines.some(l => parseNum(l.rejectNow) > 0)
+
   async function save() {
     if (!company || !profile) return
+    if (!receivedDate) { req.setError('date', s.dateRequired, 'r-date'); return }
+    if (receivedDate > today) { req.setError('date', s.dateFuture, 'r-date'); return }
     const payload = lines
       .map(l => ({ po_line_id: l.po_line_id, quantity_received: parseNum(l.receiveNow), quantity_rejected: parseNum(l.rejectNow) }))
       .filter(l => l.quantity_received > 0 || l.quantity_rejected > 0)
-    if (payload.length === 0) { toast.error(s.nothingToReceive); return }
+    if (payload.length === 0) { setTableError(s.nothingToReceive); return }
+    // goods sent back need a reason, otherwise a complaint later cannot be backed up
+    if (anyRejected && !note.trim()) { req.setError('note', s.reasonRequired, 'r-note'); return }
     setSaving(true)
     const { data: receiptId, error } = await (supabase as any).rpc('create_receipt', {
       p_po_id: poId, p_received_date: receivedDate, p_supplier_receipt_no: supplierReceiptNo.trim() || null,
@@ -98,84 +115,127 @@ export default function ReceiveFormPage() {
     navigate(`/receipts/${receiptId}`)
   }
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
+  if (loading || !po) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
   if (!canReceive) return <Navigate to="/receipts" replace />
 
+  const overdue = !!po.due && po.due < today
+
   return (
-    <div className="p-4 lg:p-6 max-w-4xl mx-auto form-skin">
-      <button onClick={() => navigate('/receipts')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-4"><ChevronLeft className="w-4 h-4" />{s.title}</button>
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">{s.receive}</h1>
-      <p className="text-gray-500 text-sm mb-5">{s.fromPo} <span className=" font-semibold text-gray-700">{poNumber}</span> · {supplierName}</p>
+    <div className="p-4 lg:p-6 form-skin">
+      <nav className="flex items-center gap-2 text-sm text-ink2 mb-5">
+        <button type="button" onClick={() => navigate('/receipts')} aria-label={s.title} title={s.title}
+          className="w-7 h-7 -ml-1.5 mr-1 inline-flex items-center justify-center rounded-lg text-icon hover:bg-selected hover:text-ink transition-colors">
+          <ArrowLeft className="w-4 h-4" strokeWidth={1.75} />
+        </button>
+        <Link to="/receipts" className="hover:text-ink transition-colors">{s.title}</Link>
+        <ChevronRight className="w-3.5 h-3.5 text-icon" />
+        <span className="text-ink font-medium">{s.newReceipt}</span>
+      </nav>
 
-      <div className="bg-white rounded-lg border border-field p-6 mb-5">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Input id="r-date" label={s.receivedDate} type="date" value={receivedDate} onChange={e => setReceivedDate(e.target.value)} />
-          <Input id="r-sup-no" label={s.supplierReceiptNo} value={supplierReceiptNo} onChange={e => setSupplierReceiptNo(e.target.value)} />
-        </div>
-        <div className="mt-4 flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-700">{s.note}</label>
-          <textarea rows={2} value={note} onChange={e => setNote(e.target.value)}
-            className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none" />
-        </div>
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold text-ink tracking-tight">{s.newReceipt}</h1>
+        <p className="mt-2 text-sm text-ink2">{s.fromPo} <Link to={`/purchase-orders/${poId}`} className="text-ink font-medium hover:underline">{po.po_number}</Link> · {po.supplier}</p>
+      </div>
 
-        {/* Attachment */}
-        <div className="mt-4">
-          <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5 mb-2"><Paperclip className="w-3.5 h-3.5" />{s.attachSlip}</label>
-          {newFiles.map((f, i) => (
-            <div key={i} className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-lg mb-2">
-              <FileText className="w-4 h-4 text-green-500 shrink-0" />
-              <span className="text-sm text-success font-medium flex-1 truncate">{f.name}</span>
-              <button type="button" onClick={() => setNewFiles(fs => fs.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4" /></button>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+        {/* left: what arrives */}
+        <div className="xl:col-span-2 flex flex-col gap-4">
+          <Card title={t.po.lineItems} className="overflow-hidden"
+            action={<Button variant="secondary" onClick={receiveAll} className="!h-8 text-[13px]">{s.receiveAll}</Button>}>
+            <div className="overflow-x-auto"><table className="table-grid w-full text-sm min-w-[760px]">
+              <GridHead cols={[[t.po.description, Package], [s.orderedQty, Hash, 'right'], [s.alreadyReceived, PackageCheck, 'right'], [s.acceptedNow, Check, 'right'], [s.rejectNow, PackageX, 'right'], [s.leftAfter, Ruler, 'right']]} />
+              <tbody className="divide-y divide-field">
+                {lines.map((l, idx) => {
+                  const after = afterOf(l)
+                  const rejNow = parseNum(l.rejectNow)
+                  return (
+                    <tr key={l.po_line_id}>
+                      <td className="px-4 py-2 text-ink">
+                        <span className="font-medium">{l.name}</span>
+                        <span className="text-ink2"> · {unitLabel(l.unit, lang) || l.unit}</span>
+                      </td>
+                      <td className="px-4 py-2 text-right text-ink2 tabular-nums">{l.ordered}</td>
+                      <td className="px-4 py-2 text-right text-ink2 tabular-nums">{l.received}</td>
+                      <td className="px-3 py-1.5 w-32">
+                        <input value={l.receiveNow} onChange={e => setField(idx, 'receiveNow', e.target.value)} inputMode="decimal" placeholder="0" aria-label={s.acceptedNow}
+                          className="w-full text-right rounded-lg border border-field hover:border-field-hover px-2.5 h-8 text-sm tabular-nums focus:outline-none focus:border-field-focus" />
+                      </td>
+                      <td className="px-3 py-1.5 w-32">
+                        <input value={l.rejectNow} onChange={e => setField(idx, 'rejectNow', e.target.value)} inputMode="decimal" placeholder="0" aria-label={s.rejectNow}
+                          className={`w-full text-right rounded-lg border px-2.5 h-8 text-sm tabular-nums focus:outline-none ${rejNow > 0 ? 'border-danger text-danger' : 'border-field hover:border-field-hover focus:border-field-focus'}`} />
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
+                        {after < 0
+                          ? <span className="badge badge-warn">{s.overBy.replace('{n}', String(Math.round(-after * 1000) / 1000))}</span>
+                          : after === 0
+                          ? <span className="inline-flex items-center gap-1 text-success"><Check className="w-3.5 h-3.5" strokeWidth={2} />0</span>
+                          : <span className="text-ink">{Math.round(after * 1000) / 1000}</span>}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table></div>
+            <div className="px-5 py-3 border-t border-field flex items-start justify-between gap-4 flex-wrap">
+              <p className="text-[13px] text-ink2 max-w-xl">{s.rejectHint}</p>
+              {(anyAccepted || anyRejected) && (
+                <span className={`badge ${openAfter === 0 ? 'badge-success' : 'badge-warn'}`}>
+                  {openAfter === 0 ? s.resultFull : s.resultOpen.replace('{n}', String(openAfter))}
+                </span>
+              )}
             </div>
-          ))}
-          <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-accent hover:bg-accent-light transition-colors w-full">
-            <UploadCloud className="w-4 h-4 text-gray-400 shrink-0" />
-            <span className="text-sm text-gray-500">{t.po.uploadQuotation}</span>
-            <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple className="hidden"
-              onChange={e => { const fl = Array.from(e.target.files ?? []); setNewFiles(fs => [...fs, ...fl]); e.target.value = '' }} />
-          </label>
+            {tableError && <p className="px-5 pb-3 -mt-1 text-xs text-red-600 inline-flex items-center gap-1.5"><CircleAlert className="w-3.5 h-3.5" />{tableError}</p>}
+          </Card>
+        </div>
+
+        {/* right: the delivery itself */}
+        <div className="flex flex-col gap-4 order-first xl:order-none">
+          <Card title={s.orderCard}>
+            <div className="p-5 grid grid-cols-2 gap-x-6 gap-y-5">
+              <div className="col-span-2"><Field label={t.po.supplier}>{po.supplier}</Field></div>
+              <Field label={s.location}>{po.location}</Field>
+              <Field label={s.deliveryDue}>
+                {po.due ? <span className={overdue ? 'text-danger font-medium' : ''}>{format(new Date(po.due), 'dd.MM.yyyy')}{overdue ? ` · ${s.overdue}` : ''}</span> : null}
+              </Field>
+            </div>
+          </Card>
+
+          <Card title={s.receiptDetails}>
+            <div className="p-5 flex flex-col gap-4">
+              <Input id="r-date" label={s.receivedDate + ' *'} type="date" max={today} value={receivedDate} error={req.errors.date}
+                onChange={e => { req.clear('date'); setReceivedDate(e.target.value) }} />
+              <Input id="r-sup-no" label={s.supplierReceiptNo} value={supplierReceiptNo} onChange={e => setSupplierReceiptNo(e.target.value)} />
+              <div className="flex flex-col gap-1">
+                <label htmlFor="r-note" className="text-sm font-medium text-gray-700">{s.note}{anyRejected ? ' *' : ''}</label>
+                <textarea id="r-note" rows={3} value={note} onChange={e => { req.clear('note'); setNote(e.target.value) }}
+                  className={`rounded-lg border px-3 py-2 text-sm focus:outline-none resize-none ${req.errors.note ? 'border-red-500' : 'border-field hover:border-field-hover focus:border-field-focus'}`} />
+                {req.errors.note && <p className="text-xs text-red-600">{req.errors.note}</p>}
+              </div>
+            </div>
+          </Card>
+
+          <Card title={s.attachSlip}>
+            <div className="p-5 flex flex-col gap-2">
+              {newFiles.map((f, i) => (
+                <div key={i} className="flex items-center gap-2.5 px-3 py-2 bg-accent-light rounded-lg">
+                  <FileText className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
+                  <span className="text-sm text-ink font-medium flex-1 truncate">{f.name}</span>
+                  <span className="text-xs text-ink2 shrink-0 tabular-nums">{Math.max(1, Math.round(f.size / 1024))} KB</span>
+                  <button type="button" onClick={() => setNewFiles(fs => fs.filter((_, j) => j !== i))} aria-label={t.common.cancel} className="text-icon hover:text-danger transition-colors shrink-0"><X className="w-4 h-4" /></button>
+                </div>
+              ))}
+              <label className="flex items-center gap-2 h-10 px-3 rounded-lg border border-dashed border-field cursor-pointer text-sm text-ink2 hover:bg-surface transition-colors w-full">
+                <UploadCloud className="w-4 h-4 text-icon shrink-0" />
+                <span>{t.po.uploadQuotation}</span>
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple className="hidden"
+                  onChange={e => { const fl = Array.from(e.target.files ?? []); setNewFiles(fs => [...fs, ...fl]); e.target.value = '' }} />
+              </label>
+            </div>
+          </Card>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-field overflow-hidden mb-5">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-[15px] font-semibold text-ink">{t.po.lineItems}</h2>
-          <Button variant="secondary" onClick={receiveAll}>{s.receiveAll}</Button>
-        </div>
-        <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
-          <thead className="bg-surface border-b border-field"><tr>
-            <th className="text-left px-4 py-2.5 text-sm font-medium text-ink2">{t.po.description}</th>
-            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2">{s.ordered}</th>
-            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2">{s.received}</th>
-            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2">{s.remaining}</th>
-            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2 w-28">{s.receiveNow}</th>
-            <th className="text-right px-4 py-2.5 text-sm font-medium text-ink2 w-28">{s.rejectNow}</th>
-          </tr></thead>
-          <tbody className="divide-y divide-field">
-            {lines.map((l, idx) => {
-              const rem = remaining(l)
-              return (
-                <tr key={l.po_line_id}>
-                  <td className="px-4 py-2.5 text-gray-800">{l.name}<span className="text-gray-400"> · {l.unit}</span></td>
-                  <td className="px-4 py-2.5 text-right text-gray-600">{l.ordered}</td>
-                  <td className="px-4 py-2.5 text-right text-gray-600">{l.received}</td>
-                  <td className="px-4 py-2.5 text-right font-medium text-gray-800">{rem}</td>
-                  <td className="px-4 py-2.5">
-                    <input value={l.receiveNow} onChange={e => setReceiveNow(idx, e.target.value)} inputMode="decimal"
-                      className="w-full text-right rounded-lg border border-field hover:border-field-hover px-2 py-1.5 text-sm focus:outline-none focus:border-field-focus" />
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <input value={l.rejectNow} onChange={e => setRejectNow(idx, e.target.value)} inputMode="decimal" placeholder="0"
-                      className="w-full text-right rounded-lg border border-field hover:border-field-hover px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 placeholder:text-placeholder" />
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table></div>
-      </div>
-
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-2 mt-5">
         <Button variant="secondary" onClick={() => navigate('/receipts')} disabled={saving}>{t.common.cancel}</Button>
         <Button loading={saving} onClick={save}>{s.saveReceipt}</Button>
       </div>

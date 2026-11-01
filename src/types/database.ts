@@ -143,6 +143,8 @@ export interface Item {
   category_id: string | null
   default_unit: string | null
   default_unit_price: number | null
+  /** the stock of this item is kept (per delivery location) */
+  track_stock: boolean
   status: 'active' | 'inactive'
   created_at: string
   updated_at: string
@@ -254,7 +256,7 @@ export interface PoAttachment {
 export interface UserPermission {
   id: string
   user_id: string
-  module: 'requests' | 'purchase_orders' | 'receipts' | 'invoices' | 'budgets' | 'reports'
+  module: 'requests' | 'purchase_orders' | 'receipts' | 'invoices' | 'budgets' | 'reports' | 'stock'
   can_view: boolean
   can_create: boolean
   can_approve: boolean

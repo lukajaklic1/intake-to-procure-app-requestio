@@ -35,7 +35,7 @@ interface ItemWithCategory extends Item {
   categories: { name: string } | null
 }
 
-const EMPTY: Partial<Item> = { name: '', long_description: '', category_id: undefined, default_unit: '', default_unit_price: null, status: 'active' }
+const EMPTY: Partial<Item> = { name: '', long_description: '', category_id: undefined, default_unit: '', default_unit_price: null, track_stock: false, status: 'active' }
 
 export default function CatalogPage() {
   const { company } = useCompany()
@@ -187,6 +187,7 @@ export default function CatalogPage() {
         category_id: categoryId,
         default_unit: unitToStore(editing.default_unit),
         default_unit_price: editing.default_unit_price ?? null,
+        track_stock: !!editing.track_stock,
         status: editing.status,
         updated_at: new Date().toISOString(),
       }).eq('id', editing.id)
@@ -202,6 +203,7 @@ export default function CatalogPage() {
         category_id: categoryId,
         default_unit: unitToStore(editing.default_unit),
         default_unit_price: editing.default_unit_price ?? null,
+        track_stock: !!editing.track_stock,
         status: 'active',
       })
       if (error) { toast.error(dbError(error, t)); setSaving(false); return }
@@ -399,6 +401,7 @@ export default function CatalogPage() {
                           <td className="px-4 py-3">
                             <div className="flex items-baseline gap-2 min-w-0">
                               <span className="font-medium text-ink whitespace-nowrap">{item.name}</span>
+                              {item.track_stock && <span className="badge badge-info !py-0 shrink-0" title={s.trackStockHint}>{s.stockTag}</span>}
                               {item.long_description && <span className="text-xs text-gray-400 truncate max-w-[260px]">{item.long_description}</span>}
                             </div>
                           </td>
@@ -444,6 +447,7 @@ export default function CatalogPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-baseline gap-2 min-w-0">
                           <span className="font-medium text-ink whitespace-nowrap">{item.name}</span>
+                              {item.track_stock && <span className="badge badge-info !py-0 shrink-0" title={s.trackStockHint}>{s.stockTag}</span>}
                           {item.long_description && <span className="text-xs text-gray-400 truncate max-w-[260px]">{item.long_description}</span>}
                         </div>
                       </td>
@@ -583,6 +587,15 @@ export default function CatalogPage() {
                 }
               }}
             />
+            <div className="sm:col-span-2">
+              <label className="flex items-start gap-3 rounded-lg border border-field px-3.5 py-3 cursor-pointer hover:bg-surface transition-colors">
+                <input type="checkbox" checked={!!editing.track_stock} onChange={e => setEditing(f => ({ ...f, track_stock: e.target.checked }))} className="mt-0.5 rounded border-field text-accent focus:ring-accent" />
+                <span>
+                  <span className="block text-sm font-medium text-ink">{s.trackStock}</span>
+                  <span className="block text-[13px] text-ink2 mt-0.5">{s.trackStockHint}</span>
+                </span>
+              </label>
+            </div>
           </div>
 
         </div>

@@ -18,6 +18,7 @@ export const USAGE = {
   location: [
     { key: 'requests', table: 'requests', column: 'location_id' },
     { key: 'orders', table: 'purchase_orders', column: 'location_id' },
+    { key: 'stock', table: 'stock_movements', column: 'location_id' },
   ],
   department: [
     { key: 'requests', table: 'requests', column: 'department_id' },
@@ -29,6 +30,7 @@ export const USAGE = {
     { key: 'requestLines', table: 'request_line_items', column: 'item_id', parent: 'requests' },
     { key: 'poLines', table: 'po_line_items', column: 'item_id', parent: 'purchase_orders' },
     { key: 'contractItems', table: 'contract_items', column: 'item_id', parent: 'contracts' },
+    { key: 'stock', table: 'stock_movements', column: 'item_id' },
   ],
   category: [
     { key: 'subcategories', table: 'categories', column: 'parent_id' },
