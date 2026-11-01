@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ChevronRight, Pencil, XCircle, Check, X, FileText, ShoppingCart, Send, Trash2, Package, Tag, Hash, Ruler, Coins, Eye, FileSearch } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -14,6 +14,7 @@ import type { Request, RequestLineItem, RequestStatus, Approval, ActivityLog } f
 import ModalActions from '../components/ui/ModalActions'
 import PersonCell from '../components/ui/PersonCell'
 import BudgetStatus from '../components/budget/BudgetStatus'
+import { Card } from '../components/ui/DetailCard'
 import GridHead from '../components/ui/GridHead'
 import { unitLabel } from '../lib/units'
 
@@ -33,15 +34,6 @@ type ReqFull = Request & {
 }
 
 /** A titled box of the page. */
-function Card({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
-  return (
-    <section className={`bg-white rounded-lg border border-field ${className}`}>
-      <h2 className="px-5 py-3 border-b border-field text-[15px] font-semibold text-ink">{title}</h2>
-      {children}
-    </section>
-  )
-}
-
 /** Small grey label above a value. */
 function Field({ label, children }: { label: string; children?: React.ReactNode }) {
   return (
@@ -64,6 +56,8 @@ export default function RequestDetailPage() {
   const backLabel = fromApprovals ? t.nav.approvals : s.title
 
   const [req, setReq] = useState<ReqFull | null>(null)
+  // lines whose full description is shown (compact by default, anyone can expand them)
+  const [openLines, setOpenLines] = useState<Set<string> | null>(null)
   const [lines, setLines] = useState<(RequestLineItem & { categories?: { name: string } | null })[]>([])
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [activity, setActivity] = useState<ActivityLog[]>([])
@@ -164,6 +158,13 @@ export default function RequestDetailPage() {
 
   const isCreator = profile?.id === req.created_by
   const myPending = approvals.find(a => a.status === 'pending' && (a.approver_id === profile?.id || isAdmin))
+  const isOpen = (lineId: string) => !!openLines?.has(lineId)
+  const allOpen = lines.filter(l => l.long_description).every(l => isOpen(l.id))
+  function toggleLine(lineId: string) {
+    const current = new Set(openLines ?? [])
+    if (current.has(lineId)) current.delete(lineId); else current.add(lineId)
+    setOpenLines(current)
+  }
   const st = req.status as RequestStatus
 
   // The step is only worth naming when a second approver is involved: "(Approver)" / "(Second approver)", nothing for a single approval
@@ -274,16 +275,22 @@ export default function RequestDetailPage() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
         {/* left: what is being requested */}
         <div className="xl:col-span-2 flex flex-col gap-4">
-          <Card title={s.lineItems} className="overflow-hidden">
+          <Card title={s.lineItems} className="overflow-hidden"
+            action={lines.some(l => l.long_description) ? (
+              <button type="button" onClick={() => setOpenLines(allOpen ? new Set() : new Set(lines.filter(l => l.long_description).map(l => l.id)))}
+                className="text-[13px] text-ink2 hover:text-ink transition-colors">{allOpen ? t.common.collapseAll : t.common.expandAll}</button>
+            ) : undefined}>
             <div className="overflow-x-auto"><table className="table-grid w-full text-sm min-w-[620px]">
               <GridHead cols={[[s.itemName, Package], [s.category, Tag], [s.quantity, Hash, 'right'], [s.unit, Ruler], [s.estUnitPrice, Coins, 'right'], [s.lineTotal, Coins, 'right']]} />
               <tbody className="divide-y divide-field">
                 {lines.map(l => (
-                  <tr key={l.id}>
+                  <Fragment key={l.id}>
+                  <tr className={l.long_description ? 'cursor-pointer hover:bg-surface transition-colors' : undefined} onClick={l.long_description ? () => toggleLine(l.id) : undefined}>
                     <td className="px-4 py-3">
                       <div className="flex items-baseline gap-2 min-w-0">
                         <span className="font-medium text-ink whitespace-nowrap">{l.name}</span>
-                        {l.long_description && <span className="text-xs text-gray-400 truncate max-w-[220px]">{l.long_description}</span>}
+                        {l.long_description && <ChevronRight className={`w-3.5 h-3.5 text-icon shrink-0 self-center transition-transform ${isOpen(l.id) ? 'rotate-90' : ''}`} strokeWidth={1.75} />}
+                        {l.long_description && !isOpen(l.id) && <span className="text-xs text-gray-400 truncate max-w-[220px]">{l.long_description}</span>}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-ink2">{l.categories?.name ?? '-'}</td>
@@ -292,6 +299,10 @@ export default function RequestDetailPage() {
                     <td className="px-4 py-3 text-right text-ink2 tabular-nums">{fmt(l.est_unit_price)}</td>
                     <td className="px-4 py-3 text-right text-ink tabular-nums">{fmt(l.line_total)}</td>
                   </tr>
+                  {l.long_description && isOpen(l.id) && (
+                    <tr className="bg-surface/60"><td colSpan={6} className="px-4 pb-3 pt-0"><p className="border-l-2 border-field pl-3 text-sm text-ink2 whitespace-pre-wrap">{l.long_description}</p></td></tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </table></div>

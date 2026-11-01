@@ -10,7 +10,7 @@ import ModalActions from '../ui/ModalActions'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 import Select from '../ui/Select'
-import { unitLabel } from '../../lib/units'
+import { unitFor } from '../../lib/units'
 import { bidTotal, baselineOf, type SBid, type SBidLine, type SCriterion, type SEvent, type SInvitation, type SItem, type SScore, type Evaluation } from '../../lib/sourcing'
 
 export interface SupplierLite { id: string; name: string; email: string | null }
@@ -92,7 +92,7 @@ export function BidModal({ open, onClose, event, items, invitation, supplier, bi
           {items.map(i => (
             <tr key={i.id}>
               <td className="px-2 py-2 text-ink">{i.name}</td>
-              <td className="px-2 py-2 text-right text-ink2 tabular-nums whitespace-nowrap">{fmtQty(Number(i.quantity))} {unitLabel(i.unit, lang)}</td>
+              <td className="px-2 py-2 text-right text-ink2 tabular-nums whitespace-nowrap">{fmtQty(Number(i.quantity))} {unitFor(i.unit, lang, Number(i.quantity))}</td>
               <td className="px-2 py-2 text-right text-ink2 tabular-nums">{i.target_price != null ? money(Number(i.target_price)) : '-'}</td>
               <td className="px-2 py-1.5">
                 <input value={prices[i.id] ?? ''} inputMode="decimal" placeholder="0,00" aria-label={s.unitPrice}

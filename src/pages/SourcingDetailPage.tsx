@@ -13,7 +13,7 @@ import ModalActions from '../components/ui/ModalActions'
 import RowMenu from '../components/ui/RowMenu'
 import PersonCell from '../components/ui/PersonCell'
 import { Card, Field } from '../components/ui/DetailCard'
-import { unitLabel } from '../lib/units'
+import { unitLabel, unitFor } from '../lib/units'
 import { useRFQDownload } from '../hooks/useRFQDownload'
 import { BidModal, ScoreModal, AddSupplierModal, SentModal, DeclineModal, AwardModal, type SupplierLite } from '../components/sourcing/SourcingModals'
 import {
@@ -265,7 +265,7 @@ export default function SourcingDetailPage() {
                       const best = Math.min(...prices.filter((p): p is number => p != null), Infinity)
                       return (
                         <tr key={it.id}>
-                          <td className="px-4 py-2.5 text-ink"><span className="font-medium">{it.name}</span><span className="text-ink2"> · {fmtQty(Number(it.quantity))} {unitLabel(it.unit, lang)}</span></td>
+                          <td className="px-4 py-2.5 text-ink"><span className="font-medium">{it.name}</span><span className="text-ink2"> · {fmtQty(Number(it.quantity))} {unitFor(it.unit, lang, Number(it.quantity))}</span></td>
                           <td className="px-4 py-2.5 text-right text-ink2 tabular-nums">{it.target_price != null ? money(Number(it.target_price)) : '-'}</td>
                           {compared.map((i, k) => {
                             const p = prices[k]

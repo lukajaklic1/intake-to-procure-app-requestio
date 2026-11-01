@@ -2,7 +2,7 @@ import { useLocation } from 'react-router-dom'
 import { PanelLeftOpen } from 'lucide-react'
 import { useLanguage } from '../../hooks/useLanguage'
 import { findNavItem } from './navConfig'
-import { useHeaderCountsValue, useHeaderTabsValue } from './HeaderCounts'
+import { useHeaderCountsValue, useHeaderInfoValue, useHeaderTabsValue } from './HeaderCounts'
 
 interface PageHeaderProps {
   sidebarCollapsed: boolean
@@ -19,6 +19,7 @@ export default function PageHeader({ sidebarCollapsed, onShowSidebar }: PageHead
   const counts = useHeaderCountsValue()
   const labeled = counts.length > 1 || counts.some(c => c.label)
   const { tabs, select } = useHeaderTabsValue()
+  const info = useHeaderInfoValue()
 
   return (
     <header className="hidden lg:flex h-14 shrink-0 items-center gap-2 px-6 border-b border-line bg-page">
@@ -49,6 +50,11 @@ export default function PageHeader({ sidebarCollapsed, onShowSidebar }: PageHead
               {c.label}<CountBadge value={c.value} />
             </span>
           ))}
+        </div>
+      )}
+      {info.length > 0 && (
+        <div className="ml-auto flex items-center gap-5 text-sm text-ink2 whitespace-nowrap">
+          {info.map(i => <span key={i.label}>{i.label}: <span className="text-ink font-medium tabular-nums">{i.value}</span></span>)}
         </div>
       )}
     </header>

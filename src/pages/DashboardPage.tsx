@@ -16,6 +16,13 @@ import EmptyState from '../components/ui/EmptyState'
 import PageToolbar from '../components/layout/PageToolbar'
 import { categoryOptions } from '../lib/categories'
 import FilterSelect from '../components/ui/FilterSelect'
+import { useHeaderTabs } from '../components/layout/HeaderCounts'
+import { Delta } from '../components/analytics/shared'
+import { deltaPct, periodStart, previousPeriod } from '../lib/analytics'
+import NeedsAction from '../components/analytics/NeedsAction'
+import PurchasingTab from '../components/analytics/PurchasingTab'
+import SavingsTab from '../components/analytics/SavingsTab'
+import InvoicesTab from '../components/analytics/InvoicesTab'
 
 const SANS = '"Inter Variable", ui-sans-serif, system-ui, sans-serif'
 const CHART_BLUE = 'var(--chart-bar-stroke)'
@@ -71,7 +78,7 @@ function getDateFrom(range: string): string | null {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function OverviewBar({ items }: { items: { icon: React.ElementType; label: string; value: string; primary?: boolean }[] }) {
+function OverviewBar({ items }: { items: { icon: React.ElementType; label: string; value: string; primary?: boolean; delta?: number | null; sub?: string }[] }) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
       {items.map((item, i) => (
@@ -79,9 +86,11 @@ function OverviewBar({ items }: { items: { icon: React.ElementType; label: strin
           <div className="mb-2">
             <span className="text-sm font-semibold text-ink2">{item.label}</span>
           </div>
-          <div className={cn('font-semibold tracking-tight text-ink', item.primary ? 'text-3xl' : 'text-2xl')}>
+          <div className={cn('font-semibold tracking-tight text-ink flex items-baseline gap-2.5 flex-wrap', item.primary ? 'text-3xl' : 'text-2xl')}>
             {item.value}
+            <Delta pct={item.delta ?? null} />
           </div>
+          {item.sub && <p className="text-xs text-ink2 mt-1.5">{item.sub}</p>}
         </div>
       ))}
     </div>
@@ -183,6 +192,9 @@ export default function DashboardPage() {
   const { company } = useCompany()
   const { t } = useLanguage()
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
+  const [tab, setTab] = useState<'spend' | 'purchasing' | 'savings' | 'invoices'>('spend')
+  // the same figures for the period right before, for the comparison next to them
+  const [cmp, setCmp] = useState<{ spend: number; count: number; prevSpend: number; prevCount: number } | null>(null)
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
   // Reference data for dropdowns
@@ -217,6 +229,27 @@ export default function DashboardPage() {
     if (!company) return
     loadCharts()
   }, [company, filters])
+
+  useEffect(() => {
+    if (!company) return
+    const cur = periodStart(filters.dateRange)
+    const prev = previousPeriod(filters.dateRange)
+    if (!cur || !prev) { setCmp(null); return }
+    const sum = (from: Date, to?: Date) => {
+      let q = supabase.from('purchase_orders').select('total_amount').eq('company_id', company.id).in('status', ['issued', 'sent', 'closed']).gte('created_at', from.toISOString())
+      if (to) q = q.lt('created_at', to.toISOString())
+      if (filters.supplierId) q = q.eq('supplier_id', filters.supplierId)
+      if (filters.departmentId) q = q.eq('department_id', filters.departmentId)
+      return q
+    }
+    let cancelled = false
+    Promise.all([sum(cur), sum(prev.from, prev.to)]).then(([c, p]) => {
+      if (cancelled) return
+      const add = (rows: { total_amount: number }[] | null) => (rows ?? []).reduce((n, r) => n + Number(r.total_amount), 0)
+      setCmp({ spend: add(c.data), count: c.data?.length ?? 0, prevSpend: add(p.data), prevCount: p.data?.length ?? 0 })
+    })
+    return () => { cancelled = true }
+  }, [company, filters.dateRange, filters.supplierId, filters.departmentId])
 
   async function loadRefs() {
     const cid = company!.id
@@ -320,6 +353,13 @@ export default function DashboardPage() {
     setFilters(DEFAULT_FILTERS)
   }
 
+  useHeaderTabs([
+    { id: 'spend', label: t.dashboard.tabSpend, active: tab === 'spend' },
+    { id: 'purchasing', label: t.dashboard.tabPurchasing, active: tab === 'purchasing' },
+    { id: 'savings', label: t.dashboard.tabSavings, active: tab === 'savings' },
+    { id: 'invoices', label: t.dashboard.tabInvoices, active: tab === 'invoices' },
+  ], id => setTab(id as typeof tab))
+
   const hasActiveFilters = filters.supplierId || filters.categoryId || filters.departmentId || filters.dateRange !== '1y'
 
   const dateRanges: { value: Filters['dateRange']; label: string }[] = [
@@ -400,10 +440,15 @@ export default function DashboardPage() {
       )}
 
 
+      {tab === 'spend' && <NeedsAction />}
+
+      {tab === 'spend' && (
+        <>
       {/* Overview */}
       <OverviewBar items={[
-        { icon: TrendingUp, label: t.dashboard.totalSpend, value: fmt(stats.total, currency), primary: true },
-        { icon: FileText,   label: t.dashboard.poCount,     value: String(stats.poCount) },
+        { icon: TrendingUp, label: t.dashboard.totalSpend, value: fmt(stats.total, currency), primary: true, delta: cmp ? deltaPct(cmp.spend, cmp.prevSpend) : null,
+          sub: filters.dateRange !== '1m' ? `${t.dashboard.avgMonthly}: ${fmt(stats.total / (filters.dateRange === '3m' ? 3 : filters.dateRange === '6m' ? 6 : Math.max(1, spendByMonth.length || 12)), currency)}` : undefined },
+        { icon: FileText,   label: t.dashboard.poCount,     value: String(stats.poCount), delta: cmp ? deltaPct(cmp.count, cmp.prevCount) : null },
         { icon: Clock,      label: t.dashboard.openPos,     value: String(stats.openPos) },
         { icon: BarChart2,  label: t.dashboard.receivedPos, value: String(stats.receivedPos) },
       ]} />
@@ -455,6 +500,12 @@ export default function DashboardPage() {
           <BreakdownTable rows={spendByMaterial} currency={currency} />
         </ChartCard>
       </div>
+        </>
+      )}
+
+      {company && tab === 'purchasing' && <PurchasingTab companyId={company.id} currency={currency} filters={filters} departments={departments} />}
+      {company && tab === 'savings' && <SavingsTab companyId={company.id} currency={currency} filters={filters} />}
+      {company && tab === 'invoices' && <InvoicesTab companyId={company.id} currency={currency} filters={filters} />}
     </div>
   )
 }

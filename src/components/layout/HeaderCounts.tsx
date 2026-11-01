@@ -1,21 +1,27 @@
 import { createContext, useContext, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 
 export interface HeaderCount { label?: string; value: number }
+/** A figure shown at the right end of the top bar, e.g. "Value of the stock: 312 €". */
+export interface HeaderInfo { label: string; value: string }
 export interface HeaderTab { id: string; label: string; count?: number; active: boolean; icon?: React.ElementType }
 
 interface Ctx {
   counts: HeaderCount[]; setCounts: (c: HeaderCount[]) => void
   tabs: HeaderTab[]; setTabs: (t: HeaderTab[]) => void
+  info: HeaderInfo[]; setInfo: (i: HeaderInfo[]) => void
   selectRef: MutableRefObject<((id: string) => void) | null>
 }
-const HeaderCountsContext = createContext<Ctx>({ counts: [], setCounts: () => {}, tabs: [], setTabs: () => {}, selectRef: { current: null } })
+const HeaderCountsContext = createContext<Ctx>({ counts: [], setCounts: () => {}, tabs: [], setTabs: () => {}, info: [], setInfo: () => {}, selectRef: { current: null } })
 
 export function HeaderCountsProvider({ children }: { children: ReactNode }) {
   const [counts, setCounts] = useState<HeaderCount[]>([])
   const [tabs, setTabs] = useState<HeaderTab[]>([])
+  const [info, setInfo] = useState<HeaderInfo[]>([])
   const selectRef = useRef<((id: string) => void) | null>(null)
-  return <HeaderCountsContext.Provider value={{ counts, setCounts, tabs, setTabs, selectRef }}>{children}</HeaderCountsContext.Provider>
+  return <HeaderCountsContext.Provider value={{ counts, setCounts, tabs, setTabs, info, setInfo, selectRef }}>{children}</HeaderCountsContext.Provider>
 }
+
+export function useHeaderInfoValue() { return useContext(HeaderCountsContext).info }
 
 export function useHeaderCountsValue() { return useContext(HeaderCountsContext).counts }
 export function useHeaderTabsValue() { const { tabs, selectRef } = useContext(HeaderCountsContext); return { tabs, select: (id: string) => selectRef.current?.(id) } }
@@ -41,4 +47,14 @@ export function useHeaderTabs(tabs: HeaderTab[], onSelect: (id: string) => void)
     return () => setTabs([])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, setTabs])
+}
+
+/** A page puts figures into the right end of the top bar. */
+export function useHeaderInfo(info: HeaderInfo[]) {
+  const { setInfo } = useContext(HeaderCountsContext)
+  const key = JSON.stringify(info)
+  useEffect(() => {
+    setInfo(JSON.parse(key))
+    return () => setInfo([])
+  }, [key, setInfo])
 }

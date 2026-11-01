@@ -82,6 +82,16 @@ export default function BudgetStatus({ departmentId, amount = 0, byCategory = {}
             <p className={`text-xs mt-1 tabular-nums ${tone === 'danger' ? 'text-danger' : 'text-ink2'}`}>
               {add > 0 ? `${now} % → ${after} % ${s.afterThis}` : `${after} %`}{tone === 'danger' ? ` · ${s.over}` : ''}
             </p>
+            {/* where the used part comes from: orders, and requests that are not ordered yet */}
+            <dl className="mt-3 pt-3 border-t border-field flex flex-col gap-1.5 text-sm">
+              <div className="flex justify-between gap-3"><dt className="text-ink2">{s.ordered}</dt><dd className="tabular-nums text-ink">{fmt(ordered)}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-ink2">{s.requested}</dt><dd className="tabular-nums text-ink">{fmt(requested)}</dd></div>
+              {add > 0 && <div className="flex justify-between gap-3"><dt className="text-ink2">{s.thisDoc}</dt><dd className="tabular-nums text-ink">{fmt(add)}</dd></div>}
+              <div className="flex justify-between gap-3 pt-1.5 border-t border-field font-medium">
+                <dt className="text-ink">{s.remaining}</dt>
+                <dd className={`tabular-nums ${budget - used - add < 0 ? 'text-danger' : 'text-ink'}`}>{fmt(budget - used - add)}</dd>
+              </div>
+            </dl>
           </div>
         )
       })}
