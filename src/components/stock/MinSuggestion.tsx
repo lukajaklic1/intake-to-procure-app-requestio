@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Triangle } from 'lucide-react'
+import { ArrowDown, ArrowUp } from 'lucide-react'
 import type { UsageInfo } from '../../lib/stock'
 
 /** The suggested minimum stock differs enough from the set one to be worth a hint. */
@@ -19,16 +19,17 @@ interface Props {
   footer: string
 }
 
-/** Small triangle (green up: raise, blue down: lower) next to a figure of the stock; the explanation shows on hover. Drawn at the page level (fixed), so the table does not clip it. */
+/** Small arrow (green up: raise, blue down: lower) next to a figure of the stock; the explanation shows on hover. Drawn at the page level (fixed), so the table does not clip it. */
 export default function MinSuggestion({ direction, title, body, footer }: Props) {
+  const Icon = direction === 'up' ? ArrowUp : ArrowDown
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   return (
     <>
       <span
         onMouseEnter={e => { const r = e.currentTarget.getBoundingClientRect(); setPos({ x: r.left, y: r.top + r.height / 2 }) }}
         onMouseLeave={() => setPos(null)}
-        className={`inline-flex items-center justify-center w-4 h-4 ${direction === 'up' ? 'text-success' : 'text-accent'}`}>
-        <Triangle className={`w-3 h-3 fill-current ${direction === 'down' ? 'rotate-180' : ''}`} strokeWidth={1.5} />
+        className={`inline-flex items-center justify-center w-5 h-5 rounded-md ${direction === 'up' ? 'text-success bg-success-light' : 'text-accent bg-accent-light'}`}>
+        <Icon className="w-3.5 h-3.5" strokeWidth={2} />
       </span>
       {pos && createPortal(
         <div role="tooltip" style={{ left: pos.x - 8, top: pos.y, transform: 'translate(-100%, -50%)' }}
