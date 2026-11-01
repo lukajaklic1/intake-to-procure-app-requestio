@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ArrowLeft, ChevronRight, PackageMinus, ClipboardCheck, ArrowRightLeft, Gauge, ShoppingCart, CalendarClock, CircleDot, Hash, User, FileText } from 'lucide-react'
+import { ArrowLeft, ChevronRight, PackageMinus, ClipboardCheck, ArrowRightLeft, Gauge, ShoppingCart, CalendarClock, CircleDot, Hash, User, FileText, Building2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -24,7 +24,7 @@ import { MovementModal, CountModal, LimitsModal, TransferModal, type StockItem, 
 
 interface Movement {
   id: string; created_at: string; movement_type: MovementType; quantity: number; reason: string | null; created_by: string | null
-  receipt_id: string | null; related_location_id: string | null; receipts: { receipt_number: string } | null
+  receipt_id: string | null; related_location_id: string | null; receipts: { receipt_number: string } | null; departments: { name: string } | null
 }
 interface OpenOrder { id: string; quantity: number; purchase_orders: { id: string; po_number: string; expected_delivery_date: string | null } }
 type Tab = 'movements' | 'orders' | 'analysis'
@@ -65,7 +65,7 @@ export default function StockDetailPage() {
       supabase.from('items').select('id, item_number, name, default_unit, category_id').eq('id', itemId).single(),
       supabase.from('locations').select('id, name').eq('company_id', company.id).eq('status', 'active').order('name'),
       loadStockOverview(),
-      supabase.from('stock_movements').select('id, created_at, movement_type, quantity, reason, created_by, receipt_id, related_location_id, receipts(receipt_number)')
+      supabase.from('stock_movements').select('id, created_at, movement_type, quantity, reason, created_by, receipt_id, related_location_id, receipts(receipt_number), departments(name)')
         .eq('item_id', itemId).eq('location_id', locationId).order('created_at', { ascending: false }).limit(5000),
       supabase.from('po_line_items').select('id, quantity, purchase_orders!inner(id, po_number, status, location_id, expected_delivery_date)')
         .eq('item_id', itemId).in('purchase_orders.status', ['issued', 'sent']).eq('purchase_orders.location_id', locationId),
@@ -109,6 +109,7 @@ export default function StockDetailPage() {
     { header: s.type, get: m => s.mt[m.movement_type], kind: 'text', width: 18 },
     { header: s.quantity, get: m => Number(m.quantity), kind: 'number', width: 12 },
     { header: s.by, get: m => (m.created_by ? names[m.created_by] : ''), kind: 'text', width: 22 },
+    { header: s.department, get: m => m.departments?.name ?? '', kind: 'text', width: 20 },
     { header: s.reason, get: m => reasonOf(m), kind: 'text', width: 34 },
   ]
 
@@ -214,13 +215,13 @@ export default function StockDetailPage() {
             <ExportButton fileName={`zaloga-${item.item_number}`} columns={exportCols} rows={filtered} />
           </div>
         }>
-          <div className="overflow-x-auto"><table className="table-grid w-full text-sm min-w-[720px] table-fixed [&_thead]:border-b [&_thead]:border-line">
+          <div className="overflow-x-auto"><table className="table-grid w-full text-sm min-w-[900px] table-fixed [&_thead]:border-b [&_thead]:border-line">
             {/* fixed widths, so the columns stay tight and only the reason takes what is left */}
-            <colgroup><col className="w-[11rem]" /><col className="w-[9rem]" /><col className="w-[9.5rem]" /><col className="w-[13rem]" /><col /></colgroup>
-            <GridHead cols={[[s.date, CalendarClock], [s.type, CircleDot], [s.quantity, Hash, 'right'], [s.by, User], [s.reason, FileText]]} />
+            <colgroup><col className="w-[11rem]" /><col className="w-[9rem]" /><col className="w-[9.5rem]" /><col className="w-[13rem]" /><col className="w-[11rem]" /><col /></colgroup>
+            <GridHead cols={[[s.date, CalendarClock], [s.type, CircleDot], [s.quantity, Hash, 'right'], [s.by, User], [s.department, Building2], [s.reason, FileText]]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={FileText} colSpan={5} title={s.noMovements} subtitle={moves.length === 0 ? s.noMovementsHint : t.common.empty.noResults.text} />
+                <TableEmptyState icon={FileText} colSpan={6} title={s.noMovements} subtitle={moves.length === 0 ? s.noMovementsHint : t.common.empty.noResults.text} />
               ) : paged.map(m => (
                 <tr key={m.id} className="hover:bg-surface transition-colors">
                   <td className="px-4 py-3 font-medium text-ink whitespace-nowrap">{format(new Date(m.created_at), 'dd.MM.yyyy HH:mm')}</td>
@@ -229,7 +230,8 @@ export default function StockDetailPage() {
                     <span className="inline-flex items-baseline justify-end"><span className="w-16 text-right">{Number(m.quantity) > 0 ? '+' : ''}{fmtQty(Number(m.quantity))}</span><span className="w-[4.75rem] pl-1.5 text-left text-ink2 font-normal">{unitOf(Math.abs(Number(m.quantity)))}</span></span>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap"><PersonCell name={m.created_by ? names[m.created_by] : null} /></td>
-                  <td className="px-4 py-3 text-ink2 max-w-[420px] truncate" title={reasonOf(m)}>
+                  <td className="px-4 py-3 text-ink2 whitespace-nowrap truncate">{m.departments?.name ?? '-'}</td>
+                    <td className="px-4 py-3 text-ink2 max-w-[420px] truncate" title={reasonOf(m)}>
                     {m.receipts ? <Link to={`/receipts/${m.receipt_id}`} className="hover:underline hover:text-ink">{reasonOf(m)}</Link> : (reasonOf(m) || '-')}
                   </td>
                 </tr>

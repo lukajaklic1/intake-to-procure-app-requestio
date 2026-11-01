@@ -53,8 +53,16 @@ export function MovementModal({ open, onClose, items, locations, rows, onSaved, 
   const [type, setType] = useState<'usage' | 'waste'>('usage')
   const [qty, setQty] = useState('')
   const [reason, setReason] = useState('')
+  const [departmentId, setDepartmentId] = useState('')
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
   const [saving, setSaving] = useState(false)
-  useEffect(() => { if (open) { setType('usage'); setQty(''); setReason(''); req.reset() } }, [open])
+  const { company, profile } = useCompany()
+  useEffect(() => { if (open) { setType('usage'); setQty(''); setReason(''); setDepartmentId(profile?.department_id ?? ''); req.reset() } }, [open])
+  // the department the usage is booked to; the department of the person is preselected
+  useEffect(() => {
+    if (!open || !company) return
+    supabase.from('departments').select('id, name').eq('company_id', company.id).eq('status', 'active').order('name').then(({ data }) => setDepartments((data as { id: string; name: string }[]) ?? []))
+  }, [open, company?.id])
 
   const item = items.find(i => i.id === itemId)
   const have = Number(rowOf(rows, itemId, locationId)?.on_hand ?? 0)
@@ -66,8 +74,9 @@ export function MovementModal({ open, onClose, items, locations, rows, onSaved, 
     if (!itemId) { req.setError('item', t.common.fieldRequired, 'mv-item'); return }
     if (!locationId) { req.setError('location', t.common.fieldRequired, 'mv-location'); return }
     if (toNum(qty) <= 0) { req.setError('qty', s.qtyRequired, 'mv-qty'); return }
+    if (!departmentId) { req.setError('department', t.common.fieldRequired, 'mv-department'); return }
     setSaving(true)
-    const { error } = await supabase.rpc('record_stock_movement', { p_item_id: itemId, p_location_id: locationId, p_type: type, p_quantity: toNum(qty), p_reason: reason })
+    const { error } = await supabase.rpc('record_stock_movement', { p_item_id: itemId, p_location_id: locationId, p_type: type, p_quantity: toNum(qty), p_reason: reason, p_department_id: departmentId })
     setSaving(false)
     if (error) { toast.error(error.message); return }
     toast.success(s.saved); onSaved(); onClose()
@@ -106,6 +115,8 @@ export function MovementModal({ open, onClose, items, locations, rows, onSaved, 
         )}
         <Input id="mv-qty" label={`${s.quantity}${unit ? ` (${unit})` : ''} *`} inputMode="decimal" placeholder="0" value={qty} error={req.errors.qty}
           onChange={e => { if (NUM.test(e.target.value)) { req.clear('qty'); setQty(e.target.value) } }} />
+        <Select id="mv-department" label={s.department} required value={departmentId} placeholder={t.common.select} error={req.errors.department}
+          options={departments.map(d => ({ value: d.id, label: d.name }))} onChange={v => { req.clear('department'); setDepartmentId(v) }} />
         <Input id="mv-reason" label={s.reason} placeholder={s.reasonPh} value={reason} onChange={e => setReason(e.target.value)} />
         {itemId && locationId && toNum(qty) > 0 && (
           <div className="text-[13px] flex items-center justify-between gap-3">
