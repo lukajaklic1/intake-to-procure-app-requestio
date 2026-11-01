@@ -74,7 +74,7 @@ export interface UsageInfo {
 export const SAFETY_DAYS = 3
 export const MIN_HISTORY_DAYS = 7
 const SERVICE_Z = 1.65        // 95 % of the days without running out
-const ORDER_CYCLE_DAYS = 14   // how often the stock is topped up, for the target turnover
+export const ORDER_CYCLE_DAYS = 14   // how often the stock is topped up, for the target turnover
 const DAY = 86400000
 
 /** Average daily usage, how long the stock lasts and a suggested minimum stock (usage per day x (lead time + safety days)).
@@ -120,6 +120,17 @@ export function computeUsage(
     })
   }
   return out
+}
+
+/** Is the stock on hand too small or too big for the usage? Too small: below the suggested minimum (with what is on the way counted in).
+ *  Too big: more than one and a half times the highest level that is worth keeping (the minimum plus one ordering cycle of usage). Nothing before a week of history. */
+export function stockLevel(r: StockRow, u: UsageInfo | undefined): { dir: 'up' | 'down'; max: number } | null {
+  if (!u || !u.enough || u.perDay <= 0 || u.suggestedMin == null) return null
+  const max = u.suggestedMin + Math.ceil(u.perDay * ORDER_CYCLE_DAYS)
+  const have = Math.max(0, Number(r.on_hand))
+  if (have + Number(r.on_order) < u.suggestedMin) return { dir: 'up', max }
+  if (have > max * 1.5) return { dir: 'down', max }
+  return null
 }
 
 /** The stock overview as numbers. */

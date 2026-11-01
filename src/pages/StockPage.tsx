@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Search, X, Hourglass, Coins, Boxes, Package, MapPin, Hash, Gauge, Repeat, CircleDot, PackageMinus, ShoppingCart, Plus, Pencil } from 'lucide-react'
+import { Search, X, Hourglass, Truck, Coins, Boxes, Package, MapPin, Hash, Gauge, Repeat, CircleDot, PackageMinus, ShoppingCart, Plus, Pencil } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -20,7 +20,7 @@ import type { ExportColumn } from '../lib/exportExcel'
 import { matchesSearch } from '../lib/search'
 import { applySort, text, rev, type SortDef } from '../lib/sort'
 import { unitLabel, unitFor } from '../lib/units'
-import { STATE_BADGE, loadStockOverview, loadUsage, stockTurnover, stockState, stockValue, suggestedQty, type StockRow, type StockState, type UsageInfo } from '../lib/stock'
+import { STATE_BADGE, loadStockOverview, loadUsage, stockTurnover, stockLevel, ORDER_CYCLE_DAYS, MIN_HISTORY_DAYS, stockState, stockValue, suggestedQty, type StockRow, type StockState, type UsageInfo } from '../lib/stock'
 import { MovementModal, CountModal, LimitsModal, TransferModal, type StockItem, type StockLocation } from '../components/stock/StockModals'
 
 interface View { key: string; item: StockItem; loc: StockLocation; row: StockRow; state: StockState }
@@ -97,6 +97,8 @@ export default function StockPage() {
     { value: value + 'Desc', label: `${label}: ${s.sortDesc}`, cmp: rev(text(get)) },
   ]
   const turnoverOf = (v: View) => (v.state === 'missing' ? null : stockTurnover([v.row], usage).turnover)
+  // the average delivery time of the item; without receipts there is only an assumption, so nothing is shown
+  const leadOf = (v: View) => { const u = usage.get(v.key); return v.state !== 'missing' && u && u.leadSamples > 0 ? u.lead : null }
   const cover = (v: View) => (usage.get(v.key)?.daysLeft ?? null)
   const sortDefs: SortDef<View>[] = [
     { value: 'low', label: `${s.state}: ${s.st.low}`, cmp: (a, b) => rank[a.state] - rank[b.state] || a.item.name.localeCompare(b.item.name) },
@@ -107,6 +109,7 @@ export default function StockPage() {
     ...numCol('onHand', s.onHand, v => (v.state === 'missing' ? null : v.row.on_hand)),
     ...numCol('min', s.minimum, v => (Number(v.row.min_qty ?? 0) > 0 ? Number(v.row.min_qty) : null)),
     ...numCol('turnover', s.turnover, turnoverOf),
+    ...numCol('lead', s.leadTime, leadOf),
     ...numCol('cover', s.cover, cover),
     ...numCol('value', s.value, v => stockValue(v.row)),
   ]
@@ -130,6 +133,7 @@ export default function StockPage() {
     { header: t.po.unit, get: v => unitLabel(v.item.default_unit, lang), kind: 'text', width: 10 },
     { header: s.minimum, get: v => v.row.min_qty, kind: 'number', width: 12 },
     { header: s.onOrder, get: v => v.row.on_order, kind: 'number', width: 12 },
+    { header: s.leadTime, get: leadOf, kind: 'number', width: 14 },
     { header: s.cover, get: v => { const d = usage.get(v.key)?.daysLeft; return d == null ? null : Math.floor(d) }, kind: 'number', width: 14 },
     { header: s.turnover, get: turnoverOf, kind: 'number', width: 14 },
     { header: s.unitCost, get: v => v.row.unit_cost ?? null, kind: 'money', width: 14 },
@@ -187,11 +191,11 @@ export default function StockPage() {
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[960px]">
-            <GridHead cols={[[s.item, Package], [s.location, MapPin], [s.onHand, Hash, 'right'], [s.minShort, Gauge, 'right'], [s.turnover, Repeat, 'right'], [s.cover, Hourglass, 'right'], [s.value, Coins, 'right'], [s.state, CircleDot], ['']]} />
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1040px]">
+            <GridHead cols={[[s.item, Package], [s.location, MapPin], [s.onHand, Hash, 'right'], [s.minShort, Gauge, 'right'], [s.turnover, Repeat, 'right'], [s.leadTime, Truck, 'right'], [s.cover, Hourglass, 'right'], [s.value, Coins, 'right'], [s.state, CircleDot], ['']]} />
             <tbody className="divide-y divide-field">
               {filtered.length === 0 ? (
-                <TableEmptyState icon={Boxes} colSpan={9}
+                <TableEmptyState icon={Boxes} colSpan={10}
                   title={filtering ? t.common.empty.noResults.title : t.common.empty.stock.title}
                   subtitle={filtering ? t.common.empty.noResults.text : t.common.empty.stock.text}
                   action={!filtering && canEdit ? <Button onClick={() => open('add')} className="gap-2 mt-2"><Plus className="w-4 h-4" />{s.add}</Button> : undefined} />
@@ -201,7 +205,7 @@ export default function StockPage() {
                 return (
                   <tr key={v.key} className={`hover:bg-surface transition-colors ${v.state !== 'missing' ? 'cursor-pointer' : ''}`} onClick={() => v.state !== 'missing' && navigate(`/stock/${v.item.id}/${v.loc.id}`)}>
                     <td className="px-3 py-3 max-w-[300px] truncate" title={`${v.item.name} (${v.item.item_number})`}><span className="font-medium text-ink">{v.item.name}</span> <span className="text-xs text-ink2 ml-1">{v.item.item_number}</span></td>
-                    <td className="px-3 py-3 text-ink2 max-w-[190px] truncate" title={v.loc.name}>{v.loc.name}</td>
+                    <td className="px-3 py-3 text-ink2 max-w-[160px] truncate" title={v.loc.name}>{v.loc.name}</td>
                     <td className={`px-3 py-3 text-right whitespace-nowrap tabular-nums ${v.row.on_hand < 0 || v.state === 'low' ? 'text-danger font-medium' : 'text-ink'}`}>{v.state === 'missing' ? <span className="text-ink2">-</span> : <span className="inline-flex items-baseline justify-end"><span className="w-12 text-right">{fmtQty(v.row.on_hand)}</span><span className="w-[4.75rem] pl-1.5 text-left text-ink2 font-normal">{unit}</span></span>}</td>
                     <td className="px-3 py-3 text-right text-ink2 whitespace-nowrap tabular-nums">
                       {(() => {
@@ -214,12 +218,24 @@ export default function StockPage() {
                         return <span className="inline-flex items-center justify-end gap-1.5"><MinSuggestion direction={dir} title={min <= 0 ? s.hintNew : dir === 'up' ? s.hintUp : s.hintDown} body={body} footer={s.hintFooter} />{num}</span>
                       })()}
                     </td>
-                    <td className="px-3 py-3 text-right text-ink whitespace-nowrap tabular-nums" title={s.turnoverHint}>{(() => { const n = turnoverOf(v); return n == null ? <span className="text-ink2">-</span> : `${String(n).replace('.', ',')}×` })()}</td>
+                    <td className="px-3 py-3 text-right text-ink whitespace-nowrap tabular-nums" title={s.turnoverHint}>{(() => {
+                      const n = turnoverOf(v); const u = usage.get(v.key)
+                      const lv = v.state === 'missing' ? null : stockLevel(v.row, u)
+                      const num = n == null ? <span className="text-ink2">-</span> : `${String(n).replace('.', ',')}×`
+                      if (!lv || !u) return num
+                      const per = fmtQty(Math.round(u.perDay * 100) / 100)
+                      const body = (lv.dir === 'up' ? s.levelUpBody : s.levelDownBody)
+                        .replace('{have}', `${fmtQty(v.row.on_hand)} ${unitFor(v.item.default_unit, lang, v.row.on_hand)}`).replace('{onOrder}', fmtQty(v.row.on_order))
+                        .replace('{min}', fmtQty(u.suggestedMin!)).replace('{max}', fmtQty(lv.max)).replace('{perDay}', per).replace('{unit}', unitFor(v.item.default_unit, lang, u.perDay))
+                        .replace('{days}', u.daysLeft != null ? String(Math.floor(u.daysLeft)) : '-').replace('{lead}', String(Math.round(u.lead))).replace('{cycle}', String(ORDER_CYCLE_DAYS))
+                      return <span className="inline-flex items-center justify-end gap-1.5"><MinSuggestion direction={lv.dir} title={lv.dir === 'up' ? s.levelUp : s.levelDown} body={body} footer={s.levelFooter} />{num}</span>
+                    })()}</td>
+                    <td className="px-3 py-3 text-right text-ink whitespace-nowrap tabular-nums">{(() => { const n = leadOf(v); return n == null ? <span className="text-ink2" title={v.state === 'missing' ? undefined : s.leadNoteNone}>-</span> : `${n} ${unitFor('day', lang, n)}` })()}</td>
                     <td className="px-3 py-3 text-right whitespace-nowrap tabular-nums" title={s.coverHint}>
                       {(() => {
                         const u = usage.get(v.key)
                         if (v.state === 'missing' || !u) return <span className="text-ink2">-</span>
-                        if (!u.enough) return <span className="text-ink2" title={s.collecting.replace('{n}', String(u.daysToGo))}>-</span>
+                        if (!u.enough) return <span className="text-ink2" title={s.collecting.replace('{n}', String(MIN_HISTORY_DAYS))}>-</span>
                         if (u.daysLeft == null) return <span className="text-ink2">-</span>
                         const d = Math.floor(u.daysLeft)
                         // it will run out before a new delivery can arrive

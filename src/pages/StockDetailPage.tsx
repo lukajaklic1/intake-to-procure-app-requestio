@@ -11,12 +11,13 @@ import FilterSelect from '../components/ui/FilterSelect'
 import GridHead from '../components/ui/GridHead'
 import Pagination from '../components/ui/Pagination'
 import TableEmptyState from '../components/ui/TableEmptyState'
+import PersonCell from '../components/ui/PersonCell'
 import { Card, Field } from '../components/ui/DetailCard'
 import ExportButton from '../components/ui/ExportButton'
 import type { ExportColumn } from '../lib/exportExcel'
 import { unitFor } from '../lib/units'
 import {
-  MOVEMENT_BADGE, STATE_BADGE, loadStockOverview, loadUsage, stockState, stockTurnover, stockValue, suggestedQty,
+  MOVEMENT_BADGE, STATE_BADGE, MIN_HISTORY_DAYS, loadStockOverview, loadUsage, stockState, stockTurnover, stockValue, suggestedQty,
   type MovementType, type StockRow, type UsageInfo,
 } from '../lib/stock'
 import { MovementModal, CountModal, LimitsModal, TransferModal, type StockItem, type StockLocation } from '../components/stock/StockModals'
@@ -175,9 +176,10 @@ export default function StockDetailPage() {
           {min > 0 && <span className="text-sm text-ink2 ml-1.5">{unitOf(min)}</span>}
         </div>
         <div className="bg-white rounded-lg border border-line p-4 pb-5">
-          <span className="text-sm font-semibold text-ink2 block mb-2">{s.onOrder}</span>
+          <span className="text-sm font-semibold text-ink2 block mb-2">{s.openOrdersCard}</span>
           <span className="text-2xl font-semibold tracking-tight tabular-nums text-ink">{row.on_order > 0 ? fmtQty(row.on_order) : '-'}</span>
           {row.on_order > 0 && <span className="text-sm text-ink2 ml-1.5">{unitOf(row.on_order)}</span>}
+          {usage && <span className="block text-xs text-ink2 mt-1.5" title={usage.leadSamples > 0 ? s.leadNote.replace('{n}', String(usage.leadSamples)) : s.leadNoteNone}>{s.leadTime}: {usage.lead} {unitFor('day', lang, usage.lead)}{usage.leadSamples === 0 ? ` (${s.leadNoteNone})` : ''}</span>}
         </div>
         <div className="bg-white rounded-lg border border-line p-4 pb-5" title={s.costHint}>
           <span className="text-sm font-semibold text-ink2 block mb-2">{s.value}</span>
@@ -197,8 +199,8 @@ export default function StockDetailPage() {
       </div>
 
       {tab === 'movements' && (
-        <>
-          <div className="flex items-center gap-2 flex-wrap mb-3">
+        <Card tall title={s.historyTitle} className="overflow-hidden" action={
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             <FilterSelect label={s.type} value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
               <option value="all">{s.allTypes}</option>
               {(['receipt', 'usage', 'waste', 'count', 'transfer', 'reversal'] as MovementType[]).map(k => <option key={k} value={k}>{s.mt[k]}</option>)}
@@ -209,36 +211,37 @@ export default function StockDetailPage() {
               <option value="3m">{t.filters.last3Months}</option>
               <option value="12m">{t.filters.last12Months}</option>
             </FilterSelect>
-            <div className="ml-auto"><ExportButton fileName={`zaloga-${item.item_number}`} columns={exportCols} rows={filtered} /></div>
+            <ExportButton fileName={`zaloga-${item.item_number}`} columns={exportCols} rows={filtered} />
           </div>
-          <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
-            <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
-              <GridHead cols={[[s.date, CalendarClock], [s.type, CircleDot], [s.quantity, Hash, 'right'], [s.by, User], [s.reason, FileText]]} />
-              <tbody className="divide-y divide-field">
-                {filtered.length === 0 ? (
-                  <TableEmptyState icon={FileText} colSpan={5} title={s.noMovements} subtitle={moves.length === 0 ? s.noMovementsHint : t.common.empty.noResults.text} />
-                ) : paged.map(m => (
-                  <tr key={m.id} className="hover:bg-surface transition-colors">
-                    <td className="px-4 py-3 text-ink2 whitespace-nowrap">{format(new Date(m.created_at), 'dd.MM.yyyy HH:mm')}</td>
-                    <td className="px-4 py-3"><span className={`badge ${MOVEMENT_BADGE[m.movement_type]}`}>{s.mt[m.movement_type]}</span></td>
-                    <td className={`px-4 py-3 text-right whitespace-nowrap tabular-nums font-medium ${Number(m.quantity) < 0 ? 'text-danger' : 'text-ink'}`}>
-                      {Number(m.quantity) > 0 ? '+' : ''}{fmtQty(Number(m.quantity))} <span className="text-ink2 font-normal">{unitOf(Math.abs(Number(m.quantity)))}</span>
-                    </td>
-                    <td className="px-4 py-3 text-ink2 whitespace-nowrap">{m.created_by ? names[m.created_by] ?? '-' : '-'}</td>
-                    <td className="px-4 py-3 text-ink2 max-w-[420px] truncate" title={reasonOf(m)}>
-                      {m.receipts ? <Link to={`/receipts/${m.receipt_id}`} className="hover:underline hover:text-ink">{reasonOf(m)}</Link> : (reasonOf(m) || '-')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table></div>
-            <Pagination total={filtered.length} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={n => { setPageSize(n); setPage(1) }} />
-          </div>
-        </>
+        }>
+          <div className="overflow-x-auto"><table className="table-grid w-full text-sm min-w-[720px] table-fixed [&_thead]:border-b [&_thead]:border-line">
+            {/* fixed widths, so the columns stay tight and only the reason takes what is left */}
+            <colgroup><col className="w-[11rem]" /><col className="w-[9rem]" /><col className="w-[9.5rem]" /><col className="w-[13rem]" /><col /></colgroup>
+            <GridHead cols={[[s.date, CalendarClock], [s.type, CircleDot], [s.quantity, Hash, 'right'], [s.by, User], [s.reason, FileText]]} />
+            <tbody className="divide-y divide-field">
+              {filtered.length === 0 ? (
+                <TableEmptyState icon={FileText} colSpan={5} title={s.noMovements} subtitle={moves.length === 0 ? s.noMovementsHint : t.common.empty.noResults.text} />
+              ) : paged.map(m => (
+                <tr key={m.id} className="hover:bg-surface transition-colors">
+                  <td className="px-4 py-3 font-medium text-ink whitespace-nowrap">{format(new Date(m.created_at), 'dd.MM.yyyy HH:mm')}</td>
+                  <td className="px-4 py-3"><span className={`badge ${MOVEMENT_BADGE[m.movement_type]}`}>{s.mt[m.movement_type]}</span></td>
+                  <td className={`px-4 py-3 text-right whitespace-nowrap tabular-nums font-medium ${Number(m.quantity) < 0 ? 'text-danger' : 'text-ink'}`}>
+                    <span className="inline-flex items-baseline justify-end"><span className="w-16 text-right">{Number(m.quantity) > 0 ? '+' : ''}{fmtQty(Number(m.quantity))}</span><span className="w-[4.75rem] pl-1.5 text-left text-ink2 font-normal">{unitOf(Math.abs(Number(m.quantity)))}</span></span>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap"><PersonCell name={m.created_by ? names[m.created_by] : null} /></td>
+                  <td className="px-4 py-3 text-ink2 max-w-[420px] truncate" title={reasonOf(m)}>
+                    {m.receipts ? <Link to={`/receipts/${m.receipt_id}`} className="hover:underline hover:text-ink">{reasonOf(m)}</Link> : (reasonOf(m) || '-')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+          <Pagination total={filtered.length} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={n => { setPageSize(n); setPage(1) }} />
+        </Card>
       )}
 
       {tab === 'orders' && (
-        <Card title={s.openOrders}>
+        <Card tall title={s.openOrders}>
           {orders.length === 0 ? <p className="p-5 text-sm text-ink2">{s.noOpenOrders}</p> : (
             <ul className="divide-y divide-field">
               {orders.map(o => (
@@ -255,9 +258,10 @@ export default function StockDetailPage() {
       )}
 
       {tab === 'analysis' && (
-        <Card title={s.usageAnalysis}>
+        <Card tall title={s.usageAnalysis}>
+          {usage && <div className="px-5 pt-5"><Field label={s.leadTime}>{usage.lead} {unitFor('day', lang, usage.lead)} <span className="text-ink2">({usage.leadSamples > 0 ? s.leadNote.replace('{n}', String(usage.leadSamples)) : s.leadNoteNone})</span></Field></div>}
           {usage && !usage.enough ? (
-            <p className="p-5 text-sm text-ink2">{s.collecting.replace('{n}', String(usage.daysToGo))}</p>
+            <p className="p-5 text-sm text-ink2">{s.collecting.replace('{n}', String(MIN_HISTORY_DAYS))}</p>
           ) : !usage || usage.perDay <= 0 ? (
             <p className="p-5 text-sm text-ink2">{s.noUsageData}</p>
           ) : (
@@ -274,7 +278,6 @@ export default function StockDetailPage() {
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
                 <Field label={s.avgUsage}>{fmtQty(Math.round(usage.perDay * 100) / 100)} {unitOf(usage.perDay)} {s.perDay}<span className="block text-xs text-ink2">{s.basisDays.replace('{n}', String(usage.windowDays))}</span></Field>
                 <Field label={s.cover}>{usage.daysLeft != null ? `${Math.floor(usage.daysLeft)} ${unitFor('day', lang, Math.floor(usage.daysLeft))}` : null}</Field>
-                <Field label={s.leadTime}>{usage.lead} {unitFor('day', lang, usage.lead)} <span className="text-ink2">({usage.leadSamples > 0 ? s.leadNote.replace('{n}', String(usage.leadSamples)) : s.leadNoteNone})</span></Field>
                 <Field label={s.suggestedSafety}>{usage.safetyStock != null ? `${fmtQty(usage.safetyStock)} ${unitOf(usage.safetyStock)}` : null}</Field>
                 <Field label={s.turnover}>{turnover?.turnover != null ? `${String(turnover.turnover).replace('.', ',')}× ${s.perYear}` : null}</Field>
                 <Field label={s.suggestedTurnover}>{usage.targetTurnover != null ? `${String(usage.targetTurnover).replace('.', ',')}× ${s.perYear}` : null}</Field>

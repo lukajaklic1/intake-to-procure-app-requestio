@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
 
 /** A titled box of a detail page. */
-export function Card({ title, children, className = '', action }: { title: string; children: ReactNode; className?: string; action?: ReactNode }) {
+export function Card({ title, children, className = '', action, tall }: { title: string; children: ReactNode; className?: string; action?: ReactNode; tall?: boolean }) {
   return (
     <section className={`bg-white rounded-lg border border-field ${className}`}>
-      <div className="px-5 py-3 border-b border-field flex items-center justify-between gap-3 min-h-[49px]">
+      <div className={`px-5 py-3 border-b border-field flex items-center justify-between gap-3 ${tall ? 'min-h-[60px]' : 'min-h-[49px]'}`}>
         <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
         {action}
       </div>
