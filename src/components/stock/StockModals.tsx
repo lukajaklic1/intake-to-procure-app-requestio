@@ -99,8 +99,11 @@ export function MovementModal({ open, onClose, items, locations, rows, onSaved, 
                   const picked = r.location_id === locationId
                   return (
                     <button key={r.location_id} type="button" disabled={!!preset?.locationId} onClick={() => { req.clear('location'); setLocationId(r.location_id) }}
-                      className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-sm text-left transition-colors ${picked ? 'bg-selected' : 'hover:bg-surface'} disabled:cursor-default`}>
-                      <span className="text-ink truncate">{locations.find(l => l.id === r.location_id)?.name}</span>
+                      className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-sm text-left transition-colors ${picked ? 'bg-surface' : 'hover:bg-surface'} disabled:cursor-default`}>
+                      <span className="flex items-center gap-2.5 min-w-0">
+                        <span className={`shrink-0 w-4 h-4 rounded-full border bg-white ${picked ? 'border-[5px] border-accent' : 'border-field'}`} />
+                        <span className={`truncate ${picked ? 'text-ink font-medium' : 'text-ink'}`}>{locations.find(l => l.id === r.location_id)?.name}</span>
+                      </span>
                       <span className={`tabular-nums whitespace-nowrap ${Number(r.on_hand) < 0 ? 'text-danger font-medium' : 'text-ink'}`}>{fmtQty(Number(r.on_hand))} <span className="text-ink2">{unitFor(item?.default_unit, lang, Number(r.on_hand))}</span></span>
                     </button>
                   )
