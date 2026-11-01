@@ -41,6 +41,7 @@ interface ReceiptRow {
   receipt_number: string
   received_date: string
   received_by: string
+  reversal_of: string | null
   supplier_receipt_no: string | null
   purchase_orders: { po_number: string; suppliers: { name: string } | null } | null
 }
@@ -91,7 +92,7 @@ export default function ReceiptsPage() {
         .eq('company_id', company.id).eq('status', 'sent').neq('received_status', 'full')
         .order('created_at', { ascending: false }),
       supabase.from('receipts')
-        .select('id, receipt_number, received_date, created_at, received_by, supplier_receipt_no, purchase_orders(po_number, suppliers(name))')
+        .select('id, receipt_number, received_date, created_at, received_by, reversal_of, supplier_receipt_no, purchase_orders(po_number, suppliers(name))')
         .eq('company_id', company.id).order('received_date', { ascending: false }),
     ])
     setQueue((q as unknown as QueueRow[]) ?? [])
@@ -109,6 +110,7 @@ export default function ReceiptsPage() {
 
   useEffect(() => { setHistPage(1) }, [search, dateRange])
   const dateFrom = getDateFrom(dateRange)
+  const cancelledIds = new Set(receipts.map(r => r.reversal_of).filter(Boolean) as string[])
   const filteredReceipts = receipts.filter(r => {
     if (!matchesSearch(search, [r.receipt_number, r.supplier_receipt_no, r.purchase_orders?.po_number, r.purchase_orders?.suppliers?.name, names[r.received_by]])) return false
     if (dateFrom && r.received_date < dateFrom) return false
@@ -137,6 +139,7 @@ export default function ReceiptsPage() {
     { header: t.po.title, get: r => r.purchase_orders?.po_number, width: 14 }, { header: t.po.supplier, get: r => r.purchase_orders?.suppliers?.name, width: 32 },
     { header: s.receivedDate, get: r => r.received_date, kind: 'date', width: 14 }, { header: s.receivedBy, get: r => names[r.received_by], width: 22 },
     { header: t.common.created, get: r => r.created_at, kind: 'date', width: 14 },
+    { header: t.common.status, get: r => (r.reversal_of ? s.reversalBadge : cancelledIds.has(r.id) ? s.reversedBadge : ''), width: 14 },
   ]
   const queueCols: ExportColumn<QueueRow>[] = [
     { header: t.po.poNumber, get: r => r.po_number, width: 14 }, { header: t.po.supplier, get: r => r.suppliers?.name, width: 32 },
@@ -229,7 +232,7 @@ export default function ReceiptsPage() {
                     <TableEmptyState icon={PackageCheck} colSpan={6} title={hasFilters ? t.common.empty.noResults.title : t.common.empty.receipts.title} subtitle={hasFilters ? t.common.empty.noResults.text : t.common.empty.receipts.text} />
                   ) : paginatedReceipts.map(r => (
                     <tr key={r.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/receipts/${r.id}`)}>
-                      <td className="px-4 py-3 whitespace-nowrap"><Link to={`/receipts/${r.id}`} onClick={e => e.stopPropagation()} className="text-ink2 hover:text-ink">{r.receipt_number}</Link></td>
+                      <td className="px-4 py-3 whitespace-nowrap"><Link to={`/receipts/${r.id}`} onClick={e => e.stopPropagation()} className="text-ink2 hover:text-ink">{r.receipt_number}</Link>{r.reversal_of ? <span className="badge badge-warn ml-2">{s.reversalBadge}</span> : cancelledIds.has(r.id) ? <span className="badge badge-neutral ml-2">{s.reversedBadge}</span> : null}</td>
                       <td className="px-4 py-3 text-ink2 whitespace-nowrap">{r.purchase_orders?.po_number ?? '-'}</td>
                       <td className="px-4 py-3 font-medium text-ink max-w-[260px] truncate">{r.purchase_orders?.suppliers?.name ?? '-'}</td>
                       <td className="px-4 py-3 text-ink whitespace-nowrap">{format(new Date(r.received_date), 'dd.MM.yyyy')}</td>

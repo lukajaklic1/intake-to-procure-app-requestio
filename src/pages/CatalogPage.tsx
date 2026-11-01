@@ -35,6 +35,14 @@ interface ItemWithCategory extends Item {
   categories: { name: string } | null
 }
 
+/** "da / yes / 1 / x" -> true, "ne / no / 0" or empty -> false, anything else -> null (not understood). */
+function parseYesNo(v?: string): boolean | null {
+  const x = (v ?? '').trim().toLowerCase()
+  if (['da', 'yes', 'y', '1', 'true', 'x'].includes(x)) return true
+  if (['', 'ne', 'no', 'n', '0', 'false'].includes(x)) return false
+  return null
+}
+
 const EMPTY: Partial<Item> = { name: '', long_description: '', category_id: undefined, default_unit: '', default_unit_price: null, track_stock: false, status: 'active' }
 
 export default function CatalogPage() {
@@ -68,6 +76,7 @@ export default function CatalogPage() {
   const [pageSize, setPageSize] = useState(20)
   function setView(v: 'tree' | 'all') { setViewState(v); try { localStorage.setItem('catalogView', v) } catch { /* ignore */ } }
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [stockFilter, setStockFilter] = useState<'all' | 'yes' | 'no'>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Partial<Item>>(EMPTY)
   const [priceStr, setPriceStr] = useState('')
@@ -227,7 +236,7 @@ export default function CatalogPage() {
   }
 
   const q = search.toLowerCase()
-  const filtering = q !== '' || statusFilter !== 'all'
+  const filtering = q !== '' || statusFilter !== 'all' || stockFilter !== 'all'
   const categoryNames = (id: string | null) => {
     const c = allCategories.find(x => x.id === id)
     return [c?.name, c?.parent_id ? allCategories.find(x => x.id === c.parent_id)?.name : null]
@@ -253,7 +262,8 @@ export default function CatalogPage() {
   ]
   const filteredItems = applySort(items, sortDefs, sort).filter(i =>
     matchesSearch(search, [i.item_number, i.name, i.long_description, unitLabel(i.default_unit, lang), ...categoryNames(i.category_id)])
-    && (statusFilter === 'all' || i.status === statusFilter))
+    && (statusFilter === 'all' || i.status === statusFilter)
+    && (stockFilter === 'all' || (stockFilter === 'yes') === !!i.track_stock))
 
   // Sections: a header per category and per subcategory, each followed by its own items.
   // While filtering, sections with no matching item are hidden.
@@ -287,7 +297,7 @@ export default function CatalogPage() {
     if (subFilter !== 'all' && i.category_id !== subFilter) return false
     return true
   })
-  useEffect(() => { setPage(1) }, [search, statusFilter, categoryFilter, subFilter, view])
+  useEffect(() => { setPage(1) }, [search, statusFilter, stockFilter, categoryFilter, subFilter, view])
   const pagedItems = flatItems.slice((page - 1) * pageSize, page * pageSize)
   const pathOf = (categoryId: string | null) => {
     const c = allCategories.find(x => x.id === categoryId)
@@ -313,6 +323,7 @@ export default function CatalogPage() {
     { header: s.itemNumber, get: i => i.item_number, width: 12 }, { header: s.nameCol, get: i => i.name, width: 36 }, { header: s.longDescription, get: i => i.long_description, width: 40 },
     { header: t.categories.single, get: i => pathOf(i.category_id).top, width: 22 }, { header: t.categories.subcategory, get: i => pathOf(i.category_id).sub, width: 26 },
     { header: s.defaultUnit, get: i => unitLabel(i.default_unit, lang), width: 12 }, { header: s.defaultUnitPrice, get: i => i.default_unit_price, kind: 'money', width: 14 },
+    { header: t.common.import.cols.stock, get: i => (i.track_stock ? (lang === 'sl' ? 'da' : 'yes') : (lang === 'sl' ? 'ne' : 'no')), width: 12 },
     { header: t.common.status, get: i => (i.status === 'active' ? t.common.active : t.common.inactive), width: 12 }, { header: t.common.created, get: i => i.created_at, kind: 'date', width: 14 },
   ]
 
@@ -345,6 +356,11 @@ export default function CatalogPage() {
         </FilterSelect>
         <FilterSelect label={t.filters.labels.status} value={statusFilter} onChange={e => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}>
           {(['all', 'active', 'inactive'] as const).map(v => <option key={v} value={v}>{v === 'all' ? t.common.allM : v === 'active' ? t.common.activeM : t.common.inactiveM}</option>)}
+        </FilterSelect>
+        <FilterSelect label={s.stockFilter} value={stockFilter} onChange={e => setStockFilter(e.target.value as 'all' | 'yes' | 'no')}>
+          <option value="all">{t.filters.allF}</option>
+          <option value="yes">{s.stockYes}</option>
+          <option value="no">{s.stockNo}</option>
         </FilterSelect>
       </PageToolbar>
 
@@ -437,8 +453,8 @@ export default function CatalogPage() {
               <tbody className="divide-y divide-field">
                 {flatItems.length === 0 ? (
                   <TableEmptyState icon={Package} colSpan={8}
-                    title={(search || statusFilter !== 'all' || categoryFilter !== 'all' || subFilter !== 'all') ? t.common.empty.noResults.title : t.common.empty.items.title}
-                    subtitle={(search || statusFilter !== 'all' || categoryFilter !== 'all' || subFilter !== 'all') ? t.common.empty.noResults.text : t.common.empty.items.text} />
+                    title={(search || statusFilter !== 'all' || stockFilter !== 'all' || categoryFilter !== 'all' || subFilter !== 'all') ? t.common.empty.noResults.title : t.common.empty.items.title}
+                    subtitle={(search || statusFilter !== 'all' || stockFilter !== 'all' || categoryFilter !== 'all' || subFilter !== 'all') ? t.common.empty.noResults.text : t.common.empty.items.text} />
                 ) : pagedItems.map(item => {
                   const path = pathOf(item.category_id)
                   return (
@@ -510,11 +526,13 @@ export default function CatalogPage() {
           { key: 'unit', label: t.common.import.cols.unit, example: lang === 'sl' ? 'kos' : 'pcs' },
           { key: 'price', label: t.common.import.cols.price, example: '5,90' },
           { key: 'description', label: t.common.import.cols.description, example: 'Ekstra deviško' },
+          { key: 'stock', label: t.common.import.cols.stock, example: lang === 'sl' ? 'ne' : 'no' },
         ]}
         existing={new Set(items.map(i => i.name.toLowerCase()))}
         keyOf={row => row.name.toLowerCase()}
         validate={row => {
           if (row.price && Number.isNaN(Number(row.price.replace(',', '.')))) return t.common.import.invalidNumber + ': ' + row.price
+          if (row.stock && parseYesNo(row.stock) === null) return `${t.common.import.cols.stock}: ${row.stock} (${lang === 'sl' ? 'da / ne' : 'yes / no'})`
           const top = allCategories.find(c => !c.parent_id && c.name.toLowerCase() === row.category.toLowerCase())
           if (!top) return `${t.common.import.unknownCategory}: ${row.category}`
           if (!allCategories.some(c => c.parent_id === top.id && c.name.toLowerCase() === row.subcategory.toLowerCase())) return `${t.common.import.unknownSubcategory}: ${row.subcategory}`
@@ -531,6 +549,7 @@ export default function CatalogPage() {
             category_id: sub.get(`${top.get(r.category.toLowerCase())}|${r.subcategory.toLowerCase()}`),
             default_unit: unitToStore(r.unit),
             default_unit_price: r.price ? Number(r.price.replace(',', '.')) : null,
+            track_stock: parseYesNo(r.stock) === true,
             status: 'active',
           }))
           for (let k = 0; k < payload.length; k += 500) {
@@ -587,15 +606,10 @@ export default function CatalogPage() {
                 }
               }}
             />
-            <div className="sm:col-span-2">
-              <label className="flex items-start gap-3 rounded-lg border border-field px-3.5 py-3 cursor-pointer hover:bg-surface transition-colors">
-                <input type="checkbox" checked={!!editing.track_stock} onChange={e => setEditing(f => ({ ...f, track_stock: e.target.checked }))} className="mt-0.5 rounded border-field text-accent focus:ring-accent" />
-                <span>
-                  <span className="block text-sm font-medium text-ink">{s.trackStock}</span>
-                  <span className="block text-[13px] text-ink2 mt-0.5">{s.trackStockHint}</span>
-                </span>
-              </label>
-            </div>
+            <label className="sm:col-span-2 inline-flex items-center gap-2.5 cursor-pointer w-fit">
+              <input type="checkbox" checked={!!editing.track_stock} onChange={e => setEditing(f => ({ ...f, track_stock: e.target.checked }))} className="rounded border-field text-accent focus:ring-accent" />
+              <span className="text-sm text-ink">{s.trackStock}</span>
+            </label>
           </div>
 
         </div>

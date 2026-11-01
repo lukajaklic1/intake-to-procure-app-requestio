@@ -30,7 +30,7 @@ interface OrderRow { id: string; po_number: string; status: string; total_amount
 type Tab = 'overview' | 'prices' | 'documents' | 'orders'
 
 const fmtDate = (d: string | null) => (d ? format(new Date(d + 'T00:00:00'), 'dd.MM.yyyy') : '-')
-const PO_BADGE: Record<string, string> = { draft: 'badge-neutral', issued: 'badge-warn', sent: 'badge-info', closed: 'badge-success', cancelled: 'badge-danger' }
+const PO_BADGE: Record<string, string> = { draft: 'badge-neutral', issued: 'badge-warn', sent: 'badge-info', closed: 'badge-success', cancelled: 'badge-neutral' }
 
 /** A titled box of the overview. */
 function Card({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {

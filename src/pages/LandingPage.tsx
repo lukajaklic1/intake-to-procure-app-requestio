@@ -106,7 +106,7 @@ export default function LandingPage() {
         { text: isSl ? 'Neomejeno naročil' : 'Unlimited POs', included: true },
         { text: isSl ? 'Do 5 uporabnikov' : 'Up to 5 users', included: true, soon: true },
         { text: isSl ? 'Vse iz Professional plana' : 'Everything in Professional', included: true },
-        { text: isSl ? 'Odobritve naročil' : 'Approval workflows', included: true, soon: true },
+        { text: isSl ? 'Potrditve naročil' : 'Approval workflows', included: true, soon: true },
         { text: isSl ? 'Proračunske omejitve po projektih' : 'Budget limits per project', included: true, soon: true },
         { text: isSl ? 'Izvoz CSV / Excel' : 'CSV / Excel export', included: true, soon: true },
         { text: isSl ? 'Prednostna podpora' : 'Priority support', included: true },

@@ -61,7 +61,7 @@ const STATUS_BADGE: Record<string, string> = {
   issued:    'badge-warn',
   sent:      'badge-info',
   closed:    'badge-success',
-  cancelled: 'badge-danger',
+  cancelled: 'badge-neutral',
 }
 
 // Date options are rendered inline with t.filters.*

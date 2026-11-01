@@ -151,7 +151,7 @@ export default function ApprovalsPage() {
   return (
     <div className="p-4 lg:p-6">
       {rows.length > 0 && (
-      <PageToolbar attached actions={<ExportButton fileName="odobritve" columns={exportCols} rows={sortedRows} />}>
+      <PageToolbar attached actions={<ExportButton fileName="potrditve" columns={exportCols} rows={sortedRows} />}>
             <div className="relative min-w-40 flex-1 max-w-[220px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}

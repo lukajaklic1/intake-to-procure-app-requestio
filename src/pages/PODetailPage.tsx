@@ -45,7 +45,7 @@ const STATUS_BADGE: Record<string, string> = {
   issued: 'badge-warn',
   sent: 'badge-info',
   closed: 'badge-success',
-  cancelled: 'badge-danger',
+  cancelled: 'badge-neutral',
 }
 
 /** A titled box of the page. */
@@ -85,7 +85,7 @@ export default function PODetailPage() {
   const [linkedReq, setLinkedReq] = useState<{ id: string; request_number: string } | null>(null)
   const [activity, setActivity] = useState<PoActivityLog[]>([])
   const [actNames, setActNames] = useState<Record<string, string>>({})
-  const [receipts, setReceipts] = useState<{ id: string; receipt_number: string; received_date: string }[]>([])
+  const [receipts, setReceipts] = useState<{ id: string; receipt_number: string; received_date: string; reversal_of: string | null }[]>([])
   const [invoices, setInvoices] = useState<{ id: string; supplier_invoice_number: string; total_amount: number; status: InvoiceStatus }[]>([])
 
   async function openAttachment(path: string) {
@@ -115,7 +115,7 @@ export default function PODetailPage() {
     const { data: atts } = await supabase.from('po_attachments').select('id, file_name, file_path').eq('po_id', id!)
     setAttachments(atts ?? [])
 
-    const { data: recs } = await supabase.from('receipts').select('id, receipt_number, received_date').eq('po_id', id!).order('received_date', { ascending: false })
+    const { data: recs } = await supabase.from('receipts').select('id, receipt_number, received_date, reversal_of').eq('po_id', id!).order('received_date', { ascending: false })
     setReceipts(recs ?? [])
 
     // invoices entered against this order (empty for people who may not see invoices)
@@ -395,7 +395,7 @@ export default function PODetailPage() {
                 {receipts.map(r => (
                   <li key={r.id}>
                     <Link to={`/receipts/${r.id}`} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm hover:bg-surface transition-colors">
-                      <span className="inline-flex items-center gap-2 font-medium text-ink"><PackageCheck className="w-4 h-4 text-icon" strokeWidth={1.75} />{r.receipt_number}</span>
+                      <span className="inline-flex items-center gap-2 font-medium text-ink"><PackageCheck className="w-4 h-4 text-icon" strokeWidth={1.75} />{r.receipt_number}{r.reversal_of ? <span className="badge badge-warn ml-2">{t.receipts.reversalBadge}</span> : receipts.some(x => x.reversal_of === r.id) ? <span className="badge badge-neutral ml-2">{t.receipts.reversedBadge}</span> : null}</span>
                       <span className="text-xs text-ink2">{format(new Date(r.received_date), 'dd.MM.yyyy')}</span>
                     </Link>
                   </li>

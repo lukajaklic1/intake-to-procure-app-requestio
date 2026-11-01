@@ -37,11 +37,12 @@ export const STATE_BADGE: Record<StockState, string> = {
   none: 'badge-neutral',
 }
 
-export type MovementType = 'receipt' | 'usage' | 'waste' | 'count'
+export type MovementType = 'receipt' | 'usage' | 'waste' | 'count' | 'reversal'
 
 export const MOVEMENT_BADGE: Record<MovementType, string> = {
   receipt: 'badge-success',
   usage: 'badge-neutral',
   waste: 'badge-warn',
   count: 'badge-info',
+  reversal: 'badge-danger',
 }
