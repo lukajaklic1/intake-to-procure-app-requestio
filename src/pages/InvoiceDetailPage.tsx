@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronRight, Pencil, Trash2, Upload, FileText, Eye, Check, Coins, CircleAlert, TriangleAlert, CircleCheck, Package, Hash, Ruler } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Pencil, Trash2, Upload, FileText, Eye, Check, Coins, Package, Hash, Ruler, Percent } from 'lucide-react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
@@ -14,7 +14,9 @@ import ModalActions from '../components/ui/ModalActions'
 import GridHead from '../components/ui/GridHead'
 import PersonCell from '../components/ui/PersonCell'
 import { Card, Field } from '../components/ui/DetailCard'
-import { computeMatch, type InvLine } from '../lib/invoiceMatching'
+import DocumentPreview from '../components/invoices/DocumentPreview'
+import MatchPanel from '../components/invoices/MatchPanel'
+import { computeMatch, invoiceTotals, type InvLine } from '../lib/invoiceMatching'
 import { loadMatchData, type MatchData } from '../lib/invoiceData'
 import { INVOICE_BADGE, MATCH_BADGE, dueState, type InvoiceStatus } from '../lib/invoices'
 import { daysUntil } from '../lib/contracts'
@@ -25,9 +27,9 @@ interface Inv {
   invoice_date: string; due_date: string | null; tax_rate: number; subtotal: number; tax_amount: number; total_amount: number; document_total: number | null
   status: InvoiceStatus; match_status: string; decision_note: string | null; paid_at: string | null; payment_reference: string | null
   notes: string | null; created_by: string | null; approved_by: string | null; approved_at: string | null; created_at: string
-  suppliers: { id: string; name: string } | null; purchase_orders: { id: string; po_number: string } | null
+  suppliers: { id: string; name: string } | null; purchase_orders: { id: string; po_number: string; total_amount: number | null } | null
 }
-interface Line { id: string; po_line_id: string | null; position: number; name: string; quantity: number; unit: string | null; unit_price: number; line_total: number }
+interface Line { id: string; po_line_id: string | null; position: number; name: string; quantity: number; unit: string | null; unit_price: number; line_total: number; tax_rate: number }
 interface Doc { id: string; file_name: string; file_path: string; file_size: number | null; created_at: string }
 interface Act { id: string; actor_id: string | null; action: string; note: string | null; created_at: string }
 
@@ -68,14 +70,14 @@ export default function InvoiceDetailPage() {
   async function load() {
     if (!company || !id) return
     const [{ data: i }, { data: ls }, { data: ds }, { data: ac }] = await Promise.all([
-      supabase.from('invoices').select('*, suppliers(id, name), purchase_orders(id, po_number)').eq('id', id).single(),
+      supabase.from('invoices').select('*, suppliers(id, name), purchase_orders(id, po_number, total_amount)').eq('id', id).single(),
       supabase.from('invoice_line_items').select('*').eq('invoice_id', id).order('position'),
       supabase.from('invoice_attachments').select('*').eq('invoice_id', id).order('created_at', { ascending: false }),
       supabase.from('invoice_activity').select('*').eq('invoice_id', id).order('created_at', { ascending: false }),
     ])
     if (!i) { toast.error(t.common.notFound); navigate('/invoices'); return }
     setInv(i as unknown as Inv)
-    setLines(((ls ?? []) as Line[]).map(l => ({ ...l, quantity: Number(l.quantity), unit_price: Number(l.unit_price), line_total: Number(l.line_total) })))
+    setLines(((ls ?? []) as Line[]).map(l => ({ ...l, quantity: Number(l.quantity), unit_price: Number(l.unit_price), line_total: Number(l.line_total), tax_rate: Number(l.tax_rate ?? i.tax_rate) })))
     setDocs((ds as Doc[]) ?? [])
     setActivity((ac as Act[]) ?? [])
     const ids = [...new Set([i.created_by, i.approved_by, ...(ac ?? []).map(a => a.actor_id)].filter(Boolean))] as string[]
@@ -89,7 +91,7 @@ export default function InvoiceDetailPage() {
     setLoading(false)
   }
 
-  const invLines: InvLine[] = useMemo(() => lines.map(l => ({ id: l.id, po_line_id: l.po_line_id, name: l.name, quantity: l.quantity, unit_price: l.unit_price })), [lines])
+  const invLines: InvLine[] = useMemo(() => lines.map(l => ({ id: l.id, po_line_id: l.po_line_id, name: l.name, quantity: l.quantity, unit_price: l.unit_price, tax_rate: l.tax_rate })), [lines])
   const result = useMemo(() => inv ? computeMatch({
     hasPo: !!inv.po_id, lines: invLines, poLines: match?.poLines ?? [], received: match?.received ?? new Map(), invoicedElsewhere: match?.invoicedElsewhere ?? new Map(),
     totalAmount: Number(inv.total_amount), documentTotal: inv.document_total != null ? Number(inv.document_total) : null,
@@ -117,6 +119,12 @@ export default function InvoiceDetailPage() {
     if (paidAt > today) { setPaidErr(s.paidFuture); return }
     if (paidAt < inv!.invoice_date) { setPaidErr(s.paidBeforeInvoice); return }
     rpc('paid', { paid: paidAt, ref: payRef })
+  }
+  // a draft goes to review with a document and with the match as it is now (the receipts may have changed since it was saved)
+  async function submit() {
+    if (docs.length === 0) { toast.error(s.documentRequired); return }
+    if (result) await supabase.from('invoices').update({ match_status: result.status, match_notes: result.issues.filter(i => i.severity === 'error').map(i => i.code).join(',') || null, updated_at: new Date().toISOString() }).eq('id', inv!.id)
+    rpc('in_review')
   }
   async function deleteInvoice() {
     const { error } = await supabase.from('invoices').delete().eq('id', inv!.id)
@@ -147,15 +155,13 @@ export default function InvoiceDetailPage() {
 
   const needNote = dialog === 'reject' || (dialog === 'approve' && result.status === 'mismatch')
   const isOpenForEdit = inv.status === 'draft' || inv.status === 'rejected'
-  const issueText = (i: (typeof result.issues)[number]) =>
-    `${i.name ? `${i.name}: ` : ''}${s.issue[i.code]}${i.expected != null ? ` (${i.code === 'total' ? `${money(i.expected)} ≠ ${money(i.actual ?? 0)}` : `${i.expected} → ${i.actual}`})` : ''}`
 
   const actionButtons = (
     <>
       {isOpenForEdit && canEdit && <>
         {inv.status === 'draft' && <Button variant="secondary" onClick={() => setDialog('delete')} className="!px-2.5" aria-label={t.common.deleteEntity}><Trash2 className="w-4 h-4 text-icon" /></Button>}
         <Button variant="secondary" onClick={() => navigate(`/invoices/${inv.id}/edit`)} className="gap-2"><Pencil className="w-4 h-4" />{t.common.editEntity}</Button>
-        <Button loading={busy} onClick={() => rpc('in_review')}>{s.submit}</Button>
+        <Button loading={busy} onClick={submit}>{s.submit}</Button>
       </>}
       {inv.status === 'in_review' && canApprove && <>
         <Button variant="secondary" onClick={() => { setNote(''); setDialog('reject') }}>{s.reject}</Button>
@@ -194,31 +200,17 @@ export default function InvoiceDetailPage() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
         {/* left: what is invoiced and whether it is right */}
         <div className="xl:col-span-2 flex flex-col gap-4">
-          <Card title={s.matching} action={<span className="text-[13px] text-ink2">{s.basis[result.basis]}</span>}>
-            <div className="p-5">
-              {result.issues.length === 0 ? (
-                <p className="inline-flex items-center gap-2 text-sm text-ink"><CircleCheck className="w-4 h-4 text-success" strokeWidth={1.75} />{s.noMatchIssues}</p>
-              ) : (
-                <ul className="flex flex-col gap-2 text-sm">
-                  {result.issues.map((i, k) => (
-                    <li key={k} className={`flex items-start gap-2 ${i.severity === 'error' ? 'text-danger' : 'text-warn'}`}>
-                      {i.severity === 'error' ? <CircleAlert className="w-4 h-4 mt-0.5 shrink-0" strokeWidth={1.75} /> : <TriangleAlert className="w-4 h-4 mt-0.5 shrink-0" strokeWidth={1.75} />}
-                      <span>{issueText(i)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </Card>
+          <MatchPanel result={result} hasPo={!!inv.po_id} input={{ lines: invLines, poLines: match?.poLines ?? [], received: match?.received ?? new Map(), invoicedElsewhere: match?.invoicedElsewhere ?? new Map() }}
+            money={money} orderTotal={inv.purchase_orders?.total_amount != null ? Number(inv.purchase_orders.total_amount) : null} invoiceSubtotal={Number(inv.subtotal)} />
 
           <Card title={s.lines} className="overflow-hidden">
-            <div className="overflow-x-auto"><table className="table-grid w-full text-sm min-w-[760px]">
+            <div className="overflow-x-auto"><table className="table-grid w-full text-sm min-w-[820px]">
               <GridHead cols={[
-                [s.lineName, Package], [s.qty, Hash, 'right'], [s.unit, Ruler], [s.unitPrice, Coins, 'right'], [s.lineTotal, Coins, 'right'],
+                [s.lineName, Package], [s.qty, Hash, 'right'], [s.unit, Ruler], [s.unitPrice, Coins, 'right'], [s.vatRate, Percent, 'right'], [s.lineTotal, Coins, 'right'],
                 ...(inv.po_id ? [[s.ordered, Hash, 'right'], [s.received, Hash, 'right'], [s.invoicedBefore, Hash, 'right'], [s.orderPrice, Coins, 'right']] as [string, typeof Hash, 'right'][] : []),
               ]} />
               <tbody className="divide-y divide-field">
-                {lines.length === 0 && <tr><td colSpan={9} className="px-4 py-6 text-center text-ink2">{s.noLines}</td></tr>}
+                {lines.length === 0 && <tr><td colSpan={10} className="px-4 py-6 text-center text-ink2">{s.noLines}</td></tr>}
                 {lines.map((l, idx) => {
                   const po = l.po_line_id ? poLineById.get(l.po_line_id) : undefined
                   const issues = result.perLine[idx] ?? []
@@ -232,6 +224,7 @@ export default function InvoiceDetailPage() {
                       <td className={`px-4 py-3 text-right tabular-nums ${has('qty_over_received') || has('qty_over_ordered') ? 'text-danger font-medium' : 'text-ink2'}`}>{l.quantity}</td>
                       <td className="px-4 py-3 text-ink2">{unitLabel(l.unit, lang) || '-'}</td>
                       <td className={`px-4 py-3 text-right tabular-nums ${has('price') ? 'text-danger font-medium' : 'text-ink2'}`}>{money(l.unit_price)}</td>
+                      <td className="px-4 py-3 text-right text-ink2 tabular-nums">{String(l.tax_rate).replace('.', ',')} %</td>
                       <td className="px-4 py-3 text-right text-ink tabular-nums">{money(l.line_total)}</td>
                       {inv.po_id && <>
                         <td className="px-4 py-3 text-right text-ink2 tabular-nums">{po ? po.quantity : '-'}</td>
@@ -255,6 +248,29 @@ export default function InvoiceDetailPage() {
 
         {/* right: with whom, when, how much */}
         <div className="flex flex-col gap-4 order-first xl:order-none">
+          <Card title={s.supplierDocument}
+            action={canEdit ? (
+              <>
+                <input ref={fileRef} type="file" multiple className="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx" onChange={e => upload(e.target.files)} />
+                <Button variant="secondary" loading={uploading} onClick={() => fileRef.current?.click()} className="!h-8 text-[13px] gap-1.5"><Upload className="w-3.5 h-3.5" />{s.upload}</Button>
+              </>
+            ) : undefined}>
+            <div className="p-4 pb-0"><DocumentPreview docs={docs.map(d => ({ key: d.id, name: d.file_name, path: d.file_path }))} height={460} /></div>
+            {docs.length === 0 ? null : (
+              <ul className="p-4 flex flex-col gap-2">
+                {docs.map(d => (
+                  <li key={d.id} className="flex items-center gap-2.5 px-3 py-2 bg-surface rounded-lg">
+                    <FileText className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
+                    <button type="button" onClick={() => openDoc(d)} className="flex-1 min-w-0 text-left text-sm font-medium text-ink truncate hover:text-primary transition-colors">{d.file_name}</button>
+                    <button type="button" onClick={() => openDoc(d)} aria-label={s.viewDoc} className="text-icon hover:text-ink transition-colors"><Eye className="w-4 h-4" strokeWidth={1.75} /></button>
+                    {canEdit && <button type="button" onClick={() => setRemoveDocRow(d)} aria-label={t.common.deleteEntity} className="text-icon hover:text-danger transition-colors"><Trash2 className="w-4 h-4" strokeWidth={1.75} /></button>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+
           <Card title={s.invoiceDetails}>
             <div className="p-5 grid grid-cols-2 gap-x-6 gap-y-5">
               <div className="col-span-2"><Field label={s.supplier}>{inv.suppliers?.name}</Field></div>
@@ -282,31 +298,12 @@ export default function InvoiceDetailPage() {
           <Card title={s.amountsCard}>
             <div className="p-5 text-sm flex flex-col gap-2">
               <div className="flex justify-between"><span className="text-ink2">{s.subtotal}</span><span className="tabular-nums text-ink">{money(Number(inv.subtotal))}</span></div>
-              <div className="flex justify-between"><span className="text-ink2">{s.tax} ({Number(inv.tax_rate)} %)</span><span className="tabular-nums text-ink">{money(Number(inv.tax_amount))}</span></div>
+              {invoiceTotals(lines, Number(inv.tax_rate)).byRate.map(g => (
+                <div key={g.rate} className="flex justify-between"><span className="text-ink2">{s.tax} {String(g.rate).replace('.', ',')} % <span className="text-xs">({s.base} {money(g.base)})</span></span><span className="tabular-nums text-ink">{money(g.tax)}</span></div>
+              ))}
               <div className="flex justify-between pt-2 mt-1 border-t border-field text-[15px] font-semibold"><span>{s.total}</span><span className="tabular-nums">{money(Number(inv.total_amount))}</span></div>
               {inv.document_total != null && <div className="flex justify-between text-xs text-ink2"><span>{s.documentTotal}</span><span className="tabular-nums">{money(Number(inv.document_total))}</span></div>}
             </div>
-          </Card>
-
-          <Card title={s.documents}
-            action={canEdit ? (
-              <>
-                <input ref={fileRef} type="file" multiple className="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx" onChange={e => upload(e.target.files)} />
-                <Button variant="secondary" loading={uploading} onClick={() => fileRef.current?.click()} className="!h-8 text-[13px] gap-1.5"><Upload className="w-3.5 h-3.5" />{s.upload}</Button>
-              </>
-            ) : undefined}>
-            {docs.length === 0 ? <p className="p-5 text-sm text-ink2">{s.noDocuments}</p> : (
-              <ul className="p-5 flex flex-col gap-2">
-                {docs.map(d => (
-                  <li key={d.id} className="flex items-center gap-2.5 px-3 py-2 bg-surface rounded-lg">
-                    <FileText className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
-                    <button type="button" onClick={() => openDoc(d)} className="flex-1 min-w-0 text-left text-sm font-medium text-ink truncate hover:text-primary transition-colors">{d.file_name}</button>
-                    <button type="button" onClick={() => openDoc(d)} aria-label={s.viewDoc} className="text-icon hover:text-ink transition-colors"><Eye className="w-4 h-4" strokeWidth={1.75} /></button>
-                    {canEdit && <button type="button" onClick={() => setRemoveDocRow(d)} aria-label={t.common.deleteEntity} className="text-icon hover:text-danger transition-colors"><Trash2 className="w-4 h-4" strokeWidth={1.75} /></button>}
-                  </li>
-                ))}
-              </ul>
-            )}
           </Card>
 
           {activity.length > 0 && (

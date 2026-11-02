@@ -8,7 +8,7 @@ import { useLanguage } from '../hooks/useLanguage'
 import Button from '../components/ui/Button'
 import Pagination from '../components/ui/Pagination'
 import PageToolbar from '../components/layout/PageToolbar'
-import { useHeaderCounts } from '../components/layout/HeaderCounts'
+import { useHeaderCounts, useHeaderInfo } from '../components/layout/HeaderCounts'
 import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import { INVOICE_BADGE, MATCH_BADGE, dueState, type InvoiceStatus } from '../lib/invoices'
@@ -109,6 +109,14 @@ export default function InvoicesPage() {
   const paged = sortedRows.slice((page - 1) * pageSize, page * pageSize)
   const filtering = q !== '' || statusFilter !== 'all' || supplierFilter !== 'all' || matchFilter !== 'all' || dueFilter !== 'all'
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
+  // what still has to be paid (approved, not paid) and how much of it is past its date, of what is shown
+  const approved = filtered.filter(r => r.status === 'approved')
+  const sum = (list: Row[]) => list.reduce((n, r) => n + Number(r.total_amount), 0)
+  const euro = (n: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n)
+  useHeaderInfo(loading ? [] : [
+    { label: s.toPayTotal, value: euro(sum(approved)) },
+    { label: s.overdueTotal, value: euro(sum(approved.filter(r => dueState(r) === 'overdue'))) },
+  ])
 
   return (
     <div className="p-4 lg:p-6">
