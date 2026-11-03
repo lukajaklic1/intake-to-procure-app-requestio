@@ -69,6 +69,7 @@ export function MovementModal({ open, onClose, items, locations, rows, onSaved, 
   const after = have - toNum(qty)
   const unit = item ? unitLabel(item.default_unit, lang) : ''
   const itemRows = rows.filter(r => r.item_id === itemId && locations.some(l => l.id === r.location_id))
+  const locationLocked = !!preset?.locationId
 
   async function save() {
     if (!itemId) { req.setError('item', t.common.fieldRequired, 'mv-item'); return }
@@ -90,21 +91,29 @@ export function MovementModal({ open, onClose, items, locations, rows, onSaved, 
           options={items.map(i => ({ value: i.id, label: `${i.name} (${i.item_number})` }))} onChange={v => { req.clear('item'); setItemId(v) }} />
         {itemId && locations.length > 1 && (
           <div>
-            <p className="text-[13px] font-medium text-ink2 mb-1.5">{s.stockByLocation}</p>
+            <p className="text-[13px] font-medium text-ink2 mb-1.5">{locationLocked ? s.location : s.stockByLocation}</p>
             {itemRows.length === 0 ? (
               <p className="text-[13px] text-ink2">{s.notInStockAnywhere}</p>
             ) : (
               <div className="rounded-lg border border-field divide-y divide-field overflow-hidden">
-                {itemRows.map(r => {
+                {itemRows.filter(r => !locationLocked || r.location_id === locationId).map(r => {
                   const picked = r.location_id === locationId
+                  const name = locations.find(l => l.id === r.location_id)?.name
+                  const qtyCell = <span className={`tabular-nums whitespace-nowrap ${Number(r.on_hand) < 0 ? 'text-danger font-medium' : 'text-ink'}`}>{fmtQty(Number(r.on_hand))} <span className="text-ink2">{unitFor(item?.default_unit, lang, Number(r.on_hand))}</span></span>
+                  if (locationLocked) return (
+                    <div key={r.location_id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm bg-surface">
+                      <span className="truncate text-ink font-medium">{name}</span>
+                      {qtyCell}
+                    </div>
+                  )
                   return (
-                    <button key={r.location_id} type="button" disabled={!!preset?.locationId} onClick={() => { req.clear('location'); setLocationId(r.location_id) }}
-                      className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-sm text-left transition-colors ${picked ? 'bg-surface' : 'hover:bg-surface'} disabled:cursor-default`}>
+                    <button key={r.location_id} type="button" onClick={() => { req.clear('location'); setLocationId(r.location_id) }}
+                      className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-sm text-left transition-colors ${picked ? 'bg-surface' : 'hover:bg-surface'}`}>
                       <span className="flex items-center gap-2.5 min-w-0">
                         <span className={`shrink-0 w-4 h-4 rounded-full border bg-white ${picked ? 'border-[5px] border-accent' : 'border-field'}`} />
-                        <span className={`truncate ${picked ? 'text-ink font-medium' : 'text-ink'}`}>{locations.find(l => l.id === r.location_id)?.name}</span>
+                        <span className={`truncate ${picked ? 'text-ink font-medium' : 'text-ink'}`}>{name}</span>
                       </span>
-                      <span className={`tabular-nums whitespace-nowrap ${Number(r.on_hand) < 0 ? 'text-danger font-medium' : 'text-ink'}`}>{fmtQty(Number(r.on_hand))} <span className="text-ink2">{unitFor(item?.default_unit, lang, Number(r.on_hand))}</span></span>
+                      {qtyCell}
                     </button>
                   )
                 })}
@@ -112,8 +121,8 @@ export function MovementModal({ open, onClose, items, locations, rows, onSaved, 
             )}
           </div>
         )}
-        {locations.length > 1 && (
-          <Select id="mv-location" label={s.location} required value={locationId} placeholder={t.common.select} disabled={!!preset?.locationId} error={req.errors.location}
+        {locations.length > 1 && !(locationLocked && itemRows.length > 0) && (
+          <Select id="mv-location" label={s.location} required value={locationId} placeholder={t.common.select} disabled={locationLocked} error={req.errors.location}
             options={locations.map(l => ({ value: l.id, label: l.name }))} onChange={v => { req.clear('location'); setLocationId(v) }} />
         )}
         <Input id="mv-qty" label={`${s.quantity}${unit ? ` (${unit})` : ''} *`} inputMode="decimal" placeholder="0" value={qty} error={req.errors.qty}

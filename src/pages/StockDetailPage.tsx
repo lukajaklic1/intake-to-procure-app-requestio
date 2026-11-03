@@ -189,6 +189,24 @@ export default function StockDetailPage() {
         </div>
       </div>
 
+      {/* the same item at the other locations: a box like the tables below, each line opens that location */}
+      {itemRows.some(r => r.location_id !== locationId) && (
+        <Card tall title={s.otherLocations} className="overflow-hidden mb-5">
+          <div className="overflow-x-auto"><table className="table-grid w-full text-sm">
+            <tbody className="divide-y divide-field">
+              {itemRows.filter(r => r.location_id !== locationId).map(r => (
+                <tr key={r.location_id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/stock/${itemId}/${r.location_id}`)}>
+                  <td className="px-4 py-3 font-medium text-ink">{locations.find(l => l.id === r.location_id)?.name}</td>
+                  <td className={`px-4 py-3 text-right whitespace-nowrap tabular-nums ${r.on_hand < 0 ? 'text-danger' : 'text-ink'}`}>
+                    <span className="inline-flex items-baseline justify-end"><span className="w-16 text-right font-medium">{fmtQty(r.on_hand)}</span><span className="w-[4.75rem] pl-1.5 text-left text-ink2">{unitOf(r.on_hand)}</span></span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        </Card>
+      )}
+
       <div className="flex items-center gap-1.5 mb-4">
         {tabs.map(x => (
           <button key={x.id} onClick={() => setTab(x.id)}
