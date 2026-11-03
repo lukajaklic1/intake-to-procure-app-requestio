@@ -20,6 +20,7 @@ import {
   MOVEMENT_BADGE, STATE_BADGE, MIN_HISTORY_DAYS, loadStockOverview, loadUsage, stockState, stockTurnover, stockValue, suggestedQty,
   type MovementType, type StockRow, type UsageInfo,
 } from '../lib/stock'
+import StockCharts from '../components/stock/StockCharts'
 import { MovementModal, CountModal, LimitsModal, TransferModal, type StockItem, type StockLocation } from '../components/stock/StockModals'
 
 interface Movement {
@@ -278,6 +279,10 @@ export default function StockDetailPage() {
       )}
 
       {tab === 'analysis' && (
+        <div className="flex flex-col gap-4">
+        <Card tall title={s.usageByWeek}>
+          <StockCharts moves={moves} unit={unitOf} />
+        </Card>
         <Card tall title={s.usageAnalysis}>
           {usage && <div className="px-5 pt-5"><Field label={s.leadTime}>{usage.lead} {unitFor('day', lang, usage.lead)} <span className="text-ink2">({usage.leadSamples > 0 ? s.leadNote.replace('{n}', String(usage.leadSamples)) : s.leadNoteNone})</span></Field></div>}
           {usage && !usage.enough ? (
@@ -307,6 +312,7 @@ export default function StockDetailPage() {
             </div>
           )}
         </Card>
+        </div>
       )}
 
       <MovementModal {...common} open={dlg === 'usage'} onClose={() => setDlg(null)} preset={preset} />
