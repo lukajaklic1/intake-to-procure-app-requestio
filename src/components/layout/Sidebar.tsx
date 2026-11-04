@@ -11,6 +11,7 @@ import AppLogo from '../ui/AppLogo'
 import { NAV_GROUPS } from './navConfig'
 import { needsAttention } from '../../lib/contracts'
 import { isLow, type StockRow } from '../../lib/stock'
+import { invoicesToDecide } from '../../lib/invoices'
 
 interface SidebarProps {
   onClose?: () => void
@@ -41,14 +42,14 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
       const canSeeStock = isAdmin || hasPerm('stock', 'view')
       const canSeeSourcing = isAdmin || hasPerm('purchase_orders', 'view')
       const today = new Date().toISOString().slice(0, 10)
-      const [{ count: pending }, { count: noPo }, { count: receiptsOpen }, { data: ctr }, { count: invReview }, stock, sourcing] = await Promise.all([
+      const [{ count: pending }, { count: noPo }, { count: receiptsOpen }, { data: ctr }, invToDecide, stock, sourcing] = await Promise.all([
         approvalsQuery,
         supabase.from('requests').select('*', { count: 'exact', head: true })
           .eq('company_id', company!.id).eq('status', 'approved').is('po_id', null),
         supabase.from('purchase_orders').select('*', { count: 'exact', head: true })
           .eq('company_id', company!.id).eq('status', 'sent').neq('received_status', 'full'),
         supabase.from('contracts').select('status, end_date, notice_days, auto_renew').eq('company_id', company!.id).eq('status', 'active'),
-        supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('company_id', company!.id).eq('status', 'in_review'),
+        invoicesToDecide(company!.id, profile!.id, isAdmin, hasPerm('invoices', 'approve')),
         canSeeStock ? supabase.rpc('stock_overview') : Promise.resolve({ data: [] as StockRow[] }),
         // sourcing events whose deadline has passed and are still waiting for a decision
         canSeeSourcing ? supabase.from('sourcing_events').select('*', { count: 'exact', head: true }).eq('company_id', company!.id).in('status', ['sent', 'evaluation']).lt('deadline', today) : Promise.resolve({ count: 0 }),
@@ -56,10 +57,10 @@ export default function Sidebar({ onClose, onCollapse }: SidebarProps) {
       setSourcingDue(sourcing.count ?? 0)
       // under the minimum and not covered by what is already on order
       setStockLow(canSeeStock ? ((stock.data ?? []) as StockRow[]).filter(isLow).length : 0)
-      setPendingApprovals(pending ?? 0)
+      setPendingApprovals((pending ?? 0) + invToDecide.length)
       setReadyForPO(noPo ?? 0)
       setOpenReceipts(receiptsOpen ?? 0)
-      setInvoicesToApprove(isAdmin || hasPerm('invoices', 'approve') ? (invReview ?? 0) : 0)
+      setInvoicesToApprove(invToDecide.length)
       setExpiringContracts((ctr ?? []).filter(c => needsAttention(c as { status: 'active'; end_date: string | null; notice_days: number | null; auto_renew: boolean }, 60)).length)
     }
     loadCounts()

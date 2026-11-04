@@ -29,6 +29,9 @@ export interface Company {
   approval_second_over: number | null
   approver_id: string | null
   second_approver_id: string | null
+  invoice_approver_id: string | null
+  invoice_second_approver_id: string | null
+  invoice_second_over: number | null
   team_edit_requests: boolean
   req_prefix: string
   req_next_number: number

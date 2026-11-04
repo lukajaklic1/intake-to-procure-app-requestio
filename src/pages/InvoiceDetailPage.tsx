@@ -31,6 +31,7 @@ interface Inv {
 }
 interface Line { id: string; po_line_id: string | null; position: number; name: string; quantity: number; unit: string | null; unit_price: number; line_total: number; tax_rate: number }
 interface Doc { id: string; file_name: string; file_path: string; file_size: number | null; created_at: string }
+interface Step { id: string; step: number; approver_id: string; status: 'pending' | 'approved' | 'rejected'; decided_by: string | null; decided_at: string | null; decision_note: string | null }
 interface Act { id: string; actor_id: string | null; action: string; note: string | null; created_at: string }
 
 const fmtDate = (d: string | null) => (d ? format(new Date(d + 'T00:00:00'), 'dd.MM.yyyy') : '-')
@@ -38,11 +39,11 @@ const fmtDate = (d: string | null) => (d ? format(new Date(d + 'T00:00:00'), 'dd
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { company, isAdmin, hasPerm } = useCompany()
+  const { company, profile, isAdmin, hasPerm } = useCompany()
   const { t, lang } = useLanguage()
   const s = t.invoices
   const canEdit = isAdmin || hasPerm('invoices', 'create')
-  const canApprove = isAdmin || hasPerm('invoices', 'approve')
+  const canApprovePerm = isAdmin || hasPerm('invoices', 'approve')
   const canPay = isAdmin || hasPerm('invoices', 'pay')
   const currency = company?.currency ?? 'EUR'
   const money = (n: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(n)
@@ -52,6 +53,7 @@ export default function InvoiceDetailPage() {
   const [lines, setLines] = useState<Line[]>([])
   const [docs, setDocs] = useState<Doc[]>([])
   const [activity, setActivity] = useState<Act[]>([])
+  const [steps, setSteps] = useState<Step[]>([])
   const [names, setNames] = useState<Record<string, string>>({})
   const [match, setMatch] = useState<MatchData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -69,18 +71,20 @@ export default function InvoiceDetailPage() {
 
   async function load() {
     if (!company || !id) return
-    const [{ data: i }, { data: ls }, { data: ds }, { data: ac }] = await Promise.all([
+    const [{ data: i }, { data: ls }, { data: ds }, { data: ac }, { data: st }] = await Promise.all([
       supabase.from('invoices').select('*, suppliers(id, name), purchase_orders(id, po_number, total_amount)').eq('id', id).single(),
       supabase.from('invoice_line_items').select('*').eq('invoice_id', id).order('position'),
       supabase.from('invoice_attachments').select('*').eq('invoice_id', id).order('created_at', { ascending: false }),
       supabase.from('invoice_activity').select('*').eq('invoice_id', id).order('created_at', { ascending: false }),
+      supabase.from('invoice_approvals').select('id, step, approver_id, status, decided_by, decided_at, decision_note').eq('invoice_id', id).order('step'),
     ])
     if (!i) { toast.error(t.common.notFound); navigate('/invoices'); return }
     setInv(i as unknown as Inv)
     setLines(((ls ?? []) as Line[]).map(l => ({ ...l, quantity: Number(l.quantity), unit_price: Number(l.unit_price), line_total: Number(l.line_total), tax_rate: Number(l.tax_rate ?? i.tax_rate) })))
     setDocs((ds as Doc[]) ?? [])
     setActivity((ac as Act[]) ?? [])
-    const ids = [...new Set([i.created_by, i.approved_by, ...(ac ?? []).map(a => a.actor_id)].filter(Boolean))] as string[]
+    setSteps((st as Step[]) ?? [])
+    const ids = [...new Set([i.created_by, i.approved_by, ...(ac ?? []).map(a => a.actor_id), ...(st ?? []).flatMap(x => [x.approver_id, x.decided_by])].filter(Boolean))] as string[]
     if (ids.length) {
       const { data: us } = await supabase.from('users').select('id, first_name, last_name').in('id', ids)
       const m: Record<string, string> = {}
@@ -153,6 +157,10 @@ export default function InvoiceDetailPage() {
     load()
   }
 
+  // the approver of the current step decides (an admin always may); the one who entered the invoice does not approve it, except an admin
+  const currentStep = steps.filter(x => x.status === 'pending')[0]
+  const isOwn = !!profile && inv.created_by === profile.id && !isAdmin
+  const canApprove = !isOwn && (currentStep ? (isAdmin || currentStep.approver_id === profile?.id) : canApprovePerm)
   const needNote = dialog === 'reject' || (dialog === 'approve' && result.status === 'mismatch')
   const isOpenForEdit = inv.status === 'draft' || inv.status === 'rejected'
 
@@ -295,6 +303,31 @@ export default function InvoiceDetailPage() {
             </div>
           </Card>
 
+          {(steps.length > 0 || inv.status === 'in_review') && (
+            <Card title={s.approvalCard}>
+              <div className="p-5 flex flex-col gap-3">
+                {steps.length === 0 && <p className="text-sm text-ink2">{s.pendingApproval}</p>}
+                {steps.map(x => (
+                  <div key={x.id} className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[12.5px] font-medium text-ink2 mb-1">{s.stepN.replace('{n}', String(x.step))}</p>
+                      <PersonCell name={names[x.approver_id]} />
+                      {x.decision_note && <p className="mt-1.5 pl-3 border-l-2 border-field text-sm text-ink2 whitespace-pre-wrap">{x.decision_note}</p>}
+                      {x.decided_at && <p className="text-xs text-ink2 mt-1">{names[x.decided_by ?? ''] ? `${names[x.decided_by ?? '']} · ` : ''}{format(new Date(x.decided_at), 'dd.MM.yyyy HH:mm')}</p>}
+                    </div>
+                    <span className={`badge shrink-0 ${x.status === 'approved' ? 'badge-success' : x.status === 'rejected' ? 'badge-danger' : 'badge-warn'}`}>{s.stepSt[x.status]}</span>
+                  </div>
+                ))}
+                {inv.status === 'in_review' && !canApprove && (
+                  <p className="text-[13px] text-ink2 pt-1 border-t border-field">
+                    {isOwn ? s.ownInvoice : currentStep ? s.onlyApprover.replace('{name}', names[currentStep.approver_id] ?? '-') : ''}
+                  </p>
+                )}
+                {inv.status === 'in_review' && steps.some(x => x.status === 'approved') && steps.some(x => x.status === 'pending') && <p className="text-[13px] text-ink2">{s.secondStepFollows}</p>}
+              </div>
+            </Card>
+          )}
+
           <Card title={s.amountsCard}>
             <div className="p-5 text-sm flex flex-col gap-2">
               <div className="flex justify-between"><span className="text-ink2">{s.subtotal}</span><span className="tabular-nums text-ink">{money(Number(inv.subtotal))}</span></div>
@@ -318,7 +351,7 @@ export default function InvoiceDetailPage() {
                         {i < activity.length - 1 && <span className="flex-1 w-px bg-line mt-1" />}
                       </div>
                       <div className="flex-1 -mt-0.5 min-w-0">
-                        <p className="text-sm text-ink"><span className="font-medium">{a.actor_id ? names[a.actor_id] ?? '-' : '-'}</span> {s.act[a.action as InvoiceStatus] ?? a.action}</p>
+                        <p className="text-sm text-ink"><span className="font-medium">{a.actor_id ? names[a.actor_id] ?? '-' : '-'}</span> {(s.act as Record<string, string>)[a.action] ?? a.action}</p>
                         {a.note && <p className="mt-1 pl-3 border-l-2 border-field text-sm text-ink2 whitespace-pre-wrap">{a.note}</p>}
                         <p className="text-xs text-ink2 mt-0.5">{format(new Date(a.created_at), 'dd.MM.yyyy HH:mm')}</p>
                       </div>

@@ -207,6 +207,25 @@ export default function SettingsPage() {
           </Section>
         )}
 
+        {isAdmin && (
+          <Section title={s.invoiceApprovals} description={s.invoiceApprovalsHint} saving={saving === 'invoice-approvals'}
+            onSave={() => save('invoice-approvals', ['invoice_approver_id', 'invoice_second_approver_id', 'invoice_second_over'])}>
+            <div className="flex flex-col gap-4">
+              <div className="sm:max-w-[calc(50%-0.5rem)]">
+                <Select id="invoice_approver" label={s.invoiceApprover} value={form.invoice_approver_id ?? ''} options={memberOptions} placeholder={s.selectApprover}
+                  onChange={v => setForm(f => ({ ...f, invoice_approver_id: v || null }))} />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input id="invoice_second_over" label={s.invoiceSecondOver} type="number"
+                  value={form.invoice_second_over?.toString() ?? ''}
+                  onChange={e => setForm(f => ({ ...f, invoice_second_over: e.target.value === '' ? null : parseFloat(e.target.value) }))} />
+                <Select id="invoice_second_approver" label={s.invoiceSecondApprover} value={form.invoice_second_approver_id ?? ''} options={memberOptions} placeholder={s.selectApprover}
+                  onChange={v => setForm(f => ({ ...f, invoice_second_approver_id: v || null }))} />
+              </div>
+            </div>
+          </Section>
+        )}
+
         <Section title={s.poTerms} description={s.poTermsHint} saving={saving === 'terms'}
           onSave={() => save('terms', ['po_terms_sl', 'po_terms_en'])}>
           <div className="flex flex-col gap-4">

@@ -20,6 +20,8 @@ import ExportButton from '../components/ui/ExportButton'
 import type { ExportColumn } from '../lib/exportExcel'
 import { loadBudgetUsage, usageOf, usedPercent } from '../lib/budget'
 import { UsedBar } from './BudgetsPage'
+import { Card } from '../components/ui/DetailCard'
+import { invoicesToDecide } from '../lib/invoices'
 
 interface Row {
   id: string
@@ -45,7 +47,7 @@ function getDateFrom(range: string): string | null {
 }
 
 export default function ApprovalsPage() {
-  const { company, profile, isAdmin } = useCompany()
+  const { company, profile, isAdmin, hasPerm } = useCompany()
   const { t } = useLanguage()
   const a = t.approvals
   const s = t.requests
@@ -66,7 +68,17 @@ export default function ApprovalsPage() {
   const [comments, setComments] = useState<Record<string, string>>({})
   // how full the budget of each department is this year (percent), for departments that have one
   const [budgetPct, setBudgetPct] = useState<Record<string, number>>({})
-  useEffect(() => { if (company && profile) { load(); loadRefs() } }, [company, profile, isAdmin])
+  useEffect(() => { if (company && profile) { load(); loadRefs(); loadInvoices() } }, [company, profile, isAdmin])
+
+  // the invoices that wait for this person: next to the requests
+  const [invoiceRows, setInvoiceRows] = useState<{ id: string; invoice_number: string; supplier_invoice_number: string; total_amount: number; due_date: string | null; suppliers: { name: string } | null }[]>([])
+  async function loadInvoices() {
+    if (!company || !profile) return
+    const ids = await invoicesToDecide(company.id, profile.id, isAdmin, hasPerm('invoices', 'approve'))
+    if (ids.length === 0) { setInvoiceRows([]); return }
+    const { data } = await supabase.from('invoices').select('id, invoice_number, supplier_invoice_number, total_amount, due_date, suppliers(name)').in('id', ids).order('due_date', { ascending: true, nullsFirst: false })
+    setInvoiceRows((data as unknown as typeof invoiceRows) ?? [])
+  }
 
   async function loadRefs() {
     if (!company) return
@@ -150,6 +162,23 @@ export default function ApprovalsPage() {
 
   return (
     <div className="p-4 lg:p-6">
+      {invoiceRows.length > 0 && (
+        <Card tall title={t.invoices.toApproveTitle} className="overflow-hidden mb-5">
+          <div className="overflow-x-auto"><table className="table-grid w-full text-sm min-w-[560px]">
+            <tbody className="divide-y divide-field">
+              {invoiceRows.map(r => (
+                <tr key={r.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/invoices/${r.id}`)}>
+                  <td className="px-4 py-3 font-medium text-ink whitespace-nowrap">{r.supplier_invoice_number}</td>
+                  <td className="px-4 py-3 text-ink2 max-w-[260px] truncate">{r.suppliers?.name ?? '-'}</td>
+                  <td className="px-4 py-3 text-ink2 whitespace-nowrap">{r.due_date ? format(new Date(r.due_date + 'T00:00:00'), 'dd.MM.yyyy') : '-'}</td>
+                  <td className="px-4 py-3 text-right text-ink whitespace-nowrap tabular-nums">{fmt(Number(r.total_amount), company?.currency)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        </Card>
+      )}
+
       {rows.length > 0 && (
       <PageToolbar attached actions={<ExportButton fileName="potrditve" columns={exportCols} rows={sortedRows} />}>
             <div className="relative min-w-40 flex-1 max-w-[220px]">
@@ -179,6 +208,7 @@ export default function ApprovalsPage() {
       </PageToolbar>
       )}
 
+      {!(!loading && rows.length === 0 && invoiceRows.length > 0) && (
       <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
@@ -211,6 +241,7 @@ export default function ApprovalsPage() {
         )}
         <Pagination total={filtered.length} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={handlePageSizeChange} />
       </div>
+      )}
     </div>
   )
 }
