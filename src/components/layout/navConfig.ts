@@ -1,11 +1,11 @@
 import {
   LayoutDashboard, FileText, FileSignature, Building2, Package,
   MapPin, Users, UserCog, Settings, Wallet, Boxes, FileSearch,
-  ClipboardList, CheckCircle2, PackageCheck, ReceiptText,
+  ClipboardList, CheckCircle2, PackageCheck, ReceiptText, Briefcase,
 } from 'lucide-react'
 
 export type NavKey = 'dashboard' | 'myRequests' | 'approvals' | 'purchaseOrders' | 'receipts' | 'stock' | 'sourcing' | 'invoices'
-  | 'suppliers' | 'contracts' | 'catalog' | 'locations' | 'departments' | 'budgets' | 'users' | 'settings'
+  | 'suppliers' | 'contracts' | 'catalog' | 'locations' | 'departments' | 'projects' | 'budgets' | 'users' | 'settings'
 
 export type SectionKey = 'sectionWorkflow' | 'sectionCatalog' | 'sectionOrganization' | 'sectionSourcing' | 'sectionAdmin'
 
@@ -46,6 +46,7 @@ export const NAV_GROUPS: { section?: SectionKey; items: NavItem[] }[] = [
     items: [
       { to: '/locations', icon: MapPin, key: 'locations' },
       { to: '/departments', icon: Users, key: 'departments' },
+      { to: '/projects', icon: Briefcase, key: 'projects', module: 'budgets' },
       { to: '/budgets', icon: Wallet, key: 'budgets', module: 'budgets' },
     ],
   },

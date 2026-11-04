@@ -58,7 +58,10 @@ export default function BudgetStatus({ departmentId, amount = 0, byCategory = {}
     <div className={`flex flex-col gap-3 ${className}`}>
       {shown.map(b => {
         const budget = Number(b.amount)
-        const ordered = usageOf(usage, b.department_id, b.category_id, 'ordered')
+        const ordered = usageOf(usage, b.department_id, b.category_id, 'ordered')   // out through orders and invoices
+        const paid = usageOf(usage, b.department_id, b.category_id, 'paid')
+        const invoiced = usageOf(usage, b.department_id, b.category_id, 'invoiced')
+        const openOrdered = usageOf(usage, b.department_id, b.category_id, 'open')
         const requested = usageOf(usage, b.department_id, b.category_id, 'requested')
         const used = ordered + requested
         const add = b.category_id === null ? amount : byCategory[b.category_id] ?? 0
@@ -76,16 +79,18 @@ export default function BudgetStatus({ departmentId, amount = 0, byCategory = {}
                 {fmt(used + add)} / {fmt(budget)}
               </span>
             </div>
-            <div className="h-1.5 rounded-full bg-selected mt-1.5 overflow-hidden" title={`${s.ordered}: ${fmt(ordered)} · ${s.requested}: ${fmt(requested)}`}>
-              <BarFill orderedPct={(ordered / budget) * 100} requestedPct={((requested + add) / budget) * 100} />
+            <div className="h-1.5 rounded-full bg-selected mt-1.5 overflow-hidden" title={`${s.paid}: ${fmt(paid)} · ${s.invoiced}: ${fmt(invoiced)} · ${s.openOrdered}: ${fmt(openOrdered)} · ${s.requested}: ${fmt(requested)}`}>
+              <BarFill orderedPct={(ordered / budget) * 100} requestedPct={((requested + add) / budget) * 100} paidPct={(paid / budget) * 100} invoicedPct={(invoiced / budget) * 100} />
             </div>
             <p className={`text-xs mt-1 tabular-nums ${tone === 'danger' ? 'text-danger' : 'text-ink2'}`}>
               {add > 0 ? `${now} % → ${after} % ${s.afterThis}` : `${after} %`}{tone === 'danger' ? ` · ${s.over}` : ''}
             </p>
             {/* where the used part comes from: orders, and requests that are not ordered yet */}
             <dl className="mt-3 pt-3 border-t border-field flex flex-col gap-1.5 text-sm">
-              <div className="flex justify-between gap-3"><dt className="text-ink2">{s.ordered}</dt><dd className="tabular-nums text-ink">{fmt(ordered)}</dd></div>
-              <div className="flex justify-between gap-3"><dt className="text-ink2">{s.requested}</dt><dd className="tabular-nums text-ink">{fmt(requested)}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="inline-flex items-center gap-2 text-ink2"><span className="w-2 h-2 rounded-sm bg-success" />{s.paid}</dt><dd className="tabular-nums text-ink">{fmt(paid)}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="inline-flex items-center gap-2 text-ink2"><span className="w-2 h-2 rounded-sm bg-success opacity-50" />{s.invoiced}</dt><dd className="tabular-nums text-ink">{fmt(invoiced)}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="inline-flex items-center gap-2 text-ink2"><span className="w-2 h-2 rounded-sm bg-primary" />{s.openOrdered}</dt><dd className="tabular-nums text-ink">{fmt(openOrdered)}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="inline-flex items-center gap-2 text-ink2"><span className="w-2 h-2 rounded-sm bg-primary opacity-40" />{s.requested}</dt><dd className="tabular-nums text-ink">{fmt(requested)}</dd></div>
               {add > 0 && <div className="flex justify-between gap-3"><dt className="text-ink2">{s.thisDoc}</dt><dd className="tabular-nums text-ink">{fmt(add)}</dd></div>}
               <div className="flex justify-between gap-3 pt-1.5 border-t border-field font-medium">
                 <dt className="text-ink">{s.remaining}</dt>

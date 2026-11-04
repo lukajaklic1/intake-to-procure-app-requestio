@@ -11,7 +11,7 @@ import PageToolbar from '../components/layout/PageToolbar'
 import { useHeaderCounts, useHeaderInfo } from '../components/layout/HeaderCounts'
 import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
-import { INVOICE_BADGE, MATCH_BADGE, dueState, type InvoiceStatus } from '../lib/invoices'
+import { INVOICE_BADGE, MATCH_BADGE, dueState, statusLabel, type InvoiceStatus } from '../lib/invoices'
 import { daysUntil } from '../lib/contracts'
 import GridHead from '../components/ui/GridHead'
 import RowMenu from '../components/ui/RowMenu'
@@ -22,7 +22,7 @@ import ExportButton from '../components/ui/ExportButton'
 import type { ExportColumn } from '../lib/exportExcel'
 
 interface Row {
-  id: string; created_at: string; invoice_number: string; supplier_invoice_number: string; supplier_id: string; po_id: string | null
+  id: string; kind: string; created_at: string; invoice_number: string; supplier_invoice_number: string; supplier_id: string; po_id: string | null
   invoice_date: string; due_date: string | null; total_amount: number; status: InvoiceStatus; match_status: string
   suppliers: { name: string } | null; purchase_orders: { po_number: string } | null
 }
@@ -56,7 +56,7 @@ export default function InvoicesPage() {
     ;(async () => {
       // spinner only on the first load: later reloads refresh the data in place
       const [{ data }, { data: sup }] = await Promise.all([
-        supabase.from('invoices').select('id, created_at, invoice_number, supplier_invoice_number, supplier_id, po_id, invoice_date, due_date, total_amount, status, match_status, suppliers(name), purchase_orders(po_number)').eq('company_id', company.id).order('invoice_date', { ascending: false }),
+        supabase.from('invoices').select('id, kind, created_at, invoice_number, supplier_invoice_number, supplier_id, po_id, invoice_date, due_date, total_amount, status, match_status, suppliers(name), purchase_orders(po_number)').eq('company_id', company.id).order('invoice_date', { ascending: false }),
         supabase.from('suppliers').select('id, name').eq('company_id', company.id).order('name'),
       ])
       setRows((data as unknown as Row[]) ?? [])
@@ -103,7 +103,7 @@ export default function InvoicesPage() {
     { header: s.dueDate, get: r => r.due_date, kind: 'date', width: 14 },
     { header: s.amount, get: r => r.total_amount, kind: 'money', width: 14 },
     { header: s.match, get: r => s.matchSt[r.match_status as keyof typeof s.matchSt] ?? r.match_status, kind: 'text', width: 14 },
-    { header: s.status, get: r => s.st[r.status], kind: 'text', width: 14 },
+    { header: s.status, get: r => statusLabel(s.st, s.stSettled, r), kind: 'text', width: 14 },
     { header: t.common.created, get: r => r.created_at, kind: 'date', width: 14 },
   ]
   const paged = sortedRows.slice((page - 1) * pageSize, page * pageSize)
@@ -120,7 +120,7 @@ export default function InvoicesPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <PageToolbar attached actions={<><ExportButton fileName="racuni" columns={exportCols} rows={sortedRows} />{canCreate && <Button onClick={() => navigate('/invoices/new')} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button>}</>}>
+      <PageToolbar attached actions={<><ExportButton fileName="racuni" columns={exportCols} rows={sortedRows} />{canCreate && <><Button variant="secondary" onClick={() => navigate('/invoices/new?credit=1')}>{s.newCredit}</Button><Button onClick={() => navigate('/invoices/new')} className="gap-2"><Plus className="w-4 h-4" />{s.new}</Button></>}</>}>
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.common.search + '…'}
@@ -166,7 +166,7 @@ export default function InvoicesPage() {
                 return (
                   <tr key={r.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/invoices/${r.id}`)}>
                     <td className="px-4 py-3 text-ink2 whitespace-nowrap">{r.invoice_number}</td>
-                    <td className="px-4 py-3 font-medium text-ink whitespace-nowrap">{r.supplier_invoice_number}</td>
+                    <td className="px-4 py-3 font-medium text-ink whitespace-nowrap">{r.supplier_invoice_number}{r.kind === 'credit_note' && <span className="badge badge-neutral ml-2">{s.creditNote}</span>}</td>
                     <td className="px-4 py-3 text-ink2 max-w-[240px] truncate" title={r.suppliers?.name}>{r.suppliers?.name ?? '-'}</td>
                     <td className="px-4 py-3 text-ink2 whitespace-nowrap">{r.purchase_orders?.po_number ?? '-'}</td>
                     <td className="px-4 py-3 text-ink whitespace-nowrap">{fmtDate(r.invoice_date)}</td>
@@ -175,7 +175,7 @@ export default function InvoicesPage() {
                     </td>
                     <td className="px-4 py-3 text-right text-ink whitespace-nowrap tabular-nums">{money(Number(r.total_amount))}</td>
                     <td className="px-4 py-3"><span className={`badge ${MATCH_BADGE[r.match_status] ?? 'badge-neutral'}`}>{s.matchSt[r.match_status as keyof typeof s.matchSt] ?? r.match_status}</span></td>
-                    <td className="px-4 py-3"><span className={`badge ${INVOICE_BADGE[r.status]}`}>{s.st[r.status]}</span></td>
+                    <td className="px-4 py-3"><span className={`badge ${INVOICE_BADGE[r.status]}`}>{statusLabel(s.st, s.stSettled, r)}</span></td>
                     <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                       <div className="flex justify-end">
                         <RowMenu items={editable

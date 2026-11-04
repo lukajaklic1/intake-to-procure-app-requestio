@@ -12,6 +12,7 @@ import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import GridHead from '../components/ui/GridHead'
 import CatalogPicker from '../components/ui/CatalogPicker'
+import ProjectBudgetStatus from '../components/budget/ProjectBudgetStatus'
 import BudgetStatus from '../components/budget/BudgetStatus'
 import LineCategoryCells from '../components/ui/LineCategoryCells'
 import { categoryScope, mainCategoryId } from '../lib/categories'
@@ -44,6 +45,7 @@ interface POHeader {
   contract_id: string
   location_id: string
   department_id: string
+  project_id: string
   payment_terms: string
   expected_delivery_date: string
   incoterm: string
@@ -52,7 +54,7 @@ interface POHeader {
 }
 
 const EMPTY_HEADER: POHeader = {
-  supplier_id: '', contract_id: '', location_id: '', department_id: '',
+  supplier_id: '', contract_id: '', location_id: '', department_id: '', project_id: '',
   payment_terms: '', expected_delivery_date: '', incoterm: '', supplier_quote_ref: '',
   notes: '',
 }
@@ -100,6 +102,7 @@ export default function POFormPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
+  const [projects, setProjects] = useState<{ id: string; name: string; project_code: string | null }[]>([])
   const [contracts, setContracts] = useState<Pick<Contract, 'id' | 'title' | 'contract_number' | 'supplier_id' | 'status' | 'end_date' | 'notice_days' | 'notice_given_at' | 'auto_renew'>[]>([])
   const [items, setItems] = useState<Item[]>([])
   const [refsLoaded, setRefsLoaded] = useState(false)
@@ -125,7 +128,7 @@ export default function POFormPage() {
       const sup = suppliers.find(x => x.id === r.supplier_id)
       const usable = r.supplier_id ? usableContracts(r.supplier_id) : []
       setHeader({
-        ...EMPTY_HEADER, supplier_id: r.supplier_id ?? '', location_id: r.location_id ?? '', department_id: r.department_id ?? '',
+        ...EMPTY_HEADER, supplier_id: r.supplier_id ?? '', location_id: r.location_id ?? '', department_id: r.department_id ?? '', project_id: r.project_id ?? '',
         payment_terms: sup?.payment_terms ?? '', incoterm: sup?.incoterm ?? '', expected_delivery_date: r.needed_by_date ?? '',
         notes: r.note ?? '', contract_id: usable.length === 1 ? usable[0].id : '',
       })
@@ -185,6 +188,7 @@ export default function POFormPage() {
   async function loadRefs() {
     if (!company) return
     const cid = company.id
+    supabase.from('projects').select('id, name, project_code').eq('company_id', cid).eq('status', 'active').order('created_at', { ascending: false }).then(({ data }) => setProjects(data ?? []))
     const [s, cat, loc, dept, itm] = await Promise.all([
       supabase.from('suppliers').select('*').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('categories').select('*').eq('company_id', cid).order('name'),
@@ -217,6 +221,7 @@ export default function POFormPage() {
       contract_id: po.contract_id ?? '',
       location_id: po.location_id ?? '',
       department_id: po.department_id ?? '',
+      project_id: po.project_id ?? '',
       payment_terms: po.payment_terms ?? '',
       expected_delivery_date: po.expected_delivery_date ?? '',
       incoterm: po.incoterm ?? '',
@@ -418,6 +423,7 @@ export default function POFormPage() {
         sourcing_event_id: fromSourcingId || null,
         contract_id: header.contract_id || null,
         department_id: header.department_id || null,
+        project_id: header.project_id || null,
         incoterm: header.incoterm || null,
         supplier_quote_ref: header.supplier_quote_ref || null,
         notes: header.notes || null,
@@ -450,6 +456,7 @@ export default function POFormPage() {
         ...header,
         contract_id: header.contract_id || null,
         department_id: header.department_id || null,
+        project_id: header.project_id || null,
         incoterm: header.incoterm || null,
         supplier_quote_ref: header.supplier_quote_ref || null,
         notes: header.notes || null,
@@ -558,6 +565,9 @@ export default function POFormPage() {
             <Select id="po-department" label={s.department} required value={header.department_id} disabled={isReadOnly} placeholder={t.common.select}
               options={departments.map(d => ({ value: d.id, label: d.name }))}
               onChange={v => setHeader(h => ({ ...h, department_id: v }))} />
+            <Select id="po-project" label={t.projects.project} value={header.project_id} disabled={isReadOnly} placeholder={t.projects.noProject}
+              options={[{ value: '', label: t.projects.noProject }, ...projects.map(p => ({ value: p.id, label: `${p.project_code ? p.project_code + ' · ' : ''}${p.name}` }))]}
+              onChange={v => setHeader(h => ({ ...h, project_id: v }))} />
             <Input id="payment_terms" label={s.paymentTermsLabel + ' *'}
               value={header.payment_terms}
               onChange={e => setHeader(h => ({ ...h, payment_terms: e.target.value }))}
@@ -585,9 +595,11 @@ export default function POFormPage() {
                 placeholder={s.notesPlaceholder}
                 className="rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none" />
             </div>
-            {header.department_id && (
+            {(header.project_id || header.department_id) && (
               <div className="sm:col-span-2 lg:col-span-4">
-                <BudgetStatus className="pt-4 border-t border-field" departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludePoId={id} excludeRequestId={fromRequestId} />
+                {header.project_id
+                  ? <ProjectBudgetStatus className="pt-4 border-t border-field" projectId={header.project_id} amount={grandTotal} excludePoId={id} excludeRequestId={fromRequestId} />
+                  : <BudgetStatus className="pt-4 border-t border-field" departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludePoId={id} excludeRequestId={fromRequestId} />}
               </div>
             )}
           </div>

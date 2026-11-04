@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronRight, Wallet, ShoppingCart, ClipboardList, Gauge, Users } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Wallet, ShoppingCart, ClipboardList, Gauge, Users, CircleCheck, ReceiptText } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
@@ -78,8 +78,9 @@ export default function BudgetYearPage() {
 
   const totals = shown.reduce((a, d) => {
     const amount = Number(budgetOf(d.id)?.amount ?? 0)
-    return { amount: a.amount + amount, ordered: a.ordered + (amount > 0 ? usageOf(usage, d.id, null, 'ordered') : 0), requested: a.requested + (amount > 0 ? usageOf(usage, d.id, null, 'requested') : 0) }
-  }, { amount: 0, ordered: 0, requested: 0 })
+    return { amount: a.amount + amount, ordered: a.ordered + (amount > 0 ? usageOf(usage, d.id, null, 'ordered') : 0), requested: a.requested + (amount > 0 ? usageOf(usage, d.id, null, 'requested') : 0),
+      paid: a.paid + (amount > 0 ? usageOf(usage, d.id, null, 'paid') : 0), invoiced: a.invoiced + (amount > 0 ? usageOf(usage, d.id, null, 'invoiced') : 0) }
+  }, { amount: 0, ordered: 0, requested: 0, paid: 0, invoiced: 0 })
 
   return (
     <div className="p-4 lg:p-6">
@@ -132,14 +133,17 @@ export default function BudgetYearPage() {
             </tbody>
           </table></div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[860px]">
-            <GridHead cols={[[s.department, Users], [s.budget, Wallet, 'right'], [s.ordered, ShoppingCart, 'right'], [s.requested, ClipboardList, 'right'], [s.remaining, Wallet, 'right'], [s.used, Gauge]]} />
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1120px]">
+            <GridHead cols={[[s.department, Users], [s.budget, Wallet, 'right'], [s.paid, CircleCheck, 'right'], [s.invoicedShort, ReceiptText, 'right'], [s.ordered, ShoppingCart, 'right'], [s.requested, ClipboardList, 'right'], [s.remaining, Wallet, 'right'], [s.used, Gauge]]} />
             <tbody className="divide-y divide-field">
-              {shown.length === 0 ? <TableEmptyState icon={Wallet} colSpan={6} title={t.common.empty.departments.title} subtitle={t.common.empty.departments.text} /> : (
+              {shown.length === 0 ? <TableEmptyState icon={Wallet} colSpan={8} title={t.common.empty.departments.title} subtitle={t.common.empty.departments.text} /> : (
                 <>
                   {shown.map(d => {
                     const amount = Number(budgetOf(d.id)?.amount ?? 0)
-                    const ordered = usageOf(usage, d.id, null, 'ordered')
+                    const ordered = usageOf(usage, d.id, null, 'ordered')   // out through orders and invoices
+                    const paid = usageOf(usage, d.id, null, 'paid')
+                    const invoiced = usageOf(usage, d.id, null, 'invoiced')
+                    const openOrdered = usageOf(usage, d.id, null, 'open')
                     const requested = usageOf(usage, d.id, null, 'requested')
                     const remaining = amount - ordered - requested
                     return (
@@ -148,20 +152,24 @@ export default function BudgetYearPage() {
                         <td className="px-2 py-1.5 w-[170px]">
                           <AmountInput value={amount} format={money} disabled={!canEdit} placeholder={s.noBudget} onSave={n => save(d.id, n, null)} />
                         </td>
-                        <td className="px-4 py-2.5 text-right text-ink2 tabular-nums whitespace-nowrap">{fmtUsage(ordered, money)}</td>
+                        <td className="px-4 py-2.5 text-right text-ink2 tabular-nums whitespace-nowrap">{fmtUsage(paid, money)}</td>
+                        <td className="px-4 py-2.5 text-right text-ink2 tabular-nums whitespace-nowrap">{fmtUsage(invoiced, money)}</td>
+                        <td className="px-4 py-2.5 text-right text-ink2 tabular-nums whitespace-nowrap">{fmtUsage(openOrdered, money)}</td>
                         <td className="px-4 py-2.5 text-right text-ink2 tabular-nums whitespace-nowrap">{fmtUsage(requested, money)}</td>
                         <td className={`px-4 py-2.5 text-right tabular-nums whitespace-nowrap ${amount > 0 && remaining < 0 ? 'text-danger' : 'text-ink'}`}>{amount > 0 ? money(remaining) : '-'}</td>
-                        <td className="px-4 py-2.5">{amount > 0 ? <UsedBar pct={usedPercent(ordered + requested, amount)} orderedPct={(ordered / amount) * 100} /> : <span className="text-ink2">-</span>}</td>
+                        <td className="px-4 py-2.5">{amount > 0 ? <UsedBar pct={usedPercent(ordered + requested, amount)} orderedPct={(ordered / amount) * 100} paidPct={(usageOf(usage, d.id, null, 'paid') / amount) * 100} invoicedPct={(usageOf(usage, d.id, null, 'invoiced') / amount) * 100} /> : <span className="text-ink2">-</span>}</td>
                       </tr>
                     )
                   })}
                   <tr className="bg-surface">
                     <td className="px-4 py-3 font-medium text-ink">{s.total}</td>
                     <td className="px-4 py-3 text-right font-medium text-ink tabular-nums whitespace-nowrap">{money(totals.amount)}</td>
-                    <td className="px-4 py-3 text-right font-medium text-ink tabular-nums whitespace-nowrap">{money(totals.ordered)}</td>
+                    <td className="px-4 py-3 text-right font-medium text-ink tabular-nums whitespace-nowrap">{money(totals.paid)}</td>
+                    <td className="px-4 py-3 text-right font-medium text-ink tabular-nums whitespace-nowrap">{money(totals.invoiced)}</td>
+                    <td className="px-4 py-3 text-right font-medium text-ink tabular-nums whitespace-nowrap">{money(totals.ordered - totals.paid - totals.invoiced)}</td>
                     <td className="px-4 py-3 text-right font-medium text-ink tabular-nums whitespace-nowrap">{money(totals.requested)}</td>
                     <td className={`px-4 py-3 text-right font-medium tabular-nums whitespace-nowrap ${totals.amount - totals.ordered - totals.requested < 0 ? 'text-danger' : 'text-ink'}`}>{money(totals.amount - totals.ordered - totals.requested)}</td>
-                    <td className="px-4 py-3"><UsedBar pct={usedPercent(totals.ordered + totals.requested, totals.amount)} orderedPct={totals.amount > 0 ? (totals.ordered / totals.amount) * 100 : 0} /></td>
+                    <td className="px-4 py-3"><UsedBar pct={usedPercent(totals.ordered + totals.requested, totals.amount)} orderedPct={totals.amount > 0 ? (totals.ordered / totals.amount) * 100 : 0} paidPct={totals.amount > 0 ? (totals.paid / totals.amount) * 100 : 0} invoicedPct={totals.amount > 0 ? (totals.invoiced / totals.amount) * 100 : 0} /></td>
                   </tr>
                 </>
               )}

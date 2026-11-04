@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronRight, Pencil, Trash2, Upload, FileText, Eye, Check, Coins, Package, Hash, Ruler, Percent } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Pencil, Trash2, Upload, Check, Coins, Package, Hash, Ruler, Percent } from 'lucide-react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
@@ -18,16 +18,18 @@ import DocumentPreview from '../components/invoices/DocumentPreview'
 import MatchPanel from '../components/invoices/MatchPanel'
 import { computeMatch, invoiceTotals, type InvLine } from '../lib/invoiceMatching'
 import { loadMatchData, type MatchData } from '../lib/invoiceData'
-import { INVOICE_BADGE, MATCH_BADGE, dueState, type InvoiceStatus } from '../lib/invoices'
+import { INVOICE_BADGE, MATCH_BADGE, dueState, statusLabel, type InvoiceStatus } from '../lib/invoices'
+import BudgetStatus from '../components/budget/BudgetStatus'
+import ProjectBudgetStatus from '../components/budget/ProjectBudgetStatus'
 import { daysUntil } from '../lib/contracts'
 import { unitLabel } from '../lib/units'
 
 interface Inv {
-  id: string; invoice_number: string; supplier_invoice_number: string; supplier_id: string; po_id: string | null
+  id: string; kind: string; department_id: string | null; project_id: string | null; invoice_number: string; supplier_invoice_number: string; supplier_id: string; po_id: string | null
   invoice_date: string; due_date: string | null; tax_rate: number; subtotal: number; tax_amount: number; total_amount: number; document_total: number | null
   status: InvoiceStatus; match_status: string; decision_note: string | null; paid_at: string | null; payment_reference: string | null
   notes: string | null; created_by: string | null; approved_by: string | null; approved_at: string | null; created_at: string
-  suppliers: { id: string; name: string } | null; purchase_orders: { id: string; po_number: string; total_amount: number | null } | null
+  suppliers: { id: string; name: string } | null; purchase_orders: { id: string; po_number: string; total_amount: number | null; department_id: string | null; project_id: string | null } | null
 }
 interface Line { id: string; po_line_id: string | null; position: number; name: string; quantity: number; unit: string | null; unit_price: number; line_total: number; tax_rate: number }
 interface Doc { id: string; file_name: string; file_path: string; file_size: number | null; created_at: string }
@@ -54,11 +56,12 @@ export default function InvoiceDetailPage() {
   const [docs, setDocs] = useState<Doc[]>([])
   const [activity, setActivity] = useState<Act[]>([])
   const [steps, setSteps] = useState<Step[]>([])
+  const [projectName, setProjectName] = useState('')
   const [names, setNames] = useState<Record<string, string>>({})
   const [match, setMatch] = useState<MatchData | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [dialog, setDialog] = useState<null | 'approve' | 'reject' | 'pay' | 'delete'>(null)
+  const [dialog, setDialog] = useState<null | 'approve' | 'reject' | 'pay' | 'delete' | 'revoke'>(null)
   const [removeDocRow, setRemoveDocRow] = useState<Doc | null>(null)
   const [note, setNote] = useState('')
   const [paidAt, setPaidAt] = useState(today)
@@ -72,7 +75,7 @@ export default function InvoiceDetailPage() {
   async function load() {
     if (!company || !id) return
     const [{ data: i }, { data: ls }, { data: ds }, { data: ac }, { data: st }] = await Promise.all([
-      supabase.from('invoices').select('*, suppliers(id, name), purchase_orders(id, po_number, total_amount)').eq('id', id).single(),
+      supabase.from('invoices').select('*, suppliers(id, name), purchase_orders(id, po_number, total_amount, department_id, project_id)').eq('id', id).single(),
       supabase.from('invoice_line_items').select('*').eq('invoice_id', id).order('position'),
       supabase.from('invoice_attachments').select('*').eq('invoice_id', id).order('created_at', { ascending: false }),
       supabase.from('invoice_activity').select('*').eq('invoice_id', id).order('created_at', { ascending: false }),
@@ -84,6 +87,8 @@ export default function InvoiceDetailPage() {
     setDocs((ds as Doc[]) ?? [])
     setActivity((ac as Act[]) ?? [])
     setSteps((st as Step[]) ?? [])
+    const pid = (i as { project_id: string | null; purchase_orders: { project_id: string | null } | null }).project_id ?? (i as { purchase_orders: { project_id: string | null } | null }).purchase_orders?.project_id ?? null
+    if (pid) { const { data: pr } = await supabase.from('projects').select('name, project_code').eq('id', pid).single(); setProjectName(pr ? `${pr.project_code ? pr.project_code + ' · ' : ''}${pr.name}` : '') } else setProjectName('')
     const ids = [...new Set([i.created_by, i.approved_by, ...(ac ?? []).map(a => a.actor_id), ...(st ?? []).flatMap(x => [x.approver_id, x.decided_by])].filter(Boolean))] as string[]
     if (ids.length) {
       const { data: us } = await supabase.from('users').select('id, first_name, last_name').in('id', ids)
@@ -100,6 +105,13 @@ export default function InvoiceDetailPage() {
     hasPo: !!inv.po_id, lines: invLines, poLines: match?.poLines ?? [], received: match?.received ?? new Map(), invoicedElsewhere: match?.invoicedElsewhere ?? new Map(),
     totalAmount: Number(inv.total_amount), documentTotal: inv.document_total != null ? Number(inv.document_total) : null,
   }) : null, [inv, invLines, match])
+
+  // the stored match (the list and the approval rule use it) follows what the receipts say now
+  useEffect(() => {
+    if (!inv || !result || !['draft', 'in_review', 'rejected'].includes(inv.status) || result.status === inv.match_status) return
+    const notes = result.issues.filter(i => i.severity === 'error').map(i => i.code).join(',') || null
+    supabase.rpc('refresh_invoice_match', { p_invoice_id: inv.id, p_status: result.status, p_notes: notes }).then(() => {})
+  }, [inv?.id, inv?.status, result?.status])
 
   if (loading || !inv || !result) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
 
@@ -147,10 +159,6 @@ export default function InvoiceDetailPage() {
     }
     setUploading(false); if (fileRef.current) fileRef.current.value = ''; load()
   }
-  async function openDoc(d: Doc) {
-    const { data } = await supabase.storage.from('quotations').createSignedUrl(d.file_path, 3600)
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
-  }
   async function removeDoc(d: Doc) {
     await supabase.storage.from('quotations').remove([d.file_path])
     await supabase.from('invoice_attachments').delete().eq('id', d.id)
@@ -161,7 +169,9 @@ export default function InvoiceDetailPage() {
   const currentStep = steps.filter(x => x.status === 'pending')[0]
   const isOwn = !!profile && inv.created_by === profile.id && !isAdmin
   const canApprove = !isOwn && (currentStep ? (isAdmin || currentStep.approver_id === profile?.id) : canApprovePerm)
-  const needNote = dialog === 'reject' || (dialog === 'approve' && result.status === 'mismatch')
+  const canRevoke = inv.status === 'approved' && (isAdmin || inv.approved_by === profile?.id)
+  const isCredit = inv.kind === 'credit_note'
+  const needNote = dialog === 'revoke' || dialog === 'reject' || (dialog === 'approve' && result.status === 'mismatch')
   const isOpenForEdit = inv.status === 'draft' || inv.status === 'rejected'
 
   const actionButtons = (
@@ -176,8 +186,9 @@ export default function InvoiceDetailPage() {
         <Button onClick={() => { setNote(''); setDialog('approve') }}>{s.approve}</Button>
       </>}
       {inv.status === 'in_review' && canEdit && !canApprove && <Button variant="secondary" loading={busy} onClick={() => rpc('draft')}>{s.recall}</Button>}
-      {inv.status === 'approved' && canPay && <Button onClick={() => { setPaidErr(''); setDialog('pay') }}>{s.markPaid}</Button>}
-      {inv.status === 'paid' && isAdmin && <Button variant="secondary" loading={busy} onClick={() => rpc('approved')}>{s.undoPaid}</Button>}
+      {inv.status === 'approved' && canRevoke && <Button variant="secondary" onClick={() => { setNote(''); setDialog('revoke') }}>{s.revoke}</Button>}
+      {inv.status === 'approved' && canPay && <Button onClick={() => { setPaidErr(''); setDialog('pay') }}>{isCredit ? s.markSettled : s.markPaid}</Button>}
+      {inv.status === 'paid' && isAdmin && <Button variant="secondary" loading={busy} onClick={() => rpc('approved')}>{isCredit ? s.undoSettled : s.undoPaid}</Button>}
     </>
   )
 
@@ -197,7 +208,8 @@ export default function InvoiceDetailPage() {
         <div className="min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-xl font-semibold text-ink tracking-tight">{inv.supplier_invoice_number}</h1>
-            <span className={`badge ${INVOICE_BADGE[inv.status]}`}>{s.st[inv.status]}</span>
+            {isCredit && <span className="badge badge-neutral">{s.creditNote}</span>}
+            <span className={`badge ${INVOICE_BADGE[inv.status]}`}>{statusLabel(s.st, s.stSettled, inv)}</span>
             <span className={`badge ${MATCH_BADGE[result.status]}`}>{s.matchSt[result.status]}</span>
           </div>
           <p className="mt-2 text-sm text-ink2">{inv.invoice_number} · {inv.suppliers?.name} · {fmtDate(inv.invoice_date)}</p>
@@ -263,25 +275,15 @@ export default function InvoiceDetailPage() {
                 <Button variant="secondary" loading={uploading} onClick={() => fileRef.current?.click()} className="!h-8 text-[13px] gap-1.5"><Upload className="w-3.5 h-3.5" />{s.upload}</Button>
               </>
             ) : undefined}>
-            <div className="p-4 pb-0"><DocumentPreview docs={docs.map(d => ({ key: d.id, name: d.file_name, path: d.file_path }))} height={460} /></div>
-            {docs.length === 0 ? null : (
-              <ul className="p-4 flex flex-col gap-2">
-                {docs.map(d => (
-                  <li key={d.id} className="flex items-center gap-2.5 px-3 py-2 bg-surface rounded-lg">
-                    <FileText className="w-4 h-4 text-icon shrink-0" strokeWidth={1.75} />
-                    <button type="button" onClick={() => openDoc(d)} className="flex-1 min-w-0 text-left text-sm font-medium text-ink truncate hover:text-primary transition-colors">{d.file_name}</button>
-                    <button type="button" onClick={() => openDoc(d)} aria-label={s.viewDoc} className="text-icon hover:text-ink transition-colors"><Eye className="w-4 h-4" strokeWidth={1.75} /></button>
-                    {canEdit && <button type="button" onClick={() => setRemoveDocRow(d)} aria-label={t.common.deleteEntity} className="text-icon hover:text-danger transition-colors"><Trash2 className="w-4 h-4" strokeWidth={1.75} /></button>}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <div className="p-4 pb-0"><DocumentPreview docs={docs.map(d => ({ key: d.id, name: d.file_name, path: d.file_path }))} height="max(640px, calc(100vh - 240px))"
+              onRemove={canEdit && isOpenForEdit ? key => setRemoveDocRow(docs.find(d => d.id === key) ?? null) : undefined} /></div>
           </Card>
 
 
           <Card title={s.invoiceDetails}>
             <div className="p-5 grid grid-cols-2 gap-x-6 gap-y-5">
               <div className="col-span-2"><Field label={s.supplier}>{inv.suppliers?.name}</Field></div>
+              {projectName && <div className="col-span-2"><Field label={t.projects.project}>{projectName}</Field></div>}
               <Field label={s.orderLink}>{inv.purchase_orders && <Link to={`/purchase-orders/${inv.purchase_orders.id}`} className="font-medium hover:underline">{inv.purchase_orders.po_number}</Link>}</Field>
               <Field label={s.createdBy}>{inv.created_by && names[inv.created_by] ? <PersonCell name={names[inv.created_by]} /> : null}</Field>
             </div>
@@ -328,6 +330,18 @@ export default function InvoiceDetailPage() {
             </Card>
           )}
 
+          {(inv.project_id ?? inv.purchase_orders?.project_id ?? inv.department_id ?? inv.purchase_orders?.department_id) && (
+            <Card title={s.budgetOfInvoice}>
+              <div className="p-5">
+                {(() => {
+                  const add = inv.status === 'approved' || inv.status === 'paid' || isCredit ? 0 : inv.purchase_orders ? Math.max(0, Number(inv.subtotal) - Number(inv.purchase_orders.total_amount ?? 0)) : Number(inv.subtotal)
+                  const pid = inv.project_id ?? inv.purchase_orders?.project_id
+                  return pid ? <ProjectBudgetStatus projectId={pid} amount={add} /> : <BudgetStatus departmentId={(inv.department_id ?? inv.purchase_orders?.department_id) as string} amount={add} />
+                })()}
+              </div>
+            </Card>
+          )}
+
           <Card title={s.amountsCard}>
             <div className="p-5 text-sm flex flex-col gap-2">
               <div className="flex justify-between"><span className="text-ink2">{s.subtotal}</span><span className="tabular-nums text-ink">{money(Number(inv.subtotal))}</span></div>
@@ -363,6 +377,17 @@ export default function InvoiceDetailPage() {
           )}
         </div>
       </div>
+
+      {/* take the approval back (note) */}
+      <Modal open={dialog === 'revoke'} onClose={() => setDialog(null)} title={s.revoke} size="sm" icon={Check}>
+        <p className="text-sm text-ink2 mb-3">{s.revokeHint}</p>
+        <textarea rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder={s.decisionNote}
+          className="w-full rounded-lg border border-field px-3 py-2 hover:border-field-hover text-sm focus:outline-none focus:border-field-focus resize-none" />
+        <ModalActions className="justify-end">
+          <Button variant="secondary" onClick={() => setDialog(null)}>{t.common.cancel}</Button>
+          <Button loading={busy} disabled={note.trim() === ''} onClick={() => rpc('in_review', { note })}>{s.revoke}</Button>
+        </ModalActions>
+      </Modal>
 
       {/* approve / reject (note) */}
       <Modal open={dialog === 'approve' || dialog === 'reject'} onClose={() => setDialog(null)} title={dialog === 'reject' ? s.reject : s.approve} size="sm" icon={Check}>

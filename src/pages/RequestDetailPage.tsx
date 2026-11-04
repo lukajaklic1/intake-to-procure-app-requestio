@@ -13,6 +13,7 @@ import { format } from 'date-fns'
 import type { Request, RequestLineItem, RequestStatus, Approval, ActivityLog } from '../types/database'
 import ModalActions from '../components/ui/ModalActions'
 import PersonCell from '../components/ui/PersonCell'
+import ProjectBudgetStatus from '../components/budget/ProjectBudgetStatus'
 import BudgetStatus from '../components/budget/BudgetStatus'
 import { Card } from '../components/ui/DetailCard'
 import GridHead from '../components/ui/GridHead'
@@ -31,6 +32,7 @@ type ReqFull = Request & {
   suppliers: { name: string } | null
   locations: { name: string } | null
   departments: { name: string } | null
+  projects?: { name: string; project_code: string | null } | null
 }
 
 /** A titled box of the page. */
@@ -79,7 +81,7 @@ export default function RequestDetailPage() {
     // spinner only on the first load: later reloads refresh the data in place
     const { data } = await supabase
       .from('requests')
-      .select('*, suppliers(name), locations(name), departments(name)')
+      .select('*, suppliers(name), locations(name), departments(name), projects(name, project_code)')
       .eq('id', id!).single()
     if (!data) { toast.error(t.common.notFound); navigate('/requests'); return }
     setReq(data as unknown as ReqFull)
@@ -364,6 +366,7 @@ export default function RequestDetailPage() {
               <div className="col-span-2"><Field label={s.supplier}>{req.suppliers?.name ?? req.supplier_name}</Field></div>
               <Field label={s.location}>{req.locations?.name}</Field>
               <Field label={s.department}>{req.departments?.name}</Field>
+              <Field label={t.projects.project}>{req.projects ? `${req.projects.project_code ? req.projects.project_code + ' · ' : ''}${req.projects.name}` : t.projects.noProject}</Field>
               <Field label={s.neededBy}>{req.needed_by_date ? format(new Date(req.needed_by_date), 'dd.MM.yyyy') : null}</Field>
               <Field label={s.requestedBy}>{names[req.created_by] && <PersonCell name={names[req.created_by]} />}</Field>
               <Field label={s.approver}>{req.approver_id && names[req.approver_id] ? <PersonCell name={names[req.approver_id]} /> : null}</Field>
@@ -371,13 +374,15 @@ export default function RequestDetailPage() {
             </div>
           </Card>
 
-          {req.department_id && !req.po_id && st !== 'cancelled' && (
+          {(req.project_id || req.department_id) && !req.po_id && st !== 'cancelled' && (
             <Card title={t.budgets.title}>
               <div className="p-5">
                 {/* a pending or approved request is already part of the usage; a draft or rejected one is shown as if it were sent */}
-                <BudgetStatus departmentId={req.department_id}
-                  amount={st === 'draft' || st === 'rejected' ? req.total_estimate : 0}
-                  byCategory={st === 'draft' || st === 'rejected' ? budgetByCategory : {}} />
+                {req.project_id
+                  ? <ProjectBudgetStatus projectId={req.project_id} amount={st === 'draft' || st === 'rejected' ? req.total_estimate : 0} />
+                  : <BudgetStatus departmentId={req.department_id as string}
+                      amount={st === 'draft' || st === 'rejected' ? req.total_estimate : 0}
+                      byCategory={st === 'draft' || st === 'rejected' ? budgetByCategory : {}} />}
               </div>
             </Card>
           )}

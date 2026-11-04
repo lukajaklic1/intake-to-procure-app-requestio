@@ -96,6 +96,7 @@ export interface Project {
   status: 'active' | 'inactive'
   budget_amount: number | null
   manager_id: string | null
+  description?: string | null
   created_at: string
   updated_at: string
 }

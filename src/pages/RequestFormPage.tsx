@@ -12,6 +12,7 @@ import Select from '../components/ui/Select'
 import GridHead from '../components/ui/GridHead'
 import { categoryScope, mainCategoryId } from '../lib/categories'
 import CatalogPicker from '../components/ui/CatalogPicker'
+import ProjectBudgetStatus from '../components/budget/ProjectBudgetStatus'
 import BudgetStatus from '../components/budget/BudgetStatus'
 import LineCategoryCells from '../components/ui/LineCategoryCells'
 import Modal from '../components/ui/Modal'
@@ -42,11 +43,12 @@ interface Header {
   supplier_name: string
   location_id: string
   department_id: string
+  project_id: string
   needed_by_date: string
   note: string
 }
 
-const EMPTY: Header = { title: '', supplier_id: '', supplier_name: '', location_id: '', department_id: '', needed_by_date: '', note: '' }
+const EMPTY: Header = { title: '', supplier_id: '', supplier_name: '', location_id: '', department_id: '', project_id: '', needed_by_date: '', note: '' }
 function newLine(position: number): Line { return { position, item_id: null, category_id: '', name: '', long_description: '', quantity: '1', unit: 'kos', est_unit_price: '0' } }
 
 export default function RequestFormPage() {
@@ -76,6 +78,7 @@ export default function RequestFormPage() {
   const [categories, setCategories] = useState<{ id: string; name: string; parent_id: string | null; status: 'active' | 'inactive' }[]>([])
   const [locations, setLocations] = useState<{ id: string; name: string; address_street: string | null; address_city: string | null; address_postal_code: string | null }[]>([])
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([])
+  const [projects, setProjects] = useState<{ id: string; name: string; project_code: string | null }[]>([])
   const [items, setItems] = useState<Item[]>([])
 
   useEffect(() => { if (company) loadRefs() }, [company])
@@ -84,6 +87,7 @@ export default function RequestFormPage() {
   async function loadRefs() {
     if (!company) return
     const cid = company.id
+    supabase.from('projects').select('id, name, project_code').eq('company_id', cid).eq('status', 'active').order('created_at', { ascending: false }).then(({ data }) => setProjects(data ?? []))
     const [sup, c, l, d, itm] = await Promise.all([
       supabase.from('suppliers').select('id, name').eq('company_id', cid).eq('status', 'active').order('name'),
       supabase.from('categories').select('id, name, parent_id, status').eq('company_id', cid).order('name'),
@@ -116,7 +120,7 @@ export default function RequestFormPage() {
     setReqStatus(req.status)
     setHeader({
       supplier_id: req.supplier_id ?? '', supplier_name: req.supplier_name ?? '',
-      location_id: req.location_id ?? '', department_id: req.department_id ?? '',
+      location_id: req.location_id ?? '', department_id: req.department_id ?? '', project_id: req.project_id ?? '',
       title: req.title ?? '', needed_by_date: req.needed_by_date ?? '', note: req.note ?? '',
     })
     setDiscount(String(req.discount_amount ?? 0))
@@ -206,6 +210,7 @@ export default function RequestFormPage() {
       supplier_name: header.supplier_name.trim() || null,
       location_id: header.location_id || null,
       department_id: header.department_id || null,
+      project_id: header.project_id || null,
       needed_by_date: header.needed_by_date || null,
       note: header.note.trim() || null,
       discount_amount: discountAmount,
@@ -305,6 +310,11 @@ export default function RequestFormPage() {
               <Select id="r-department" label={s.department} required value={header.department_id} placeholder={t.common.select} error={titleReq.errors.department}
                 options={departments.map(d => ({ value: d.id, label: d.name }))}
                 onChange={v => { titleReq.clear('department'); setHeader(h => ({ ...h, department_id: v })) }} />
+              <div>
+                <Select id="r-project" label={t.projects.project} value={header.project_id} placeholder={t.projects.noProject}
+                  options={[{ value: '', label: t.projects.noProject }, ...projects.map(p => ({ value: p.id, label: `${p.project_code ? p.project_code + ' · ' : ''}${p.name}` }))]}
+                  onChange={v => setHeader(h => ({ ...h, project_id: v }))} />
+              </div>
               <Input id="r-needed" label={s.neededBy} type="date" value={header.needed_by_date} onChange={e => setHeader(h => ({ ...h, needed_by_date: e.target.value }))} />
               <div className="sm:col-span-2 lg:col-span-4 flex flex-col gap-1">
                 <label htmlFor="r-note" className="text-sm font-medium text-gray-700">{s.note}</label>
@@ -315,7 +325,9 @@ export default function RequestFormPage() {
             {approverName && (
               <p className="mt-4 text-[13px] text-ink2">{s.goesTo} <span className="font-medium text-ink">{approverName}</span></p>
             )}
-            {header.department_id && (
+            {header.project_id ? (
+              <ProjectBudgetStatus className="mt-5 pt-4 border-t border-field" projectId={header.project_id} amount={grandTotal} excludeRequestId={id} />
+            ) : header.department_id && (
               <BudgetStatus className="mt-5 pt-4 border-t border-field" departmentId={header.department_id} amount={grandTotal} byCategory={budgetByCategory} excludeRequestId={id} />
             )}
           </div>

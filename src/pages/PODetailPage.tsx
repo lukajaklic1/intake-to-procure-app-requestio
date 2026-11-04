@@ -12,6 +12,7 @@ import { format } from 'date-fns'
 import type { PoActivityLog } from '../types/database'
 import { localizeCountry } from '../lib/countries'
 import GridHead from '../components/ui/GridHead'
+import ProjectBudgetStatus from '../components/budget/ProjectBudgetStatus'
 import BudgetStatus from '../components/budget/BudgetStatus'
 import { unitLabel } from '../lib/units'
 import { INVOICE_BADGE, type InvoiceStatus } from '../lib/invoices'
@@ -38,6 +39,8 @@ interface POFull {
   suppliers: { name: string; email: string | null; address_street: string | null; address_city: string | null; address_postal_code: string | null; address_country: string | null; vat_number: string | null }
   locations: { name: string; address_street: string | null; address_city: string | null; address_postal_code: string | null }
   departments: { name: string } | null
+  project_id: string | null
+  projects?: { name: string; project_code: string | null } | null
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -99,7 +102,7 @@ export default function PODetailPage() {
     // spinner only on the first load: later reloads refresh the data in place
     const { data } = await supabase
       .from('purchase_orders')
-      .select('*, contracts(id, title, contract_number), suppliers(name,email,address_street,address_city,address_postal_code,address_country,vat_number), locations(name,address_street,address_city,address_postal_code), departments(name)')
+      .select('*, contracts(id, title, contract_number), suppliers(name,email,address_street,address_city,address_postal_code,address_country,vat_number), locations(name,address_street,address_city,address_postal_code), departments(name), projects(name, project_code)')
       .eq('id', id!)
       .single()
     setPo(data as unknown as POFull)
@@ -363,11 +366,13 @@ export default function PODetailPage() {
             </div>
           </Card>
 
-          {po.department_id && po.status !== 'cancelled' && (
+          {(po.project_id || po.department_id) && po.status !== 'cancelled' && (
             <Card title={t.budgets.title}>
               <div className="p-5">
                 {/* an issued, sent or closed order is already part of the usage; a draft is shown as if it were issued */}
-                <BudgetStatus departmentId={po.department_id} amount={po.status === 'draft' ? po.total_amount : 0} />
+                {po.project_id
+                  ? <ProjectBudgetStatus projectId={po.project_id} amount={po.status === 'draft' ? po.total_amount : 0} />
+                  : <BudgetStatus departmentId={po.department_id as string} amount={po.status === 'draft' ? po.total_amount : 0} />}
               </div>
             </Card>
           )}
@@ -375,6 +380,7 @@ export default function PODetailPage() {
           <Card title={s.orderDetails}>
             <div className="p-5 grid grid-cols-2 gap-x-6 gap-y-5">
               <Field label={s.department}>{po.departments?.name}</Field>
+              <Field label={t.projects.project}>{po.projects ? `${po.projects.project_code ? po.projects.project_code + ' · ' : ''}${po.projects.name}` : t.projects.noProject}</Field>
               <Field label={s.incoterm}>{po.incoterm}</Field>
               <div className="col-span-2"><Field label={s.paymentTermsLabel}>{po.payment_terms}</Field></div>
               {contract && <div className="col-span-2"><Field label={t.contracts.linkedContract}>{contract.contract_number} · {contract.title}</Field></div>}

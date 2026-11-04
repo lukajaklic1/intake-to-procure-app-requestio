@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, Search, X, ClipboardList, IdCard, Wallet, MapPin, User, UserCheck, CalendarClock, Coins, MessageSquare, Eye } from 'lucide-react'
+import { CheckCircle2, Search, X, ClipboardList, IdCard, Wallet, MapPin, User, UserCheck, CalendarClock, Coins, MessageSquare, Eye, ReceiptText, Building2, FileText, Scale } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCompany } from '../hooks/useCompany'
 import { useLanguage } from '../hooks/useLanguage'
 import Pagination from '../components/ui/Pagination'
 import PageToolbar from '../components/layout/PageToolbar'
-import { useHeaderCounts } from '../components/layout/HeaderCounts'
+import { useHeaderCounts, useHeaderTabs } from '../components/layout/HeaderCounts'
 import FilterSelect from '../components/ui/FilterSelect'
 import TableEmptyState from '../components/ui/TableEmptyState'
 import { format, subMonths, startOfMonth } from 'date-fns'
@@ -20,8 +20,7 @@ import ExportButton from '../components/ui/ExportButton'
 import type { ExportColumn } from '../lib/exportExcel'
 import { loadBudgetUsage, usageOf, usedPercent } from '../lib/budget'
 import { UsedBar } from './BudgetsPage'
-import { Card } from '../components/ui/DetailCard'
-import { invoicesToDecide } from '../lib/invoices'
+import { invoicesToDecide, MATCH_BADGE } from '../lib/invoices'
 
 interface Row {
   id: string
@@ -34,6 +33,13 @@ interface Row {
   created_by: string
   approver_id: string | null
   locations: { name: string } | null
+}
+
+interface InvRow {
+  id: string; created_at: string; invoice_number: string; supplier_invoice_number: string; total_amount: number; due_date: string | null
+  match_status: string; created_by: string | null
+  suppliers: { name: string } | null; purchase_orders: { po_number: string } | null
+  invoice_approvals: { step: number; approver_id: string; status: string }[]
 }
 
 function fmt(n: number, currency = 'EUR') {
@@ -70,14 +76,19 @@ export default function ApprovalsPage() {
   const [budgetPct, setBudgetPct] = useState<Record<string, number>>({})
   useEffect(() => { if (company && profile) { load(); loadRefs(); loadInvoices() } }, [company, profile, isAdmin])
 
-  // the invoices that wait for this person: next to the requests
-  const [invoiceRows, setInvoiceRows] = useState<{ id: string; invoice_number: string; supplier_invoice_number: string; total_amount: number; due_date: string | null; suppliers: { name: string } | null }[]>([])
+  // the invoices that wait for this person: a second tab next to the requests
+  const [invoiceRows, setInvoiceRows] = useState<InvRow[]>([])
+  const [tabState, setTabState] = useState<'requests' | 'invoices' | null>(null)
+  const [invSearch, setInvSearch] = useState('')
+  const [invSort, setInvSort] = useState('due')
   async function loadInvoices() {
     if (!company || !profile) return
     const ids = await invoicesToDecide(company.id, profile.id, isAdmin, hasPerm('invoices', 'approve'))
     if (ids.length === 0) { setInvoiceRows([]); return }
-    const { data } = await supabase.from('invoices').select('id, invoice_number, supplier_invoice_number, total_amount, due_date, suppliers(name)').in('id', ids).order('due_date', { ascending: true, nullsFirst: false })
-    setInvoiceRows((data as unknown as typeof invoiceRows) ?? [])
+    const { data } = await supabase.from('invoices')
+      .select('id, created_at, invoice_number, supplier_invoice_number, total_amount, due_date, match_status, created_by, suppliers(name), purchase_orders(po_number), invoice_approvals(step, approver_id, status)')
+      .in('id', ids)
+    setInvoiceRows((data as unknown as InvRow[]) ?? [])
   }
 
   async function loadRefs() {
@@ -160,26 +171,35 @@ export default function ApprovalsPage() {
 
   useHeaderCounts(loading ? [] : [{ value: filtered.length }])
 
+  // which tab is open: the one that has something to decide, unless one was chosen
+  const tab = tabState ?? (!loading && rows.length === 0 && invoiceRows.length > 0 ? 'invoices' : 'requests')
+  useHeaderTabs([
+    { id: 'requests', label: s.title, count: rows.length, active: tab === 'requests' },
+    { id: 'invoices', label: t.invoices.title, count: invoiceRows.length, active: tab === 'invoices' },
+  ], id => { setTabState(id as 'requests' | 'invoices'); setPage(1) })
+  const nameOf = (id: string | null | undefined) => (id ? names[id] ?? (members.find(m => m.id === id) ? `${members.find(m => m.id === id)!.first_name} ${members.find(m => m.id === id)!.last_name}` : undefined) : undefined)
+  const invSortDefs: SortDef<InvRow>[] = [
+    { value: 'due', label: t.sort.dueDate, cmp: dateLast(r => r.due_date) },
+    { value: 'newest', label: t.sort.newest, cmp: rev(date(r => r.created_at)) },
+    { value: 'amountDesc', label: t.sort.amountDesc, cmp: rev(num(r => r.total_amount)) },
+    { value: 'amountAsc', label: t.sort.amountAsc, cmp: num(r => r.total_amount) },
+  ]
+  const invFiltered = invoiceRows.filter(r => matchesSearch(invSearch, [r.supplier_invoice_number, r.invoice_number, r.suppliers?.name, r.purchase_orders?.po_number]))
+  const invSorted = applySort(invFiltered, invSortDefs, invSort)
+  const invPaged = invSorted.slice((page - 1) * pageSize, page * pageSize)
+  const currentApprover = (r: InvRow) => r.invoice_approvals.filter(x => x.status === 'pending').sort((x, y) => x.step - y.step)[0]?.approver_id ?? null
+  const invExportCols: ExportColumn<InvRow>[] = [
+    { header: t.invoices.invoiceNo, get: r => r.invoice_number, kind: 'text', width: 14 },
+    { header: t.invoices.supplierInvoiceNo, get: r => r.supplier_invoice_number, kind: 'text', width: 20 },
+    { header: t.invoices.supplier, get: r => r.suppliers?.name, kind: 'text', width: 32 },
+    { header: t.invoices.po, get: r => r.purchase_orders?.po_number, kind: 'text', width: 14 },
+    { header: t.invoices.dueDate, get: r => r.due_date, kind: 'date', width: 14 },
+    { header: t.invoices.amount, get: r => r.total_amount, kind: 'money', width: 14 },
+  ]
+
   return (
     <div className="p-4 lg:p-6">
-      {invoiceRows.length > 0 && (
-        <Card tall title={t.invoices.toApproveTitle} className="overflow-hidden mb-5">
-          <div className="overflow-x-auto"><table className="table-grid w-full text-sm min-w-[560px]">
-            <tbody className="divide-y divide-field">
-              {invoiceRows.map(r => (
-                <tr key={r.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/invoices/${r.id}`)}>
-                  <td className="px-4 py-3 font-medium text-ink whitespace-nowrap">{r.supplier_invoice_number}</td>
-                  <td className="px-4 py-3 text-ink2 max-w-[260px] truncate">{r.suppliers?.name ?? '-'}</td>
-                  <td className="px-4 py-3 text-ink2 whitespace-nowrap">{r.due_date ? format(new Date(r.due_date + 'T00:00:00'), 'dd.MM.yyyy') : '-'}</td>
-                  <td className="px-4 py-3 text-right text-ink whitespace-nowrap tabular-nums">{fmt(Number(r.total_amount), company?.currency)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table></div>
-        </Card>
-      )}
-
-      {rows.length > 0 && (
+      {tab === 'requests' && rows.length > 0 && (
       <PageToolbar attached actions={<ExportButton fileName="potrditve" columns={exportCols} rows={sortedRows} />}>
             <div className="relative min-w-40 flex-1 max-w-[220px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
@@ -208,7 +228,7 @@ export default function ApprovalsPage() {
       </PageToolbar>
       )}
 
-      {!(!loading && rows.length === 0 && invoiceRows.length > 0) && (
+      {tab === 'requests' && (
       <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
         {loading ? (
           <div data-empty className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
@@ -241,6 +261,51 @@ export default function ApprovalsPage() {
         )}
         <Pagination total={filtered.length} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={handlePageSizeChange} />
       </div>
+      )}
+
+      {tab === 'invoices' && (
+        <>
+          {invoiceRows.length > 0 && (
+            <PageToolbar attached actions={<ExportButton fileName="potrditve-racuni" columns={invExportCols} rows={invSorted} />}>
+              <div className="relative min-w-40 flex-1 max-w-[220px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-filter-label" />
+                <input value={invSearch} onChange={e => { setInvSearch(e.target.value); setPage(1) }} placeholder={t.common.search + '…'}
+                  className="w-full pl-9 pr-3 h-9 text-sm border border-field rounded-lg hover:border-field-hover focus:outline-none focus:border-field-hover bg-white text-ink placeholder:text-filter-label" />
+              </div>
+              <SortFilter defs={invSortDefs} value={invSort} onChange={v => { setInvSort(v); setPage(1) }} />
+            </PageToolbar>
+          )}
+          <div className="data-card table-bleed table-grid bg-white rounded-lg border border-field overflow-hidden">
+            <div className="overflow-x-auto"><table className="w-full text-sm min-w-[1180px]">
+              <GridHead cols={[[t.invoices.invoiceNo, IdCard], [t.invoices.supplierInvoiceNo, ReceiptText], [t.invoices.supplier, Building2], [t.invoices.po, FileText], [t.invoices.match, Scale], [t.invoices.enteredBy, User], ...(isAdmin ? [[t.invoices.approverCol, UserCheck]] as GridCol[] : []), [t.invoices.dueDate, CalendarClock], [t.invoices.amount, Coins, 'right'], ['']]} />
+              <tbody className="divide-y divide-field">
+                {invFiltered.length === 0 ? (
+                  <TableEmptyState icon={CheckCircle2} colSpan={isAdmin ? 10 : 9}
+                    title={invSearch ? t.common.empty.noResults.title : t.invoices.noToApprove}
+                    subtitle={invSearch ? t.common.empty.noResults.text : t.invoices.noToApproveText} />
+                ) : invPaged.map(r => (
+                  <tr key={r.id} className="hover:bg-surface transition-colors cursor-pointer" onClick={() => navigate(`/invoices/${r.id}`, { state: { from: '/approvals' } })}>
+                    <td className="px-4 py-3 text-ink2 whitespace-nowrap">{r.invoice_number}</td>
+                    <td className="px-4 py-3 font-medium text-ink whitespace-nowrap">{r.supplier_invoice_number}</td>
+                    <td className="px-4 py-3 text-ink2 max-w-[260px] truncate" title={r.suppliers?.name}>{r.suppliers?.name ?? '-'}</td>
+                    <td className="px-4 py-3 text-ink2 whitespace-nowrap">{r.purchase_orders?.po_number ?? '-'}</td>
+                    <td className="px-4 py-3"><span className={`badge ${MATCH_BADGE[r.match_status] ?? 'badge-neutral'}`}>{t.invoices.matchSt[r.match_status as keyof typeof t.invoices.matchSt] ?? r.match_status}</span></td>
+                    <td className="px-4 py-3"><PersonCell name={nameOf(r.created_by)} /></td>
+                    {isAdmin && <td className="px-4 py-3"><PersonCell name={nameOf(currentApprover(r))} /></td>}
+                    <td className="px-4 py-3 text-ink whitespace-nowrap">{r.due_date ? format(new Date(r.due_date + 'T00:00:00'), 'dd.MM.yyyy') : '-'}</td>
+                    <td className="px-4 py-3 text-right text-ink whitespace-nowrap tabular-nums">{fmt(Number(r.total_amount), company?.currency)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end" onClick={e => e.stopPropagation()}>
+                        <RowMenu items={[{ label: a.review, icon: Eye, onClick: () => navigate(`/invoices/${r.id}`, { state: { from: '/approvals' } }) }]} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>
+            <Pagination total={invFiltered.length} page={page} pageSize={pageSize} onChange={setPage} onPageSizeChange={handlePageSizeChange} />
+          </div>
+        </>
       )}
     </div>
   )

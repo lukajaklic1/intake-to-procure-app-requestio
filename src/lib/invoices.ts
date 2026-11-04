@@ -38,3 +38,7 @@ export async function invoicesToDecide(companyId: string, me: string, isAdmin: b
   }
   return out
 }
+
+/** The status text of an invoice: a credit note that is paid is "settled" (set off), not paid. */
+export const statusLabel = (st: Record<string, string>, stSettled: string, inv: { status: string; kind?: string }) =>
+  inv.kind === 'credit_note' && inv.status === 'paid' ? stSettled : st[inv.status]

@@ -20,6 +20,8 @@ import ContractDetailPage from './pages/ContractDetailPage'
 import CatalogPage from './pages/CatalogPage'
 import LocationsPage from './pages/LocationsPage'
 import DepartmentsPage from './pages/DepartmentsPage'
+import ProjectsPage from './pages/ProjectsPage'
+import ProjectDetailPage from './pages/ProjectDetailPage'
 import PurchaseOrdersPage from './pages/PurchaseOrdersPage'
 import POFormPage from './pages/POFormPage'
 import PODetailPage from './pages/PODetailPage'
@@ -86,6 +88,8 @@ export default function Root() {
             <Route path="/catalog"                element={<App><CatalogPage /></App>} />
             <Route path="/locations"              element={<App><LocationsPage /></App>} />
             <Route path="/departments"            element={<App><DepartmentsPage /></App>} />
+            <Route path="/projects"               element={<App><ProjectsPage /></App>} />
+            <Route path="/projects/:id"           element={<App><ProjectDetailPage /></App>} />
             <Route path="/requests"               element={<App><RequestsPage /></App>} />
             <Route path="/requests/new"           element={<App><RequestFormPage /></App>} />
             <Route path="/requests/:id"           element={<App><RequestDetailPage /></App>} />
